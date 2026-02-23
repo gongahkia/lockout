@@ -2,7 +2,7 @@ import Foundation
 import CloudKit
 
 public final class CloudKitSyncService {
-    private let db = CKContainer(identifier: "iCloud.com.yourapp.lookaway").privateCloudDatabase
+    private let db = CKContainer(identifier: "iCloud.com.yourapp.lockout").privateCloudDatabase
     private static let lastSyncKey = "ck_last_sync_date"
 
     public init() {}

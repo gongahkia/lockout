@@ -70,7 +70,7 @@ final class iOSAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationC
     }
 
     // MARK: - Background task
-    private static let bgIdentifier = "com.yourapp.lookaway.refresh"
+    private static let bgIdentifier = "com.yourapp.lockout.refresh"
 
     private func registerBackgroundTask() {
         BGTaskScheduler.shared.register(forTaskWithIdentifier: Self.bgIdentifier, using: nil) { [weak self] task in

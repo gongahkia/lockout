@@ -50,7 +50,7 @@ struct StatisticsView: View {
     private func exportCSV() {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.commaSeparatedText]
-        panel.nameFieldStringValue = "lookaway-stats.csv"
+        panel.nameFieldStringValue = "lockout-stats.csv"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         var csv = "date,completed,skipped\n"
         let fmt = ISO8601DateFormatter()
