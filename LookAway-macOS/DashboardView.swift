@@ -1,0 +1,77 @@
+import SwiftUI
+import LookAwayCore
+
+struct DashboardView: View {
+    @EnvironmentObject var scheduler: BreakScheduler
+    @State private var now = Date()
+    private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+    private var repo: BreakHistoryRepository { AppDelegate.shared.repository }
+
+    private var remaining: TimeInterval {
+        guard let nb = scheduler.nextBreak else { return 0 }
+        return max(0, nb.fireDate.timeIntervalSince(now))
+    }
+
+    private var timeString: String {
+        let m = Int(remaining) / 60; let s = Int(remaining) % 60
+        return String(format: "%02d:%02d", m, s)
+    }
+
+    private var progress: Double {
+        guard let nb = scheduler.nextBreak else { return 0 }
+        let config = config(for: nb.type)
+        let total = Double(config.intervalMinutes) * 60
+        return 1.0 - (remaining / total)
+    }
+
+    private var todayCompliance: Double {
+        let stats = repo.dailyStats(for: 1)
+        return stats.first?.complianceRate ?? 0
+    }
+
+    private func config(for type: BreakType) -> BreakConfig {
+        switch type {
+        case .eye: scheduler.currentSettings.eyeConfig
+        case .micro: scheduler.currentSettings.microConfig
+        case .long: scheduler.currentSettings.longConfig
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 24) {
+            CountdownRing(
+                progress: progress,
+                label: scheduler.nextBreak?.type.rawValue.capitalized ?? "—",
+                timeString: timeString
+            )
+            VStack {
+                Text("\(Int(todayCompliance * 100))%")
+                    .font(.largeTitle).bold()
+                Text("Today's compliance").font(.caption).foregroundStyle(.secondary)
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                Toggle("Eye breaks (20-20-20)", isOn: Binding(
+                    get: { scheduler.currentSettings.eyeConfig.isEnabled },
+                    set: { scheduler.currentSettings.eyeConfig.isEnabled = $0; reschedule() }
+                ))
+                Toggle("Micro breaks", isOn: Binding(
+                    get: { scheduler.currentSettings.microConfig.isEnabled },
+                    set: { scheduler.currentSettings.microConfig.isEnabled = $0; reschedule() }
+                ))
+                Toggle("Long breaks", isOn: Binding(
+                    get: { scheduler.currentSettings.longConfig.isEnabled },
+                    set: { scheduler.currentSettings.longConfig.isEnabled = $0; reschedule() }
+                ))
+            }
+            Button(scheduler.currentSettings.isPaused ? "Resume" : "Pause All") {
+                scheduler.currentSettings.isPaused ? scheduler.resume() : scheduler.pause()
+            }
+        }
+        .padding(32)
+        .onReceive(tick) { now = $0 }
+    }
+
+    private func reschedule() {
+        scheduler.reschedule(with: scheduler.currentSettings)
+    }
+}
