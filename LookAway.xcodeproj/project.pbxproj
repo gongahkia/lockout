@@ -19,6 +19,7 @@
 		4BD939D542FA3077609A750C /* LookAway-iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "LookAway-iOS.entitlements"; sourceTree = "<group>"; };
 		4FEC03002C9C5AB0E7F7ABAC /* LookAway-iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "LookAway-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		5AB4B88F3810608E8AB11A32 /* LookAway-macOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "LookAway-macOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		71B6F18349BAF3EDD3A14F4B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		7FFC09DF6F4C50E3A5B9035E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		C03E1EF9F14161777251FD30 /* LookAway-macOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "LookAway-macOS.entitlements"; sourceTree = "<group>"; };
 		F252D8338816A2B7CFF91BB5 /* LookAwayCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = LookAwayCore; path = Packages/LookAwayCore; sourceTree = SOURCE_ROOT; };
@@ -75,6 +76,7 @@
 			isa = PBXGroup;
 			children = (
 				347C066E3F74177C22DA8A7E /* App.swift */,
+				71B6F18349BAF3EDD3A14F4B /* Info.plist */,
 				C03E1EF9F14161777251FD30 /* LookAway-macOS.entitlements */,
 			);
 			path = "LookAway-macOS";
@@ -331,8 +333,7 @@
 				CODE_SIGN_ENTITLEMENTS = "LookAway-macOS/LookAway-macOS.entitlements";
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_FILE = "LookAway-macOS/Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -353,8 +354,7 @@
 				CODE_SIGN_ENTITLEMENTS = "LookAway-macOS/LookAway-macOS.entitlements";
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_FILE = "LookAway-macOS/Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
