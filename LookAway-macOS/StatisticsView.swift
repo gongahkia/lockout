@@ -41,8 +41,21 @@ struct StatisticsView: View {
                 summaryCell(value: "\(streak)d", label: "Streak")
             }
         }
+            Button("Export CSV") { exportCSV() }
+        }
         .padding(24)
         .navigationTitle("Statistics")
+    }
+
+    private func exportCSV() {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.commaSeparatedText]
+        panel.nameFieldStringValue = "lookaway-stats.csv"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        var csv = "date,completed,skipped\n"
+        let fmt = ISO8601DateFormatter()
+        for s in stats { csv += "\(fmt.string(from: s.date)),\(s.completed),\(s.skipped)\n" }
+        try? csv.write(to: url, atomically: true, encoding: .utf8)
     }
 
     private func legendDot(color: Color, label: String) -> some View {
