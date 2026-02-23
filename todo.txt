@@ -1,3 +1,0 @@
-(B) Write XCTest for BreakHistoryRepository save idempotency: insert two BreakSessions with identical UUID but different status (.skipped then .completed), fetch all, assert count == 1 and status == .completed +test
-(B) Write XCTest for AppSettingsStore round-trip: call AppSettingsStore.save(.defaults), then AppSettingsStore.load() and assert the loaded value is non-nil and all three intervalMinutes values match .defaults +test
-(B) Write XCTest for BreakScheduler multi-timer: call start(settings: .defaults), assert timers.count == 3 (one per enabled break type) after start() +test
