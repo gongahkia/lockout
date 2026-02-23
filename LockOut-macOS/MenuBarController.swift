@@ -9,6 +9,7 @@ final class MenuBarController {
     private var midnightTimer: Timer?
     private var cancellables = Set<AnyCancellable>()
     private var countdownItem: NSMenuItem!
+    private var tickCount = 0
 
     private var scheduler: BreakScheduler { AppDelegate.shared.scheduler }
 
@@ -62,9 +63,18 @@ final class MenuBarController {
 
     private func startTick() {
         tickTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            self?.updateCountdown()
-            self?.updateOverdue()
+            guard let self else { return }
+            tickCount += 1
+            updateCountdown()
+            updateOverdue()
+            if tickCount % 60 == 0 { updateStreak() }
         }
+    }
+
+    private func updateStreak() {
+        let streak = ComplianceCalculator.streakDays(stats: AppDelegate.shared.repository.dailyStats(for: 30))
+        statusItem.button?.title = streak > 0 ? " \(streak)" : ""
+        statusItem.button?.imagePosition = streak > 0 ? .imageLeading : .imageOnly
     }
 
     private func updateCountdown() {
