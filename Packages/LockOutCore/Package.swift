@@ -5,7 +5,6 @@ let package = Package(
     name: "LockOutCore",
     platforms: [
         .macOS(.v14),
-        .iOS(.v17),
     ],
     products: [
         .library(name: "LockOutCore", targets: ["LockOutCore"]),
