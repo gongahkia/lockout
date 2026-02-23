@@ -11,6 +11,7 @@ public final class SettingsSyncService {
         guard let data = try? JSONEncoder().encode(settings) else { return }
         store.set(data, forKey: Self.key)
         store.synchronize()
+        AppSettingsStore.save(settings)
     }
 
     public func pull() -> AppSettings? {
