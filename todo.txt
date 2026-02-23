@@ -1,2 +1,1 @@
-(C) macOS StatisticsView: export stats as CSV via NSSavePanel writing date, completed, skipped columns per row +stats
 (C) Identify the name of the current app, then rename it (and all its refernces in the repo) to its new name "LockOut"
