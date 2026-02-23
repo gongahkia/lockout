@@ -10,7 +10,7 @@ struct CountdownRing: View {
             Circle()
                 .stroke(Color.secondary.opacity(0.3), lineWidth: 8)
             Circle()
-                .trim(from: 0, to: progress)
+                .trim(from: 0, to: min(max(progress, 0), 1))
                 .stroke(style: StrokeStyle(lineWidth: 8, lineCap: .round))
                 .foregroundStyle(.blue)
                 .rotationEffect(.degrees(-90))

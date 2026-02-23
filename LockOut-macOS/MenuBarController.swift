@@ -88,10 +88,8 @@ final class MenuBarController {
             item.title = isPaused ? "Resume Breaks" : "Pause Breaks"
         }
         // update snooze label
-        if let item = menu.item(withTitle: { menu.items.first(where: { $0.title.hasPrefix("Snooze") })?.title ?? "" }()) {
-            let n = scheduler.currentSettings.snoozeDurationMinutes
-            item.title = "Snooze \(n) min"
-        }
+        let n = scheduler.currentSettings.snoozeDurationMinutes
+        menu.items.first(where: { $0.title.hasPrefix("Snooze") })?.title = "Snooze \(n) min"
     }
 
     private func updateOverdue() {
