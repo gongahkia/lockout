@@ -1,4 +1,3 @@
-(A) Create Xcode project with macOS and iOS targets in a single workspace named LookAway +core
 (A) Create local Swift Package "LookAwayCore" under Packages/ directory inside the workspace +core
 (A) Add LookAwayCore as a local package dependency to both macOS and iOS targets via Xcode package settings +core
 (A) Configure CloudKit container identifier "iCloud.com.yourapp.lookaway" in Apple Developer portal and add CloudKit entitlement to both targets' .entitlements files +sync
