@@ -1,0 +1,559 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		06451FB5B803E6740E2DC228 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E68C89854BF263EEA7A37020 /* MainTabView.swift */; };
+		07FFD8AB47A7A073C11B67B0 /* NotificationScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5213966088B45EDEDFAB3DB9 /* NotificationScheduler.swift */; };
+		08EFFE4D83CC961E2FE441B5 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5782A31C97B36C8FABDD8FB /* App.swift */; };
+		2C00CB460807902DE2A8BE61 /* ScheduleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA618151088F841DF02A9AB4 /* ScheduleView.swift */; };
+		2D2D4FBDBAC62D411B855E3A /* BreakOverlayWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28D1FD3D1A0C46EF066DBDF2 /* BreakOverlayWindowController.swift */; };
+		415D7F177C3B66C63A4BF9F3 /* CountdownRing.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC615D83A5821145836EDF81 /* CountdownRing.swift */; };
+		4CFE22AFEB43AA8317EA12B6 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EDE4C084892541139681104 /* DashboardView.swift */; };
+		57033478B73C53AA923ACCE5 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF3F51AF20A5C194B4FC9341 /* AppDelegate.swift */; };
+		68B720751C11E9F105732754 /* iOSAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9E038CDE1A9F9007BA4EF2F /* iOSAppDelegate.swift */; };
+		6C3DDAB5D641CA26F2FB511F /* iOSDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3841F397A711BA9317B32ADA /* iOSDashboardView.swift */; };
+		76617BE801C87979397E901C /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41AECC536CCF144C95E32B34 /* App.swift */; };
+		7A6BA5DE538C7B79DC160275 /* MainWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 601CBF2954C45AFB93461E62 /* MainWindowView.swift */; };
+		800C866431A1E736A575E726 /* OnboardingWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53A7E02C66E5EB6D30FCB114 /* OnboardingWindowController.swift */; };
+		9E041092BA550AD00EEF96FF /* BreakOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AED47563A2C27939F91AE838 /* BreakOverlayView.swift */; };
+		A5E51FEE9A5EFF66C541092C /* StatisticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2BBC298E6AD51254214EBAD /* StatisticsView.swift */; };
+		AE7A5C1319E576998E45B6E8 /* LaunchAtLoginService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B3C833ADF26AF750BE6FEB0 /* LaunchAtLoginService.swift */; };
+		B887F41E1B59534EA90CA812 /* iOSOnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86FDFEE97134DB03C7090201 /* iOSOnboardingView.swift */; };
+		C2473AF31932F532B0AA2354 /* iOSSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D781A82D4F10547A9BD4988 /* iOSSettingsView.swift */; };
+		C5A84F82335886AFA0591E98 /* iOSScheduleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E4B8BB6AE1E5BAE44E49F0A /* iOSScheduleView.swift */; };
+		C75F2E4BEAD2FA7FA6AF1A6E /* iOSStatisticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C07A2D83519F6E70DE803D55 /* iOSStatisticsView.swift */; };
+		D03B7FAEB0419AF5B04FC683 /* MenuBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE441D970C385D4B4F7B9FBB /* MenuBarController.swift */; };
+		D3690341B10C1F7B6C669B68 /* iOSBreakSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C671ECD030254E4619C39646 /* iOSBreakSheetView.swift */; };
+		E448E4DCC6073EAFE05AE8B7 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBEE4DDF3A542BD2C65C0DBB /* SettingsView.swift */; };
+		E604AF5F50328B385B2FD302 /* LockOutCore in Frameworks */ = {isa = PBXBuildFile; productRef = 73009A8E7394BD09F7F313DD /* LockOutCore */; };
+		F572A0C88312657D7B63DAAC /* LockOutCore in Frameworks */ = {isa = PBXBuildFile; productRef = 26B9F06EFD93A1FDA99A0BA9 /* LockOutCore */; };
+		FF1FBE4895D50213E0DE2E62 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 331AAB4E91699EB69AD1555B /* Assets.xcassets */; };
+		FFA0A31C0704FCEF1D32F130 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 92EF9024D3382703737ACCE8 /* Assets.xcassets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		28D1FD3D1A0C46EF066DBDF2 /* BreakOverlayWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BreakOverlayWindowController.swift; sourceTree = "<group>"; };
+		331AAB4E91699EB69AD1555B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		3841F397A711BA9317B32ADA /* iOSDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iOSDashboardView.swift; sourceTree = "<group>"; };
+		3E4B8BB6AE1E5BAE44E49F0A /* iOSScheduleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iOSScheduleView.swift; sourceTree = "<group>"; };
+		41AECC536CCF144C95E32B34 /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
+		4B3C833ADF26AF750BE6FEB0 /* LaunchAtLoginService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginService.swift; sourceTree = "<group>"; };
+		5213966088B45EDEDFAB3DB9 /* NotificationScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationScheduler.swift; sourceTree = "<group>"; };
+		53A7E02C66E5EB6D30FCB114 /* OnboardingWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingWindowController.swift; sourceTree = "<group>"; };
+		601CBF2954C45AFB93461E62 /* MainWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowView.swift; sourceTree = "<group>"; };
+		7EDE4C084892541139681104 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
+		7F6F50452DDD714803F44F43 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		83E99025DAF17C3ED13D0BE5 /* LockOut-iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "LockOut-iOS.entitlements"; sourceTree = "<group>"; };
+		86FDFEE97134DB03C7090201 /* iOSOnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iOSOnboardingView.swift; sourceTree = "<group>"; };
+		8D781A82D4F10547A9BD4988 /* iOSSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iOSSettingsView.swift; sourceTree = "<group>"; };
+		92EF9024D3382703737ACCE8 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		AED47563A2C27939F91AE838 /* BreakOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BreakOverlayView.swift; sourceTree = "<group>"; };
+		AF0972D59A9A04404E4BA582 /* LockOutCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = LockOutCore; path = Packages/LockOutCore; sourceTree = SOURCE_ROOT; };
+		B5782A31C97B36C8FABDD8FB /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
+		BA618151088F841DF02A9AB4 /* ScheduleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleView.swift; sourceTree = "<group>"; };
+		BBD75DAEF8CA7E15E269FBA4 /* LockOut-iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "LockOut-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		BC615D83A5821145836EDF81 /* CountdownRing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CountdownRing.swift; sourceTree = "<group>"; };
+		C07A2D83519F6E70DE803D55 /* iOSStatisticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iOSStatisticsView.swift; sourceTree = "<group>"; };
+		C671ECD030254E4619C39646 /* iOSBreakSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iOSBreakSheetView.swift; sourceTree = "<group>"; };
+		DD2B5A7959272B4F9628E5AB /* LockOut-macOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "LockOut-macOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		DE441D970C385D4B4F7B9FBB /* MenuBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarController.swift; sourceTree = "<group>"; };
+		E370CD309FE61A6187087D63 /* LookAway-iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "LookAway-iOS.entitlements"; sourceTree = "<group>"; };
+		E68C89854BF263EEA7A37020 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
+		EDA5EB2B353C7982D30DF549 /* LockOut-macOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "LockOut-macOS.entitlements"; sourceTree = "<group>"; };
+		F18D6E7C901BF42F9F135044 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		F2BBC298E6AD51254214EBAD /* StatisticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatisticsView.swift; sourceTree = "<group>"; };
+		F9E038CDE1A9F9007BA4EF2F /* iOSAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iOSAppDelegate.swift; sourceTree = "<group>"; };
+		FBEE4DDF3A542BD2C65C0DBB /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		FD99AC94D4142F31E063B337 /* LookAway-macOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "LookAway-macOS.entitlements"; sourceTree = "<group>"; };
+		FF3F51AF20A5C194B4FC9341 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		829AAB55205473812FB580E1 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E604AF5F50328B385B2FD302 /* LockOutCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9414B44F543FE5325E541739 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F572A0C88312657D7B63DAAC /* LockOutCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		16BCA9E27A55EE14931A89A4 = {
+			isa = PBXGroup;
+			children = (
+				F4BBEBD9F408D1865142A4CC /* LockOut-iOS */,
+				954975FF7586B9521AF1A945 /* LockOut-macOS */,
+				FCAFD76DF04C7A0D23D0AFDA /* Packages */,
+				A8D5873AC0456AC09D3DB800 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		954975FF7586B9521AF1A945 /* LockOut-macOS */ = {
+			isa = PBXGroup;
+			children = (
+				B5782A31C97B36C8FABDD8FB /* App.swift */,
+				FF3F51AF20A5C194B4FC9341 /* AppDelegate.swift */,
+				92EF9024D3382703737ACCE8 /* Assets.xcassets */,
+				AED47563A2C27939F91AE838 /* BreakOverlayView.swift */,
+				28D1FD3D1A0C46EF066DBDF2 /* BreakOverlayWindowController.swift */,
+				BC615D83A5821145836EDF81 /* CountdownRing.swift */,
+				7EDE4C084892541139681104 /* DashboardView.swift */,
+				F18D6E7C901BF42F9F135044 /* Info.plist */,
+				4B3C833ADF26AF750BE6FEB0 /* LaunchAtLoginService.swift */,
+				EDA5EB2B353C7982D30DF549 /* LockOut-macOS.entitlements */,
+				FD99AC94D4142F31E063B337 /* LookAway-macOS.entitlements */,
+				601CBF2954C45AFB93461E62 /* MainWindowView.swift */,
+				DE441D970C385D4B4F7B9FBB /* MenuBarController.swift */,
+				53A7E02C66E5EB6D30FCB114 /* OnboardingWindowController.swift */,
+				BA618151088F841DF02A9AB4 /* ScheduleView.swift */,
+				FBEE4DDF3A542BD2C65C0DBB /* SettingsView.swift */,
+				F2BBC298E6AD51254214EBAD /* StatisticsView.swift */,
+			);
+			path = "LockOut-macOS";
+			sourceTree = "<group>";
+		};
+		A8D5873AC0456AC09D3DB800 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				BBD75DAEF8CA7E15E269FBA4 /* LockOut-iOS.app */,
+				DD2B5A7959272B4F9628E5AB /* LockOut-macOS.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		F4BBEBD9F408D1865142A4CC /* LockOut-iOS */ = {
+			isa = PBXGroup;
+			children = (
+				41AECC536CCF144C95E32B34 /* App.swift */,
+				331AAB4E91699EB69AD1555B /* Assets.xcassets */,
+				7F6F50452DDD714803F44F43 /* Info.plist */,
+				F9E038CDE1A9F9007BA4EF2F /* iOSAppDelegate.swift */,
+				C671ECD030254E4619C39646 /* iOSBreakSheetView.swift */,
+				3841F397A711BA9317B32ADA /* iOSDashboardView.swift */,
+				86FDFEE97134DB03C7090201 /* iOSOnboardingView.swift */,
+				3E4B8BB6AE1E5BAE44E49F0A /* iOSScheduleView.swift */,
+				8D781A82D4F10547A9BD4988 /* iOSSettingsView.swift */,
+				C07A2D83519F6E70DE803D55 /* iOSStatisticsView.swift */,
+				83E99025DAF17C3ED13D0BE5 /* LockOut-iOS.entitlements */,
+				E370CD309FE61A6187087D63 /* LookAway-iOS.entitlements */,
+				E68C89854BF263EEA7A37020 /* MainTabView.swift */,
+				5213966088B45EDEDFAB3DB9 /* NotificationScheduler.swift */,
+			);
+			path = "LockOut-iOS";
+			sourceTree = "<group>";
+		};
+		FCAFD76DF04C7A0D23D0AFDA /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				AF0972D59A9A04404E4BA582 /* LockOutCore */,
+			);
+			path = Packages;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		09BBC8DDCDF5AF0C7A9AB486 /* LockOut-iOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 925412B7BA23D11D2B79A89D /* Build configuration list for PBXNativeTarget "LockOut-iOS" */;
+			buildPhases = (
+				3729FC5A6FEC0E81FEDF67A2 /* Sources */,
+				ABD9F492A94D1A46F5553140 /* Resources */,
+				9414B44F543FE5325E541739 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "LockOut-iOS";
+			packageProductDependencies = (
+				26B9F06EFD93A1FDA99A0BA9 /* LockOutCore */,
+			);
+			productName = "LockOut-iOS";
+			productReference = BBD75DAEF8CA7E15E269FBA4 /* LockOut-iOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+		B821F38C31EF249E20F5F216 /* LockOut-macOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B42C077F994F3E7264B296AD /* Build configuration list for PBXNativeTarget "LockOut-macOS" */;
+			buildPhases = (
+				6BC865B52ABAA6825E24A555 /* Sources */,
+				D2C16A8F8254FC01B7780ABC /* Resources */,
+				829AAB55205473812FB580E1 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "LockOut-macOS";
+			packageProductDependencies = (
+				73009A8E7394BD09F7F313DD /* LockOutCore */,
+			);
+			productName = "LockOut-macOS";
+			productReference = DD2B5A7959272B4F9628E5AB /* LockOut-macOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		80232DF89A03CC25933AD508 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+			};
+			buildConfigurationList = 41DEBAE90711419CBECA59F1 /* Build configuration list for PBXProject "LockOut" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 16BCA9E27A55EE14931A89A4;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				422C69CA8A4B042118833CB3 /* XCLocalSwiftPackageReference "Packages/LockOutCore" */,
+			);
+			preferredProjectObjectVersion = 77;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				09BBC8DDCDF5AF0C7A9AB486 /* LockOut-iOS */,
+				B821F38C31EF249E20F5F216 /* LockOut-macOS */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		ABD9F492A94D1A46F5553140 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FF1FBE4895D50213E0DE2E62 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D2C16A8F8254FC01B7780ABC /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FFA0A31C0704FCEF1D32F130 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		3729FC5A6FEC0E81FEDF67A2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				76617BE801C87979397E901C /* App.swift in Sources */,
+				06451FB5B803E6740E2DC228 /* MainTabView.swift in Sources */,
+				07FFD8AB47A7A073C11B67B0 /* NotificationScheduler.swift in Sources */,
+				68B720751C11E9F105732754 /* iOSAppDelegate.swift in Sources */,
+				D3690341B10C1F7B6C669B68 /* iOSBreakSheetView.swift in Sources */,
+				6C3DDAB5D641CA26F2FB511F /* iOSDashboardView.swift in Sources */,
+				B887F41E1B59534EA90CA812 /* iOSOnboardingView.swift in Sources */,
+				C5A84F82335886AFA0591E98 /* iOSScheduleView.swift in Sources */,
+				C2473AF31932F532B0AA2354 /* iOSSettingsView.swift in Sources */,
+				C75F2E4BEAD2FA7FA6AF1A6E /* iOSStatisticsView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6BC865B52ABAA6825E24A555 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				08EFFE4D83CC961E2FE441B5 /* App.swift in Sources */,
+				57033478B73C53AA923ACCE5 /* AppDelegate.swift in Sources */,
+				9E041092BA550AD00EEF96FF /* BreakOverlayView.swift in Sources */,
+				2D2D4FBDBAC62D411B855E3A /* BreakOverlayWindowController.swift in Sources */,
+				415D7F177C3B66C63A4BF9F3 /* CountdownRing.swift in Sources */,
+				4CFE22AFEB43AA8317EA12B6 /* DashboardView.swift in Sources */,
+				AE7A5C1319E576998E45B6E8 /* LaunchAtLoginService.swift in Sources */,
+				7A6BA5DE538C7B79DC160275 /* MainWindowView.swift in Sources */,
+				D03B7FAEB0419AF5B04FC683 /* MenuBarController.swift in Sources */,
+				800C866431A1E736A575E726 /* OnboardingWindowController.swift in Sources */,
+				2C00CB460807902DE2A8BE61 /* ScheduleView.swift in Sources */,
+				E448E4DCC6073EAFE05AE8B7 /* SettingsView.swift in Sources */,
+				A5E51FEE9A5EFF66C541092C /* StatisticsView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		14CCE2CB37D8EC16D8CAE80B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "LockOut-macOS/LockOut-macOS.entitlements";
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				INFOPLIST_FILE = "LockOut-macOS/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.yourapp.lockout.macos;
+				PRODUCT_NAME = LockOut;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+		78B4EA79CB1592907114522B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "LockOut-macOS/LockOut-macOS.entitlements";
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				INFOPLIST_FILE = "LockOut-macOS/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.yourapp.lockout.macos;
+				PRODUCT_NAME = LockOut;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.9;
+			};
+			name = Release;
+		};
+		80B196541404BB97216CDED9 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "LockOut-iOS/LockOut-iOS.entitlements";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
+				INFOPLIST_FILE = "LockOut-iOS/Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.yourapp.lockout.ios;
+				PRODUCT_NAME = LockOut;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		820E01E597F9A35841C25AD9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		C9B077A2C936C4DCF8594ECD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		E9A0BFF6AE8255992EBFEC3B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "LockOut-iOS/LockOut-iOS.entitlements";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
+				INFOPLIST_FILE = "LockOut-iOS/Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.yourapp.lockout.ios;
+				PRODUCT_NAME = LockOut;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		41DEBAE90711419CBECA59F1 /* Build configuration list for PBXProject "LockOut" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				820E01E597F9A35841C25AD9 /* Debug */,
+				C9B077A2C936C4DCF8594ECD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		925412B7BA23D11D2B79A89D /* Build configuration list for PBXNativeTarget "LockOut-iOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E9A0BFF6AE8255992EBFEC3B /* Debug */,
+				80B196541404BB97216CDED9 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		B42C077F994F3E7264B296AD /* Build configuration list for PBXNativeTarget "LockOut-macOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				14CCE2CB37D8EC16D8CAE80B /* Debug */,
+				78B4EA79CB1592907114522B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		422C69CA8A4B042118833CB3 /* XCLocalSwiftPackageReference "Packages/LockOutCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/LockOutCore;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		26B9F06EFD93A1FDA99A0BA9 /* LockOutCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LockOutCore;
+		};
+		73009A8E7394BD09F7F313DD /* LockOutCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LockOutCore;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 80232DF89A03CC25933AD508 /* Project object */;
+}

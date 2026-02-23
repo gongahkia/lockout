@@ -1,4 +1,4 @@
-name: LookAway
+name: LockOut
 options:
   bundleIdPrefix: com.yourapp
   createIntermediateGroups: true
@@ -7,66 +7,66 @@ options:
     iOS: "17.0"
 
 packages:
-  LookAwayCore:
-    path: Packages/LookAwayCore
+  LockOutCore:
+    path: Packages/LockOutCore
 
 targets:
-  LookAway-macOS:
+  LockOut-macOS:
     type: application
     platform: macOS
     deploymentTarget: "14.0"
     sources:
-      - path: LookAway-macOS
+      - path: LockOut-macOS
     dependencies:
-      - package: LookAwayCore
+      - package: LockOutCore
     info:
-      path: LookAway-macOS/Info.plist
+      path: LockOut-macOS/Info.plist
       properties:
         LSUIElement: true           # menu bar agent, no Dock icon
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.yourapp.lookaway.macos
+        PRODUCT_BUNDLE_IDENTIFIER: com.yourapp.lockout.macos
         SWIFT_VERSION: "5.9"
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: "1"
-        PRODUCT_NAME: LookAway
+        PRODUCT_NAME: LockOut
     entitlements:
-      path: LookAway-macOS/LookAway-macOS.entitlements
+      path: LockOut-macOS/LockOut-macOS.entitlements
       properties:
         com.apple.developer.icloud-container-identifiers:
-          - iCloud.com.yourapp.lookaway
+          - iCloud.com.yourapp.lockout
         com.apple.developer.icloud-services:
           - CloudKit
-        com.apple.developer.ubiquity-kvstore-identifier: $(TeamIdentifierPrefix)com.yourapp.lookaway
+        com.apple.developer.ubiquity-kvstore-identifier: $(TeamIdentifierPrefix)com.yourapp.lockout
         com.apple.developer.aps-environment: development
 
-  LookAway-iOS:
+  LockOut-iOS:
     type: application
     platform: iOS
     deploymentTarget: "17.0"
     sources:
-      - path: LookAway-iOS
+      - path: LockOut-iOS
     dependencies:
-      - package: LookAwayCore
+      - package: LockOutCore
     info:
-      path: LookAway-iOS/Info.plist
+      path: LockOut-iOS/Info.plist
       properties:
         UIBackgroundModes:
           - fetch
           - remote-notification
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.yourapp.lookaway.ios
+        PRODUCT_BUNDLE_IDENTIFIER: com.yourapp.lockout.ios
         SWIFT_VERSION: "5.9"
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: "1"
-        PRODUCT_NAME: LookAway
+        PRODUCT_NAME: LockOut
     entitlements:
-      path: LookAway-iOS/LookAway-iOS.entitlements
+      path: LockOut-iOS/LockOut-iOS.entitlements
       properties:
         com.apple.developer.icloud-container-identifiers:
-          - iCloud.com.yourapp.lookaway
+          - iCloud.com.yourapp.lockout
         com.apple.developer.icloud-services:
           - CloudKit
-        com.apple.developer.ubiquity-kvstore-identifier: $(TeamIdentifierPrefix)com.yourapp.lookaway
+        com.apple.developer.ubiquity-kvstore-identifier: $(TeamIdentifierPrefix)com.yourapp.lockout
         com.apple.developer.aps-environment: development
