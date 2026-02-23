@@ -6,6 +6,7 @@ final class MenuBarController {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let menu = NSMenu()
     private var tickTimer: Timer?
+    private var midnightTimer: Timer?
     private var cancellables = Set<AnyCancellable>()
     private var countdownItem: NSMenuItem!
 
@@ -16,7 +17,14 @@ final class MenuBarController {
         scheduler.objectWillChange.sink { [weak self] in
             DispatchQueue.main.async { self?.updateIcon() }
         }.store(in: &cancellables)
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self, selector: #selector(appSwitched), name: NSWorkspace.didActivateApplicationNotification, object: nil
+        )
         startTick()
+    }
+
+    @objc private func appSwitched() {
+        updateOverdue() // re-evaluate fullscreen detection on every app switch
     }
 
     private func setup() {
@@ -34,6 +42,9 @@ final class MenuBarController {
         let pauseItem = NSMenuItem(title: "Pause Breaks", action: #selector(togglePause), keyEquivalent: "")
         pauseItem.target = self
         menu.addItem(pauseItem)
+        let pauseTomorrow = NSMenuItem(title: "Pause until tomorrow", action: #selector(pauseUntilTomorrow), keyEquivalent: "")
+        pauseTomorrow.target = self
+        menu.addItem(pauseTomorrow)
         let nowItem = NSMenuItem(title: "Take Break Now", action: #selector(takeBreakNow), keyEquivalent: "")
         nowItem.target = self
         menu.addItem(nowItem)
@@ -87,6 +98,17 @@ final class MenuBarController {
         guard let nb = scheduler.nextBreak else { return }
         let overdue = nb.fireDate.addingTimeInterval(120) < Date()
         statusItem.button?.appearsDisabled = overdue
+    }
+
+    @objc private func pauseUntilTomorrow() {
+        scheduler.pause()
+        midnightTimer?.invalidate()
+        let cal = Calendar.current
+        guard let midnight = cal.nextDate(after: Date(), matching: DateComponents(hour: 0, minute: 0, second: 0), matchingPolicy: .nextTime) else { return }
+        midnightTimer = Timer.scheduledTimer(withTimeInterval: midnight.timeIntervalSinceNow, repeats: false) { [weak self] _ in
+            self?.scheduler.resume()
+        }
+        updateIcon()
     }
 
     @objc private func togglePause() {

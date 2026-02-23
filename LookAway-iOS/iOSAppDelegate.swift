@@ -23,6 +23,7 @@ final class iOSAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationC
             registerNotificationCategories()
             if granted { NotificationScheduler.schedule(settings: settings) }
         }
+        NotificationCenter.default.addObserver(self, selector: #selector(appBecameActive), name: UIApplication.didBecomeActiveNotification, object: nil)
         registerBackgroundTask()
         Task {
             await cloudSync.sync(repository: repository)
@@ -49,6 +50,12 @@ final class iOSAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationC
         default: break
         }
         handler()
+    }
+
+    @objc private func appBecameActive() {
+        UNUserNotificationCenter.current().setBadgeCount(0, withCompletionHandler: nil)
+        let skipped = repository.dailyStats(for: 1).first?.skipped ?? 0
+        if skipped > 0 { UNUserNotificationCenter.current().setBadgeCount(skipped, withCompletionHandler: nil) }
     }
 
     private func registerNotificationCategories() {
