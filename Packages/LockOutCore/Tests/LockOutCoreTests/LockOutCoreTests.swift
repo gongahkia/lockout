@@ -1,4 +1,5 @@
 import XCTest
+import SwiftData
 @testable import LockOutCore
 
 // MARK: - ComplianceCalculator tests
@@ -58,5 +59,40 @@ final class BreakSchedulerTests: XCTestCase {
         let expectedMin = before.addingTimeInterval(5 * 60 - 2)
         let expectedMax = before.addingTimeInterval(5 * 60 + 2)
         XCTAssertTrue(fireDate >= expectedMin && fireDate <= expectedMax)
+    }
+
+    func testMultiTimerCountAfterStart() async {
+        scheduler.start(settings: .defaults)
+        XCTAssertEqual(scheduler.timers.count, 3)
+    }
+}
+
+// MARK: - BreakHistoryRepository idempotency
+final class BreakHistoryRepositoryTests: XCTestCase {
+    func testSaveIdempotency() throws {
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: BreakSessionRecord.self, configurations: config)
+        let repo = BreakHistoryRepository(modelContext: ModelContext(container))
+        let id = UUID()
+        let s1 = BreakSession(id: id, type: .eye, scheduledAt: Date(), status: .skipped)
+        let s2 = BreakSession(id: id, type: .eye, scheduledAt: Date(), status: .completed)
+        repo.save(s1)
+        repo.save(s2)
+        let all = repo.fetchSessions(from: Date.distantPast, to: Date.distantFuture)
+        let matching = all.filter { $0.id == id }
+        XCTAssertEqual(matching.count, 1)
+        XCTAssertEqual(matching.first?.status, .completed)
+    }
+}
+
+// MARK: - AppSettingsStore round-trip
+final class AppSettingsStoreTests: XCTestCase {
+    func testRoundTrip() {
+        AppSettingsStore.save(.defaults)
+        let loaded = AppSettingsStore.load()
+        XCTAssertNotNil(loaded)
+        XCTAssertEqual(loaded?.eyeConfig.intervalMinutes, AppSettings.defaults.eyeConfig.intervalMinutes)
+        XCTAssertEqual(loaded?.microConfig.intervalMinutes, AppSettings.defaults.microConfig.intervalMinutes)
+        XCTAssertEqual(loaded?.longConfig.intervalMinutes, AppSettings.defaults.longConfig.intervalMinutes)
     }
 }

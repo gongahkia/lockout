@@ -6,7 +6,7 @@ public final class BreakScheduler: ObservableObject {
     @Published public var nextBreak: (type: BreakType, fireDate: Date)?
     @Published public var currentSettings: AppSettings
 
-    private var timers: [BreakType: Timer] = [:]
+    var timers: [BreakType: Timer] = [:] // internal for testability
 
     public init(settings: AppSettings = .defaults) {
         self.currentSettings = settings
