@@ -23,5 +23,9 @@
 		<string>fetch</string>
 		<string>remote-notification</string>
 	</array>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.yourapp.lookaway.refresh</string>
+	</array>
 </dict>
 </plist>
