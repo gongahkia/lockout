@@ -25,8 +25,8 @@ struct DashboardView: View {
     }
 
     private var todayCompliance: Double {
-        let stats = repo.dailyStats(for: 1)
-        return stats.first?.complianceRate ?? 0
+        let sessions = repo.fetchSessions(from: Calendar.current.startOfDay(for: Date()), to: Date())
+        return Double(sessions.filter { $0.status == .completed }.count) / Double(max(sessions.count, 1))
     }
 
     private func config(for type: BreakType) -> BreakConfig {

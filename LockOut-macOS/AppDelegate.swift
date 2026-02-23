@@ -9,6 +9,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var repository: BreakHistoryRepository!
     private(set) var settingsSync: SettingsSyncService!
     private(set) var cloudSync: CloudKitSyncService!
+    private(set) var updaterController: UpdaterController!
+    @Published var syncError: String?
     private var modelContainer: ModelContainer!
     var menuBarController: MenuBarController?
     var overlayController: BreakOverlayWindowController?
@@ -21,6 +23,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         repository = BreakHistoryRepository(modelContext: ModelContext(modelContainer))
         settingsSync = SettingsSyncService()
         cloudSync = CloudKitSyncService()
+        updaterController = UpdaterController()
+        cloudSync.onError = { [weak self] msg in DispatchQueue.main.async { self?.syncError = msg } }
         let settings = settingsSync.pull() ?? AppSettingsStore.load() ?? .defaults
         scheduler = BreakScheduler(settings: settings)
         repository.pruneOldRecords(retentionDays: settings.historyRetentionDays) // clean stale on launch
@@ -31,6 +35,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         scheduler.$currentSettings.dropFirst().sink { AppSettingsStore.save($0) }.store(in: &cancellables)
         menuBarController = MenuBarController()
         overlayController = BreakOverlayWindowController()
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [weak self] _ in self?.scheduler.pause() }
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in self?.scheduler.resume() }
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.screensDidSleepNotification, object: nil, queue: .main) { [weak self] _ in self?.overlayController?.dismiss() }
         if !UserDefaults.standard.bool(forKey: "hasOnboarded") {
             OnboardingWindowController.present()
         }
@@ -39,6 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         UserDefaults.standard.set(Date(), forKey: Self.lastFireKey)
+        settingsSync.stopObserving()
     }
 
     private func applyLaunchOffset(settings: AppSettings) {

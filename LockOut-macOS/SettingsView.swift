@@ -38,6 +38,9 @@ struct SettingsView: View {
                     }
                 }
             }
+            if let err = AppDelegate.shared.syncError {
+                Text(err).foregroundStyle(.red).font(.caption)
+            }
         }
         .padding(24)
         .navigationTitle("Settings")

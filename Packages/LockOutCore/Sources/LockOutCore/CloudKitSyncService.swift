@@ -4,6 +4,7 @@ import CloudKit
 public final class CloudKitSyncService {
     private let db = CKContainer(identifier: "iCloud.com.yourapp.lockout").privateCloudDatabase
     private static let lastSyncKey = "ck_last_sync_date"
+    public var onError: ((String) -> Void)?
 
     public init() {}
 
@@ -77,15 +78,21 @@ public final class CloudKitSyncService {
     private func handle(error: Error) {
         guard let ckError = error as? CKError else {
             print("[CloudKit] error: \(error)")
+            onError?(error.localizedDescription)
             return
         }
         switch ckError.code {
-        case .networkUnavailable, .quotaExceeded:
+        case .networkUnavailable:
             print("[CloudKit] non-fatal: \(ckError.code)")
+        case .quotaExceeded:
+            print("[CloudKit] non-fatal: \(ckError.code)")
+            onError?(ckError.localizedDescription)
         case .accountTemporarilyUnavailable:
             NotificationCenter.default.post(name: .cloudKitAccountUnavailable, object: nil)
+            onError?(ckError.localizedDescription)
         default:
             print("[CloudKit] error: \(ckError)")
+            onError?(ckError.localizedDescription)
         }
     }
 }

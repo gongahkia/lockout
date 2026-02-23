@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import Sparkle
 import LockOutCore
 
 final class MenuBarController {
@@ -57,6 +58,9 @@ final class MenuBarController {
         openItem.target = self
         menu.addItem(openItem)
         menu.addItem(.separator())
+        let updateItem = NSMenuItem(title: "Check for Updates…", action: #selector(SPUUpdater.checkForUpdates(_:)), keyEquivalent: "")
+        updateItem.target = AppDelegate.shared.updaterController.updater
+        menu.addItem(updateItem)
         let quitItem = NSMenuItem(title: "Quit LockOut", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         menu.addItem(quitItem)
     }
