@@ -13,7 +13,8 @@ public final class CloudKitSyncService {
     }
 
     public func uploadSession(_ session: BreakSession) async {
-        let record = CKRecord(recordType: "BreakSession")
+        let recordID = CKRecord.ID(recordName: session.id.uuidString)
+        let record = CKRecord(recordType: "BreakSession", recordID: recordID)
         record["id"] = session.id.uuidString as CKRecordValue
         record["type"] = session.type.rawValue as CKRecordValue
         record["scheduledAt"] = session.scheduledAt as CKRecordValue
@@ -42,7 +43,10 @@ public final class CloudKitSyncService {
 
     public func sync(repository: BreakHistoryRepository) async {
         let remote = await fetchSessions(since: lastSyncDate)
-        for session in remote { repository.save(resolveConflict(local: nil, remote: session)) }
+        for session in remote {
+            let local = repository.fetchSession(id: session.id)
+            repository.save(resolveConflict(local: local, remote: session))
+        }
         let end = Date()
         let local = repository.fetchSessions(from: lastSyncDate, to: end)
         for session in local { await uploadSession(session) }
