@@ -8,10 +8,19 @@ public final class BreakHistoryRepository {
         self.context = modelContext
     }
 
+    public func fetchSession(id: UUID) -> BreakSession? {
+        let descriptor = FetchDescriptor<BreakSessionRecord>(predicate: #Predicate { $0.id == id })
+        return (try? context.fetch(descriptor))?.first?.toBreakSession()
+    }
+
     public func save(_ session: BreakSession) {
-        let record = BreakSessionRecord(from: session)
-        context.insert(record)
-        try? context.save()
+        if let existing = (try? context.fetch(FetchDescriptor<BreakSessionRecord>(predicate: #Predicate { $0.id == session.id })))?.first {
+            existing.status = session.status.rawValue
+            existing.endedAt = session.endedAt
+        } else {
+            context.insert(BreakSessionRecord(from: session))
+        }
+        do { try context.save() } catch { fputs("[SwiftData] \(error)\n", stderr) }
     }
 
     public func fetchSessions(from startDate: Date, to endDate: Date) -> [BreakSession] {
@@ -28,13 +37,14 @@ public final class BreakHistoryRepository {
         )
         guard let old = try? context.fetch(descriptor) else { return }
         old.forEach { context.delete($0) }
-        try? context.save()
+        do { try context.save() } catch { fputs("[SwiftData] \(error)\n", stderr) }
     }
 
     public func dailyStats(for days: Int) -> [DayStat] {
         let cal = Calendar.current
+        let startOfToday = cal.startOfDay(for: Date())
         let end = Date()
-        let start = cal.date(byAdding: .day, value: -days, to: end) ?? end
+        let start = cal.startOfDay(for: cal.date(byAdding: .day, value: -(days - 1), to: startOfToday)!)
         let sessions = fetchSessions(from: start, to: end)
         var map: [Date: (Int, Int)] = [:]
         for s in sessions {

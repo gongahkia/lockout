@@ -32,7 +32,7 @@ public struct BreakSession: Codable, Sendable {
 // MARK: - SwiftData persistence
 @Model
 public final class BreakSessionRecord {
-    public var id: UUID
+    @Attribute(.unique) public var id: UUID
     public var type: String         // raw BreakType
     public var scheduledAt: Date
     public var endedAt: Date?
