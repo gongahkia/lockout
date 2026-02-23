@@ -8,6 +8,7 @@ final class BreakOverlayWindowController {
     private var repo: BreakHistoryRepository { AppDelegate.shared.repository }
 
     func show(breakType: BreakType, duration: Int) {
+        guard windows.isEmpty else { return }
         guard !isScreenLocked() else {
             scheduler.markCompleted(repository: repo)
             return
@@ -17,15 +18,18 @@ final class BreakOverlayWindowController {
             return
         }
         NSSound(named: NSSound.Name("Glass"))?.play()
-        dismiss()
         for screen in NSScreen.screens {
-            let win = NSWindow(
+            let win = LockOutOverlayWindow(
                 contentRect: screen.frame,
                 styleMask: .borderless,
                 backing: .buffered,
                 defer: false,
                 screen: screen
             )
+            win.onEscape = { [weak self] in
+                self?.scheduler.skip(repository: self!.repo)
+                self?.dismiss()
+            }
             win.level = .screenSaver
             win.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
             win.isOpaque = false
@@ -36,6 +40,7 @@ final class BreakOverlayWindowController {
             win.contentView = NSHostingView(rootView: view)
             win.alphaValue = 0
             win.orderFront(nil)
+            win.makeKey()
             NSAnimationContext.runAnimationGroup { ctx in
                 ctx.duration = 0.3
                 win.animator().alphaValue = 1
