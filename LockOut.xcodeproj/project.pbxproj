@@ -15,11 +15,13 @@
 		57033478B73C53AA923ACCE5 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF3F51AF20A5C194B4FC9341 /* AppDelegate.swift */; };
 		7A6BA5DE538C7B79DC160275 /* MainWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 601CBF2954C45AFB93461E62 /* MainWindowView.swift */; };
 		800C866431A1E736A575E726 /* OnboardingWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53A7E02C66E5EB6D30FCB114 /* OnboardingWindowController.swift */; };
+		963CD49C8D582C933C5D6223 /* LockOutOverlayWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73BDAE0E60049FD7F39D963D /* LockOutOverlayWindow.swift */; };
 		9E041092BA550AD00EEF96FF /* BreakOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AED47563A2C27939F91AE838 /* BreakOverlayView.swift */; };
 		A5E51FEE9A5EFF66C541092C /* StatisticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2BBC298E6AD51254214EBAD /* StatisticsView.swift */; };
 		AE7A5C1319E576998E45B6E8 /* LaunchAtLoginService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B3C833ADF26AF750BE6FEB0 /* LaunchAtLoginService.swift */; };
 		D03B7FAEB0419AF5B04FC683 /* MenuBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE441D970C385D4B4F7B9FBB /* MenuBarController.swift */; };
 		E448E4DCC6073EAFE05AE8B7 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBEE4DDF3A542BD2C65C0DBB /* SettingsView.swift */; };
+		E5A22EEBE3DD758598F08342 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = C19875F89F839FD739C35E7C /* Sparkle */; };
 		E604AF5F50328B385B2FD302 /* LockOutCore in Frameworks */ = {isa = PBXBuildFile; productRef = 73009A8E7394BD09F7F313DD /* LockOutCore */; };
 		FFA0A31C0704FCEF1D32F130 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 92EF9024D3382703737ACCE8 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
@@ -29,6 +31,7 @@
 		4B3C833ADF26AF750BE6FEB0 /* LaunchAtLoginService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginService.swift; sourceTree = "<group>"; };
 		53A7E02C66E5EB6D30FCB114 /* OnboardingWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingWindowController.swift; sourceTree = "<group>"; };
 		601CBF2954C45AFB93461E62 /* MainWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowView.swift; sourceTree = "<group>"; };
+		73BDAE0E60049FD7F39D963D /* LockOutOverlayWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LockOutOverlayWindow.swift; sourceTree = "<group>"; };
 		7EDE4C084892541139681104 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		92EF9024D3382703737ACCE8 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AED47563A2C27939F91AE838 /* BreakOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BreakOverlayView.swift; sourceTree = "<group>"; };
@@ -51,6 +54,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				E604AF5F50328B385B2FD302 /* LockOutCore in Frameworks */,
+				E5A22EEBE3DD758598F08342 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -79,6 +83,7 @@
 				F18D6E7C901BF42F9F135044 /* Info.plist */,
 				4B3C833ADF26AF750BE6FEB0 /* LaunchAtLoginService.swift */,
 				EDA5EB2B353C7982D30DF549 /* LockOut-macOS.entitlements */,
+				73BDAE0E60049FD7F39D963D /* LockOutOverlayWindow.swift */,
 				601CBF2954C45AFB93461E62 /* MainWindowView.swift */,
 				DE441D970C385D4B4F7B9FBB /* MenuBarController.swift */,
 				53A7E02C66E5EB6D30FCB114 /* OnboardingWindowController.swift */,
@@ -123,6 +128,7 @@
 			name = "LockOut-macOS";
 			packageProductDependencies = (
 				73009A8E7394BD09F7F313DD /* LockOutCore */,
+				C19875F89F839FD739C35E7C /* Sparkle */,
 			);
 			productName = "LockOut-macOS";
 			productReference = DD2B5A7959272B4F9628E5AB /* LockOut-macOS.app */;
@@ -136,6 +142,12 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					B821F38C31EF249E20F5F216 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Manual;
+					};
+				};
 			};
 			buildConfigurationList = 41DEBAE90711419CBECA59F1 /* Build configuration list for PBXProject "LockOut" */;
 			compatibilityVersion = "Xcode 14.0";
@@ -148,6 +160,7 @@
 			mainGroup = 16BCA9E27A55EE14931A89A4;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				3FEE243233C1D3F195D2E7C3 /* XCRemoteSwiftPackageReference "Sparkle" */,
 				422C69CA8A4B042118833CB3 /* XCLocalSwiftPackageReference "Packages/LockOutCore" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -182,6 +195,7 @@
 				415D7F177C3B66C63A4BF9F3 /* CountdownRing.swift in Sources */,
 				4CFE22AFEB43AA8317EA12B6 /* DashboardView.swift in Sources */,
 				AE7A5C1319E576998E45B6E8 /* LaunchAtLoginService.swift in Sources */,
+				963CD49C8D582C933C5D6223 /* LockOutOverlayWindow.swift in Sources */,
 				7A6BA5DE538C7B79DC160275 /* MainWindowView.swift in Sources */,
 				D03B7FAEB0419AF5B04FC683 /* MenuBarController.swift in Sources */,
 				800C866431A1E736A575E726 /* OnboardingWindowController.swift in Sources */,
@@ -199,8 +213,11 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "LockOut-macOS/LockOut-macOS.entitlements";
+				CODE_SIGN_IDENTITY = "Developer ID Application";
+				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
 				INFOPLIST_FILE = "LockOut-macOS/Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -220,8 +237,11 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "LockOut-macOS/LockOut-macOS.entitlements";
+				CODE_SIGN_IDENTITY = "Developer ID Application";
+				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
 				INFOPLIST_FILE = "LockOut-macOS/Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -385,10 +405,26 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		3FEE243233C1D3F195D2E7C3 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.6.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
 		73009A8E7394BD09F7F313DD /* LockOutCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = LockOutCore;
+		};
+		C19875F89F839FD739C35E7C /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3FEE243233C1D3F195D2E7C3 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
