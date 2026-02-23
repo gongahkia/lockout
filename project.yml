@@ -6,6 +6,10 @@ options:
     macOS: "14.0"
     iOS: "17.0"
 
+packages:
+  LookAwayCore:
+    path: Packages/LookAwayCore
+
 targets:
   LookAway-macOS:
     type: application
@@ -13,6 +17,8 @@ targets:
     deploymentTarget: "14.0"
     sources:
       - path: LookAway-macOS
+    dependencies:
+      - package: LookAwayCore
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.yourapp.lookaway.macos
@@ -31,6 +37,8 @@ targets:
     deploymentTarget: "17.0"
     sources:
       - path: LookAway-iOS
+    dependencies:
+      - package: LookAwayCore
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.yourapp.lookaway.ios

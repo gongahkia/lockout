@@ -8,7 +8,9 @@
 
 /* Begin PBXBuildFile section */
 		512BD7C1F13EBC65DDE19608 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 220C3A547E954463C6883E21 /* App.swift */; };
+		8E279B0FF7B82043F4F09F5A /* LookAwayCore in Frameworks */ = {isa = PBXBuildFile; productRef = 3FC72B25856B150195670DA2 /* LookAwayCore */; };
 		A80FBAEA213526567C26BAC9 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 347C066E3F74177C22DA8A7E /* App.swift */; };
+		E316CAFC2C725B8055A067C2 /* LookAwayCore in Frameworks */ = {isa = PBXBuildFile; productRef = A4D06E1149370912A20D16FE /* LookAwayCore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -18,9 +20,37 @@
 		4FEC03002C9C5AB0E7F7ABAC /* LookAway-iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "LookAway-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		5AB4B88F3810608E8AB11A32 /* LookAway-macOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "LookAway-macOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		C03E1EF9F14161777251FD30 /* LookAway-macOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "LookAway-macOS.entitlements"; sourceTree = "<group>"; };
+		F252D8338816A2B7CFF91BB5 /* LookAwayCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = LookAwayCore; path = Packages/LookAwayCore; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
+/* Begin PBXFrameworksBuildPhase section */
+		2E51C0CD9E6AD7BBBED1B7BD /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8E279B0FF7B82043F4F09F5A /* LookAwayCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		39A5532CE7FE1B712A588245 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E316CAFC2C725B8055A067C2 /* LookAwayCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
 /* Begin PBXGroup section */
+		02185E3D758E08F92C96CAB5 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				F252D8338816A2B7CFF91BB5 /* LookAwayCore */,
+			);
+			path = Packages;
+			sourceTree = "<group>";
+		};
 		884C5336354306B8192DCFF4 /* Products */ = {
 			isa = PBXGroup;
 			children = (
@@ -53,6 +83,7 @@
 			children = (
 				D2FAC901D792FE02D3305ACB /* LookAway-iOS */,
 				F0ABFAE8874384E850DDA50D /* LookAway-macOS */,
+				02185E3D758E08F92C96CAB5 /* Packages */,
 				884C5336354306B8192DCFF4 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -65,6 +96,7 @@
 			buildConfigurationList = 2F822632342C40BC51A145D0 /* Build configuration list for PBXNativeTarget "LookAway-iOS" */;
 			buildPhases = (
 				03C905B513083B7EC5B2D72B /* Sources */,
+				2E51C0CD9E6AD7BBBED1B7BD /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -72,6 +104,7 @@
 			);
 			name = "LookAway-iOS";
 			packageProductDependencies = (
+				3FC72B25856B150195670DA2 /* LookAwayCore */,
 			);
 			productName = "LookAway-iOS";
 			productReference = 4FEC03002C9C5AB0E7F7ABAC /* LookAway-iOS.app */;
@@ -82,6 +115,7 @@
 			buildConfigurationList = 08FFF77EC4041A42EA411D20 /* Build configuration list for PBXNativeTarget "LookAway-macOS" */;
 			buildPhases = (
 				7A652D8DB1942B451EAEFBAA /* Sources */,
+				39A5532CE7FE1B712A588245 /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -89,6 +123,7 @@
 			);
 			name = "LookAway-macOS";
 			packageProductDependencies = (
+				A4D06E1149370912A20D16FE /* LookAwayCore */,
 			);
 			productName = "LookAway-macOS";
 			productReference = 5AB4B88F3810608E8AB11A32 /* LookAway-macOS.app */;
@@ -113,6 +148,9 @@
 			);
 			mainGroup = FFD55BA6F37A1C2CDCB52B2D;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				4CA399EE6F8ED22565D8A842 /* XCLocalSwiftPackageReference "Packages/LookAwayCore" */,
+			);
 			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
 			projectRoot = "";
@@ -381,6 +419,24 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		4CA399EE6F8ED22565D8A842 /* XCLocalSwiftPackageReference "Packages/LookAwayCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/LookAwayCore;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		3FC72B25856B150195670DA2 /* LookAwayCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LookAwayCore;
+		};
+		A4D06E1149370912A20D16FE /* LookAwayCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LookAwayCore;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 81A23F0A9E314E3A8A446698 /* Project object */;
 }
