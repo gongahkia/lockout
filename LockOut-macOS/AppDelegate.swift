@@ -22,8 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let settings = settingsSync.pull() ?? .defaults
         scheduler = BreakScheduler(settings: settings)
         repository.pruneOldRecords(retentionDays: settings.historyRetentionDays) // clean stale on launch
-        let offsetSettings = applyLaunchOffset(settings: settings)
-        scheduler.start(settings: offsetSettings)
+        applyLaunchOffset(settings: settings)
         settingsSync.observeChanges { [weak self] remote in
             self?.scheduler.reschedule(with: remote)
         }
@@ -39,18 +38,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         UserDefaults.standard.set(Date(), forKey: Self.lastFireKey)
     }
 
-    private func applyLaunchOffset(settings: AppSettings) -> AppSettings {
-        guard let last = UserDefaults.standard.object(forKey: Self.lastFireKey) as? Date else { return settings }
-        let elapsed = Date().timeIntervalSince(last)
-        var adjusted = settings
-        let configs: [(BreakType, BreakConfig)] = [
-            (.eye, settings.eyeConfig), (.micro, settings.microConfig), (.long, settings.longConfig)
-        ]
-        for (_, config) in configs where config.isEnabled {
-            let interval = Double(config.intervalMinutes) * 60
-            if elapsed < interval { return adjusted } // at least one break not yet due — keep as-is
+    private func applyLaunchOffset(settings: AppSettings) {
+        guard let last = UserDefaults.standard.object(forKey: Self.lastFireKey) as? Date else {
+            scheduler.start(settings: settings)
+            return
         }
-        return adjusted
+        let elapsed = Date().timeIntervalSince(last)
+        scheduler.start(settings: settings, offsetSeconds: elapsed)
     }
 
     private func requestNotificationPermission() {
