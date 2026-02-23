@@ -31,4 +31,4 @@
 (B) Write XCTest unit tests for ComplianceCalculator: streakDays returns 0 for all-skipped input, returns N for N consecutive fully-compliant days, handles empty array +stats
 (C) Add macOS app icon assets (1024x1024 png) and iOS app icon assets (1024x1024 png) using "eye" SF Symbol as the base design element in Assets.xcassets +macos +ios
 (C) macOS StatisticsView: export stats as CSV via NSSavePanel writing date, completed, skipped columns per row +stats
-(C) Identify the name of the current app, then rename it (and all its refernces in the repo) to its new name "LockOut"
+(C) Identify the name of the current app, then rename it (and all its refernces in the repo) to its new name "LockOut" including in filenames
