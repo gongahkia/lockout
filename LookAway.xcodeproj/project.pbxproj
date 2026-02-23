@@ -19,6 +19,7 @@
 		4BD939D542FA3077609A750C /* LookAway-iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "LookAway-iOS.entitlements"; sourceTree = "<group>"; };
 		4FEC03002C9C5AB0E7F7ABAC /* LookAway-iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "LookAway-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		5AB4B88F3810608E8AB11A32 /* LookAway-macOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "LookAway-macOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		7FFC09DF6F4C50E3A5B9035E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		C03E1EF9F14161777251FD30 /* LookAway-macOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "LookAway-macOS.entitlements"; sourceTree = "<group>"; };
 		F252D8338816A2B7CFF91BB5 /* LookAwayCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = LookAwayCore; path = Packages/LookAwayCore; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
@@ -64,6 +65,7 @@
 			isa = PBXGroup;
 			children = (
 				220C3A547E954463C6883E21 /* App.swift */,
+				7FFC09DF6F4C50E3A5B9035E /* Info.plist */,
 				4BD939D542FA3077609A750C /* LookAway-iOS.entitlements */,
 			);
 			path = "LookAway-iOS";
@@ -307,7 +309,7 @@
 				CODE_SIGN_ENTITLEMENTS = "LookAway-iOS/LookAway-iOS.entitlements";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "LookAway-iOS/Info.plist";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -373,7 +375,7 @@
 				CODE_SIGN_ENTITLEMENTS = "LookAway-iOS/LookAway-iOS.entitlements";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "LookAway-iOS/Info.plist";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
