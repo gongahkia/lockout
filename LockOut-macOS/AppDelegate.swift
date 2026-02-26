@@ -31,6 +31,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let bundleID = Bundle.main.bundleIdentifier ?? ""
+        if bundleID == "com.yourapp.lockout.macos" {
+            let alert = NSAlert()
+            alert.messageText = "Configuration Required"
+            alert.informativeText = "Configure Config.xcconfig before distributing LockOut."
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "Quit")
+            alert.runModal()
+            NSApp.terminate(nil)
+            return
+        }
         if NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).count > 1 {
             NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
                 .first(where: { $0 != NSRunningApplication.current })?
