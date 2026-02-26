@@ -17,37 +17,60 @@ private final class ScheduleDebouncer: ObservableObject {
 struct ScheduleView: View {
     @EnvironmentObject var scheduler: BreakScheduler
     @StateObject private var debouncer = ScheduleDebouncer()
+    @State private var editingIndex: Int? = nil
+    @State private var showEditor = false
+
+    private var customTypes: Binding<[CustomBreakType]> {
+        Binding(
+            get: { scheduler.currentSettings.customBreakTypes },
+            set: { scheduler.currentSettings.customBreakTypes = $0; reschedule() }
+        )
+    }
 
     var body: some View {
         Form {
-            breakGroup(title: "Eye Break (20-20-20)", config: Binding(
-                get: { scheduler.currentSettings.eyeConfig },
-                set: { scheduler.currentSettings.eyeConfig = $0; reschedule() }
-            ))
-            breakGroup(title: "Micro Break", config: Binding(
-                get: { scheduler.currentSettings.microConfig },
-                set: { scheduler.currentSettings.microConfig = $0; reschedule() }
-            ))
-            breakGroup(title: "Long Break", config: Binding(
-                get: { scheduler.currentSettings.longConfig },
-                set: { scheduler.currentSettings.longConfig = $0; reschedule() }
-            ))
+            Section("Break Types") {
+                List {
+                    ForEach(customTypes.wrappedValue.indices, id: \.self) { i in
+                        HStack {
+                            Toggle("", isOn: customTypes[i].enabled)
+                                .labelsHidden()
+                            Text(customTypes.wrappedValue[i].name)
+                            Spacer()
+                            Text("\(customTypes.wrappedValue[i].intervalMinutes)m / \(customTypes.wrappedValue[i].durationSeconds)s")
+                                .foregroundStyle(.secondary).font(.caption)
+                            Button("Edit") { editingIndex = i; showEditor = true }
+                                .buttonStyle(.plain)
+                        }
+                    }
+                    .onDelete { customTypes.wrappedValue.remove(atOffsets: $0); reschedule() }
+                    .onMove { customTypes.wrappedValue.move(fromOffsets: $0, toOffset: $1); reschedule() }
+                }
+                Button("Add Break Type") {
+                    var newType = CustomBreakType(name: "New Break", intervalMinutes: 30, durationSeconds: 60)
+                    scheduler.currentSettings.customBreakTypes.append(newType)
+                    editingIndex = scheduler.currentSettings.customBreakTypes.count - 1
+                    showEditor = true
+                    reschedule()
+                }
+            }
             Button("Restore Defaults") {
-                scheduler.reschedule(with: .defaults)
+                scheduler.currentSettings.customBreakTypes = AppSettings.defaultCustomBreakTypes
+                scheduler.reschedule(with: scheduler.currentSettings)
             }
         }
         .padding(24)
         .navigationTitle("Schedule")
         .onAppear { debouncer.setup(scheduler: scheduler) }
-    }
-
-    @ViewBuilder
-    private func breakGroup(title: String, config: Binding<BreakConfig>) -> some View {
-        GroupBox(label: Text(title).font(.headline)) {
-            Stepper("Every \(config.wrappedValue.intervalMinutes) min",
-                    value: config.intervalMinutes, in: 1...120)
-            Stepper("For \(config.wrappedValue.durationSeconds) sec",
-                    value: config.durationSeconds, in: 5...3600)
+        .sheet(isPresented: $showEditor) {
+            if let i = editingIndex {
+                VStack {
+                    CustomBreakTypeEditorView(breakType: customTypes[i])
+                        .frame(minWidth: 400)
+                    Button("Done") { showEditor = false }
+                        .padding()
+                }
+            }
         }
     }
 
