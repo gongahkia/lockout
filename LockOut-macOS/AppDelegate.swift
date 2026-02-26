@@ -46,7 +46,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         cloudSync.onError = { [weak self] msg in DispatchQueue.main.async { self?.syncError = msg } }
         let settings = settingsSync.pull() ?? AppSettingsStore.load() ?? .defaults
         scheduler = BreakScheduler(settings: settings)
-        repository.pruneOldRecords(retentionDays: settings.historyRetentionDays) // clean stale on launch
+        let retentionDays = settings.historyRetentionDays
+        let repo = repository!
+        Task.detached { repo.pruneOldRecords(retentionDays: retentionDays) }
         applyLaunchOffset(settings: settings)
         settingsSync.observeChanges { [weak self] remote in
             self?.scheduler.reschedule(with: remote)
