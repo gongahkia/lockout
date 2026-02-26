@@ -13,9 +13,22 @@ final class MenuBarController {
     private var tickCount = 0
     private var appSwitchDebounceWork: DispatchWorkItem?
 
-    private var scheduler: BreakScheduler { AppDelegate.shared.scheduler }
+    private let scheduler: BreakScheduler
+    private let repository: BreakHistoryRepository
+    private let settingsSync: SettingsSyncService
+    private let showBreak: (BreakType, Int) -> Void
+    private let updater: SPUStandardUpdaterController
 
-    init() {
+    init(scheduler: BreakScheduler,
+         repository: BreakHistoryRepository,
+         settingsSync: SettingsSyncService,
+         updater: SPUStandardUpdaterController,
+         showBreak: @escaping (BreakType, Int) -> Void) {
+        self.scheduler = scheduler
+        self.repository = repository
+        self.settingsSync = settingsSync
+        self.updater = updater
+        self.showBreak = showBreak
         setup()
         scheduler.objectWillChange.sink { [weak self] in
             DispatchQueue.main.async { self?.updateIcon() }
@@ -63,7 +76,7 @@ final class MenuBarController {
         menu.addItem(openItem)
         menu.addItem(.separator())
         let updateItem = NSMenuItem(title: "Check for Updates…", action: #selector(SPUUpdater.checkForUpdates(_:)), keyEquivalent: "")
-        updateItem.target = AppDelegate.shared.updaterController.updater
+        updateItem.target = updater.updater
         menu.addItem(updateItem)
         let quitItem = NSMenuItem(title: "Quit LockOut", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         menu.addItem(quitItem)
@@ -80,7 +93,7 @@ final class MenuBarController {
     }
 
     func updateStreak() {
-        let streak = ComplianceCalculator.streakDays(stats: AppDelegate.shared.repository.dailyStats(for: 30))
+        let streak = ComplianceCalculator.streakDays(stats: repository.dailyStats(for: 30))
         statusItem.button?.title = streak > 0 ? " \(streak)" : ""
         statusItem.button?.imagePosition = streak > 0 ? .imageLeading : .imageOnly
     }
@@ -101,11 +114,9 @@ final class MenuBarController {
         let name = isPaused ? "eye.slash" : "eye"
         statusItem.button?.image = NSImage(systemSymbolName: name, accessibilityDescription: "LockOut")
         statusItem.button?.image?.isTemplate = true
-        // update pause menu label
         if let item = menu.item(withTitle: "Pause Breaks") ?? menu.item(withTitle: "Resume Breaks") {
             item.title = isPaused ? "Resume Breaks" : "Pause Breaks"
         }
-        // update snooze label
         let n = scheduler.currentSettings.snoozeDurationMinutes
         menu.items.first(where: { $0.title.hasPrefix("Snooze") })?.title = "Snooze \(n) min"
     }
@@ -133,10 +144,7 @@ final class MenuBarController {
     }
 
     @objc private func takeBreakNow() {
-        AppDelegate.shared.overlayController?.show(
-            breakType: scheduler.nextBreak?.type ?? .eye,
-            duration: scheduler.currentSettings.eyeConfig.durationSeconds
-        )
+        showBreak(scheduler.nextBreak?.type ?? .eye, scheduler.currentSettings.eyeConfig.durationSeconds)
     }
 
     @objc private func snooze() {
