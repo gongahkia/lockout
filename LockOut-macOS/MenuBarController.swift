@@ -144,4 +144,12 @@ final class MenuBarController {
         NSApp.activate(ignoringOtherApps: true)
         NSApp.windows.first(where: { $0.title == "LockOut" })?.makeKeyAndOrderFront(nil)
     }
+
+    func stopObserving() {
+        tickTimer?.invalidate()
+        tickTimer = nil
+        midnightTimer?.invalidate()
+        midnightTimer = nil
+        cancellables.removeAll()
+    }
 }
