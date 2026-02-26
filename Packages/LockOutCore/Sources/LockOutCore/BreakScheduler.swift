@@ -75,10 +75,12 @@ public final class BreakScheduler: ObservableObject {
         stop()
         currentSettings.isPaused = true
         nextBreak = nil
+        AppSettingsStore.save(currentSettings)
     }
 
     public func resume() {
         currentSettings.isPaused = false
+        AppSettingsStore.save(currentSettings)
         start(settings: currentSettings)
     }
 
