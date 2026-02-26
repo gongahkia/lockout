@@ -22,21 +22,26 @@ public final class BreakScheduler: ObservableObject {
         currentSettings = settings
         guard !settings.isPaused else { return }
         let now = Date()
-        let configs: [(BreakType, BreakConfig)] = [
-            (.eye, settings.eyeConfig),
-            (.micro, settings.microConfig),
-            (.long, settings.longConfig),
-        ]
         var soonest: (type: BreakType, fireDate: Date)?
-        for (type, config) in configs where config.isEnabled {
-            let fireDate = now.addingTimeInterval(Double(config.intervalMinutes) * 60 - offsetSeconds)
+        for customType in settings.customBreakTypes.filter(\.enabled) {
+            let fireDate = now.addingTimeInterval(Double(customType.intervalMinutes) * 60 - offsetSeconds)
+            let id = customType.id
+            let legacyType = legacyBreakType(for: customType)
             let timer = Timer.scheduledTimer(withTimeInterval: max(0, fireDate.timeIntervalSinceNow), repeats: false) { [weak self] _ in
-                Task { @MainActor [weak self] in self?.timerFired(type: type) }
+                Task { @MainActor [weak self] in self?.timerFired(type: legacyType, customTypeID: id) }
             }
-            timers[type] = timer
-            if soonest == nil || fireDate < soonest!.fireDate { soonest = (type: type, fireDate: fireDate) }
+            timers[legacyType] = timer
+            if soonest == nil || fireDate < soonest!.fireDate { soonest = (type: legacyType, fireDate: fireDate) }
         }
         nextBreak = soonest
+    }
+
+    // maps customBreakType to nearest legacy BreakType for backward compat; uses name heuristic
+    private func legacyBreakType(for t: CustomBreakType) -> BreakType {
+        let lower = t.name.lowercased()
+        if lower.contains("micro") { return .micro }
+        if lower.contains("long") { return .long }
+        return .eye
     }
 
     public func stop() {
@@ -90,18 +95,15 @@ public final class BreakScheduler: ObservableObject {
         start(settings: settings)
     }
 
-    private func timerFired(type: BreakType) {
+    private func timerFired(type: BreakType, customTypeID: UUID? = nil) {
         timers[type] = nil
-        // update nextBreak to the soonest remaining pending timer
         let pending = timers.compactMap { (t, timer) -> (BreakType, Date)? in
-            let remaining = timer.fireDate
-            return (t, remaining)
+            (t, timer.fireDate)
         }.min(by: { $0.1 < $1.1 })
         if let (t, d) = pending {
             nextBreak = (type: t, fireDate: d)
         } else {
-            nextBreak = (type: type, fireDate: Date()) // fired type becomes current
+            nextBreak = (type: type, fireDate: Date())
         }
-        // caller observes nextBreak for overlay
     }
 }
