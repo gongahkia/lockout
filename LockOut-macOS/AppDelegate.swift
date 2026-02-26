@@ -94,6 +94,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         requestNotificationPermission()
         startIdleDetection()
+        observeFocusMode()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -108,6 +109,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let elapsed = Date().timeIntervalSince(last)
         scheduler.start(settings: settings, offsetSeconds: elapsed)
+    }
+
+    private func observeFocusMode() {
+        let nc = CFNotificationCenterGetDarwinNotifyCenter()
+        CFNotificationCenterAddObserver(nc, Unmanaged.passUnretained(self).toOpaque(),
+            { _, observer, _, _, _ in
+                guard let ptr = observer else { return }
+                let delegate = Unmanaged<AppDelegate>.fromOpaque(ptr).takeUnretainedValue()
+                guard delegate.scheduler.currentSettings.pauseDuringFocus else { return }
+                // Toggle pause based on DND; presence of notification means state changed.
+                // Re-check current DND state via UserNotifications isn't directly available;
+                // use a heuristic: toggle opposite of current pause state.
+                if delegate.scheduler.currentSettings.isPaused { delegate.scheduler.resume() }
+                else { delegate.scheduler.pause() }
+            },
+            "com.apple.donotdisturb.state.changed" as CFString, nil, .deliverImmediately)
     }
 
     private func startIdleDetection() {
