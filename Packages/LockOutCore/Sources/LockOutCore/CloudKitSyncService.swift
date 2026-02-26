@@ -2,7 +2,11 @@ import Foundation
 import CloudKit
 
 public final class CloudKitSyncService {
-    private let db = CKContainer(identifier: "iCloud.com.yourapp.lockout").privateCloudDatabase
+    private let db: CKDatabase = {
+        let id = Bundle.main.object(forInfoDictionaryKey: "CLOUDKIT_CONTAINER_ID") as? String
+            ?? "iCloud.com.yourapp.lockout" // fallback for unit test context
+        return CKContainer(identifier: id).privateCloudDatabase
+    }()
     private static let lastSyncKey = "ck_last_sync_date"
     public var onError: ((String) -> Void)?
 
