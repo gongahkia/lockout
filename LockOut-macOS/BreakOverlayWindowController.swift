@@ -22,6 +22,11 @@ final class BreakOverlayWindowController {
             scheduler.markCompleted(repository: repo)
             return
         }
+        let frontmostID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? ""
+        if scheduler.currentSettings.blockedBundleIDs.contains(frontmostID) {
+            scheduler.markCompleted(repository: repo)
+            return
+        }
         NSSound(named: NSSound.Name("Glass"))?.play()
         for screen in NSScreen.screens {
             let win = LockOutOverlayWindow(

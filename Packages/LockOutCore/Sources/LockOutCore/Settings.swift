@@ -20,10 +20,12 @@ public struct AppSettings: Codable, Sendable {
     public var historyRetentionDays: Int
     public var isPaused: Bool
     public var customBreakTypes: [CustomBreakType]
+    public var blockedBundleIDs: [String]
 
     public init(eyeConfig: BreakConfig, microConfig: BreakConfig, longConfig: BreakConfig,
                 snoozeDurationMinutes: Int = 5, historyRetentionDays: Int = 7, isPaused: Bool = false,
-                customBreakTypes: [CustomBreakType] = AppSettings.defaultCustomBreakTypes) {
+                customBreakTypes: [CustomBreakType] = AppSettings.defaultCustomBreakTypes,
+                blockedBundleIDs: [String] = []) {
         self.eyeConfig = eyeConfig
         self.microConfig = microConfig
         self.longConfig = longConfig
@@ -31,6 +33,7 @@ public struct AppSettings: Codable, Sendable {
         self.historyRetentionDays = historyRetentionDays
         self.isPaused = isPaused
         self.customBreakTypes = customBreakTypes
+        self.blockedBundleIDs = blockedBundleIDs
     }
 
     public static var defaultCustomBreakTypes: [CustomBreakType] {[
