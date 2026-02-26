@@ -33,10 +33,11 @@ public final class CloudKitSyncService {
             .store(in: &cancellables)
     }
 
-    private var lastSyncDate: Date {
+    public var lastSyncDate: Date {
         get { (UserDefaults.standard.object(forKey: Self.lastSyncKey) as? Date) ?? .distantPast }
         set { UserDefaults.standard.set(newValue, forKey: Self.lastSyncKey) }
     }
+    public var pendingUploadsCount: Int { pendingUploads.count }
 
     public func uploadSession(_ session: BreakSession) async {
         guard NetworkMonitor.shared.isConnected else {

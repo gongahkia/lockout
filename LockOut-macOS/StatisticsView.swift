@@ -5,6 +5,7 @@ import LockOutCore
 struct StatisticsView: View {
     @State private var range = 7
     private var repo: BreakHistoryRepository { AppDelegate.shared.repository }
+    private var cloudSync: CloudKitSyncService { AppDelegate.shared.cloudSync }
     private var stats: [DayStat] { repo.dailyStats(for: range) }
 
     var body: some View {
@@ -41,10 +42,32 @@ struct StatisticsView: View {
                 summaryCell(value: "\(streak)d", label: "Streak")
             }
         }
+            syncStatusRow
             Button("Export CSV") { exportCSV() }
         }
         .padding(24)
         .navigationTitle("Statistics")
+    }
+
+    @ViewBuilder private var syncStatusRow: some View {
+        let pending = cloudSync.pendingUploadsCount
+        let lastSync = cloudSync.lastSyncDate
+        HStack(spacing: 6) {
+            if pending > 0 {
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.yellow)
+                Text("\(pending) pending upload\(pending == 1 ? "" : "s")")
+            } else {
+                Image(systemName: "checkmark.icloud").foregroundStyle(.secondary)
+            }
+            Spacer()
+            if lastSync == .distantPast {
+                Text("Never synced").foregroundStyle(.secondary)
+            } else {
+                Text("Last synced: \(lastSync.formatted(.dateTime.month().day().hour().minute()))")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .font(.caption)
     }
 
     private func exportCSV() {
