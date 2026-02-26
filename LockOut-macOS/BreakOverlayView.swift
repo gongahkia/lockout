@@ -53,6 +53,7 @@ struct BreakOverlayView: View {
             if remaining > 0 { remaining -= 1 }
             else {
                 scheduler.markCompleted(repository: repo)
+                AppDelegate.shared.menuBarController?.updateStreak()
                 onDismiss()
             }
         }

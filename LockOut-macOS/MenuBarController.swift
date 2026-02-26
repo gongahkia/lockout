@@ -75,7 +75,7 @@ final class MenuBarController {
         }
     }
 
-    private func updateStreak() {
+    func updateStreak() {
         let streak = ComplianceCalculator.streakDays(stats: AppDelegate.shared.repository.dailyStats(for: 30))
         statusItem.button?.title = streak > 0 ? " \(streak)" : ""
         statusItem.button?.imagePosition = streak > 0 ? .imageLeading : .imageOnly
