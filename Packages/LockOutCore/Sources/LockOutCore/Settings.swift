@@ -23,11 +23,13 @@ public struct AppSettings: Codable, Sendable {
     public var blockedBundleIDs: [String]
     public var idleThresholdMinutes: Int
     public var pauseDuringFocus: Bool
+    public var pauseDuringCalendarEvents: Bool
 
     public init(eyeConfig: BreakConfig, microConfig: BreakConfig, longConfig: BreakConfig,
                 snoozeDurationMinutes: Int = 5, historyRetentionDays: Int = 7, isPaused: Bool = false,
                 customBreakTypes: [CustomBreakType] = AppSettings.defaultCustomBreakTypes,
-                blockedBundleIDs: [String] = [], idleThresholdMinutes: Int = 5, pauseDuringFocus: Bool = false) {
+                blockedBundleIDs: [String] = [], idleThresholdMinutes: Int = 5, pauseDuringFocus: Bool = false,
+                pauseDuringCalendarEvents: Bool = false) {
         self.eyeConfig = eyeConfig
         self.microConfig = microConfig
         self.longConfig = longConfig
@@ -38,6 +40,7 @@ public struct AppSettings: Codable, Sendable {
         self.blockedBundleIDs = blockedBundleIDs
         self.idleThresholdMinutes = max(1, min(60, idleThresholdMinutes))
         self.pauseDuringFocus = pauseDuringFocus
+        self.pauseDuringCalendarEvents = pauseDuringCalendarEvents
     }
 
     public static var defaultCustomBreakTypes: [CustomBreakType] {[

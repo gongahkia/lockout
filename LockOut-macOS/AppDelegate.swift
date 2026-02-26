@@ -2,6 +2,7 @@ import AppKit
 import Combine
 import SwiftData
 import LockOutCore
+import EventKit
 
 // MARK: - Schema migration stubs
 enum LockOutSchemaV1: VersionedSchema {
@@ -29,6 +30,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var idleCheckTimer: Timer?
     private var idlePaused = false
     private var activityMonitor: Any?
+    private var calendarTimer: Timer?
+    private var calendarPaused = false
+    private let ekStore = EKEventStore()
 
     private static let lastFireKey = "last_break_fire_date"
 
@@ -95,6 +99,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         requestNotificationPermission()
         startIdleDetection()
         observeFocusMode()
+        startCalendarPolling()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -109,6 +114,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let elapsed = Date().timeIntervalSince(last)
         scheduler.start(settings: settings, offsetSeconds: elapsed)
+    }
+
+    private func startCalendarPolling() {
+        guard scheduler.currentSettings.pauseDuringCalendarEvents else { return }
+        ekStore.requestFullAccessToEvents { [weak self] granted, _ in
+            guard granted, let self else { return }
+            self.calendarTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+                self?.checkCalendarEvents()
+            }
+        }
+    }
+
+    private func checkCalendarEvents() {
+        guard scheduler.currentSettings.pauseDuringCalendarEvents else { return }
+        let now = Date()
+        let cals = ekStore.calendars(for: .event)
+        let pred = ekStore.predicateForEvents(withStart: now.addingTimeInterval(-1), end: now.addingTimeInterval(1), calendars: cals)
+        let active = ekStore.events(matching: pred).contains { $0.startDate <= now && $0.endDate >= now }
+        if active && !calendarPaused {
+            calendarPaused = true
+            scheduler.pause()
+        } else if !active && calendarPaused {
+            calendarPaused = false
+            scheduler.resume()
+        }
     }
 
     private func observeFocusMode() {
