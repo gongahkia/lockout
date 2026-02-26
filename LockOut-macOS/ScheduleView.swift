@@ -1,8 +1,22 @@
 import SwiftUI
+import Combine
 import LockOutCore
+
+@MainActor
+private final class ScheduleDebouncer: ObservableObject {
+    let subject = PassthroughSubject<AppSettings, Never>()
+    private var cancellable: AnyCancellable?
+    func setup(scheduler: BreakScheduler) {
+        guard cancellable == nil else { return }
+        cancellable = subject
+            .debounce(for: .milliseconds(500), scheduler: RunLoop.main)
+            .sink { [weak scheduler] s in scheduler?.reschedule(with: s) }
+    }
+}
 
 struct ScheduleView: View {
     @EnvironmentObject var scheduler: BreakScheduler
+    @StateObject private var debouncer = ScheduleDebouncer()
 
     var body: some View {
         Form {
@@ -24,6 +38,7 @@ struct ScheduleView: View {
         }
         .padding(24)
         .navigationTitle("Schedule")
+        .onAppear { debouncer.setup(scheduler: scheduler) }
     }
 
     @ViewBuilder
@@ -36,5 +51,5 @@ struct ScheduleView: View {
         }
     }
 
-    private func reschedule() { scheduler.reschedule(with: scheduler.currentSettings) }
+    private func reschedule() { debouncer.subject.send(scheduler.currentSettings) }
 }
