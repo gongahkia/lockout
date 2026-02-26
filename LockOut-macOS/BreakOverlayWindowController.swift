@@ -9,11 +9,11 @@ final class BreakOverlayWindowController {
 
     func show(breakType: BreakType, duration: Int) {
         guard windows.isEmpty else { return }
-        guard !isScreenLocked() else {
+        guard !SystemStateService.isScreenLocked() else {
             scheduler.markCompleted(repository: repo)
             return
         }
-        guard !frontmostAppIsFullscreen() else {
+        guard !SystemStateService.frontmostAppIsFullscreen() else {
             scheduler.markCompleted(repository: repo)
             return
         }
@@ -62,18 +62,4 @@ final class BreakOverlayWindowController {
         }
     }
 
-    private func isScreenLocked() -> Bool {
-        (CGSessionCopyCurrentDictionary() as? [String: Any])?["CGSSessionScreenIsLocked"] as? Bool ?? false
-    }
-
-    private func frontmostAppIsFullscreen() -> Bool {
-        guard let app = NSWorkspace.shared.frontmostApplication else { return false }
-        let pid = app.processIdentifier
-        let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] ?? []
-        return list.contains { info in
-            (info[kCGWindowOwnerPID as String] as? Int32) == pid &&
-            (info[kCGWindowLayer as String] as? Int32) == 0 &&
-            (info[kCGWindowIsOnscreen as String] as? Bool) == true
-        }
-    }
 }
