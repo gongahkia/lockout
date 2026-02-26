@@ -1,5 +1,20 @@
 import Foundation
 
+// MARK: - Profiles
+public struct AppProfile: Codable, Identifiable, Sendable {
+    public var id: UUID
+    public var name: String
+    public var customBreakTypes: [CustomBreakType]
+    public var blockedBundleIDs: [String]
+    public var idleThresholdMinutes: Int
+
+    public init(id: UUID = UUID(), name: String, customBreakTypes: [CustomBreakType] = AppSettings.defaultCustomBreakTypes,
+                blockedBundleIDs: [String] = [], idleThresholdMinutes: Int = 5) {
+        self.id = id; self.name = name; self.customBreakTypes = customBreakTypes
+        self.blockedBundleIDs = blockedBundleIDs; self.idleThresholdMinutes = idleThresholdMinutes
+    }
+}
+
 public struct BreakConfig: Codable, Sendable {
     public var intervalMinutes: Int
     public var durationSeconds: Int
@@ -26,12 +41,15 @@ public struct AppSettings: Codable, Sendable {
     public var pauseDuringCalendarEvents: Bool
     public var workdayStartHour: Int?   // nil = no automatic start
     public var workdayEndHour: Int?     // nil = no automatic end
+    public var profiles: [AppProfile]
+    public var activeProfileId: UUID?
 
     public init(eyeConfig: BreakConfig, microConfig: BreakConfig, longConfig: BreakConfig,
                 snoozeDurationMinutes: Int = 5, historyRetentionDays: Int = 7, isPaused: Bool = false,
                 customBreakTypes: [CustomBreakType] = AppSettings.defaultCustomBreakTypes,
                 blockedBundleIDs: [String] = [], idleThresholdMinutes: Int = 5, pauseDuringFocus: Bool = false,
-                pauseDuringCalendarEvents: Bool = false, workdayStartHour: Int? = nil, workdayEndHour: Int? = nil) {
+                pauseDuringCalendarEvents: Bool = false, workdayStartHour: Int? = nil, workdayEndHour: Int? = nil,
+                profiles: [AppProfile] = [], activeProfileId: UUID? = nil) {
         self.eyeConfig = eyeConfig
         self.microConfig = microConfig
         self.longConfig = longConfig
@@ -45,6 +63,8 @@ public struct AppSettings: Codable, Sendable {
         self.pauseDuringCalendarEvents = pauseDuringCalendarEvents
         self.workdayStartHour = workdayStartHour
         self.workdayEndHour = workdayEndHour
+        self.profiles = profiles
+        self.activeProfileId = activeProfileId
     }
 
     public static var defaultCustomBreakTypes: [CustomBreakType] {[

@@ -75,6 +75,12 @@ final class MenuBarController {
         openItem.target = self
         menu.addItem(openItem)
         menu.addItem(.separator())
+        let profileMenu = NSMenu()
+        let profileItem = NSMenuItem(title: "Profile", action: nil, keyEquivalent: "")
+        profileItem.submenu = profileMenu
+        menu.addItem(profileItem)
+        rebuildProfileMenu(profileMenu)
+        menu.addItem(.separator())
         let updateItem = NSMenuItem(title: "Check for Updates…", action: #selector(SPUUpdater.checkForUpdates(_:)), keyEquivalent: "")
         updateItem.target = updater.updater
         menu.addItem(updateItem)
@@ -155,6 +161,28 @@ final class MenuBarController {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         NSApp.windows.first(where: { $0.title == "LockOut" })?.makeKeyAndOrderFront(nil)
+    }
+
+    private func rebuildProfileMenu(_ profileMenu: NSMenu) {
+        profileMenu.removeAllItems()
+        for profile in scheduler.currentSettings.profiles {
+            let item = NSMenuItem(title: profile.name, action: #selector(switchProfile(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = profile.id.uuidString
+            item.state = scheduler.currentSettings.activeProfileId == profile.id ? .on : .off
+            profileMenu.addItem(item)
+        }
+    }
+
+    @objc private func switchProfile(_ sender: NSMenuItem) {
+        guard let idStr = sender.representedObject as? String,
+              let id = UUID(uuidString: idStr),
+              let profile = scheduler.currentSettings.profiles.first(where: { $0.id == id }) else { return }
+        scheduler.currentSettings.activeProfileId = id
+        scheduler.currentSettings.customBreakTypes = profile.customBreakTypes
+        scheduler.currentSettings.blockedBundleIDs = profile.blockedBundleIDs
+        scheduler.currentSettings.idleThresholdMinutes = profile.idleThresholdMinutes
+        scheduler.reschedule(with: scheduler.currentSettings)
     }
 
     func stopObserving() {
