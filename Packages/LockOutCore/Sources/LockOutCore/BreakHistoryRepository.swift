@@ -32,12 +32,14 @@ public final class BreakHistoryRepository {
 
     public func pruneOldRecords(retentionDays: Int) {
         let cutoff = Calendar.current.date(byAdding: .day, value: -retentionDays, to: Date()) ?? Date()
-        let descriptor = FetchDescriptor<BreakSessionRecord>(
-            predicate: #Predicate { $0.scheduledAt < cutoff }
-        )
-        guard let old = try? context.fetch(descriptor) else { return }
-        old.forEach { context.delete($0) }
-        do { try context.save() } catch { fputs("[SwiftData] \(error)\n", stderr) }
+        let descriptor = FetchDescriptor<BreakSessionRecord>(predicate: #Predicate { $0.scheduledAt < cutoff })
+        do {
+            let old = try context.fetch(descriptor)
+            old.forEach { context.delete($0) }
+            try context.save()
+        } catch {
+            fputs("[SwiftData] pruneOldRecords: \(error)\n", stderr)
+        }
     }
 
     public func dailyStats(for days: Int) -> [DayStat] {
