@@ -13,7 +13,8 @@ public final class BreakScheduler: ObservableObject {
     }
 
     deinit {
-        timers.values.forEach { $0.invalidate() }
+        timers.values.forEach { $0.invalidate() } // stop() can't be called in deinit due to @MainActor isolation
+        timers.removeAll()
     }
 
     public func start(settings: AppSettings, offsetSeconds: TimeInterval = 0) {
