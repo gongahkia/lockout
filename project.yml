@@ -27,8 +27,9 @@ targets:
       path: LockOut-macOS/Info.plist
       properties:
         LSUIElement: true           # menu bar agent, no Dock icon
-        SUFeedURL: "https://your-domain.com/appcast.xml"
-        SUPublicEDKey: ""
+        SUFeedURL: "$(SPARKLE_FEED_URL)"
+        SUPublicEDKey: "$(SPARKLE_ED_KEY)"
+        CLOUDKIT_CONTAINER_ID: "$(CLOUDKIT_CONTAINER_ID)"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(PRODUCT_BUNDLE_IDENTIFIER)
