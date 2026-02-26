@@ -4,17 +4,22 @@ import LockOutCore
 struct BreakOverlayView: View {
     let breakType: BreakType
     let duration: Int
+    let minDisplaySeconds: Int
     let scheduler: BreakScheduler
     let repository: BreakHistoryRepository
     let onDismiss: () -> Void
 
     @State private var remaining: Int
     @State private var breatheScale: CGFloat = 0.5
+    @State private var showTime = Date()
     private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
-    init(breakType: BreakType, duration: Int, scheduler: BreakScheduler, repository: BreakHistoryRepository, onDismiss: @escaping () -> Void) {
+    private var canSkip: Bool { Date().timeIntervalSince(showTime) >= Double(minDisplaySeconds) }
+
+    init(breakType: BreakType, duration: Int, minDisplaySeconds: Int = 5, scheduler: BreakScheduler, repository: BreakHistoryRepository, onDismiss: @escaping () -> Void) {
         self.breakType = breakType
         self.duration = duration
+        self.minDisplaySeconds = minDisplaySeconds
         self.scheduler = scheduler
         self.repository = repository
         self.onDismiss = onDismiss
@@ -40,12 +45,14 @@ struct BreakOverlayView: View {
                         onDismiss()
                     }
                     .buttonStyle(.plain)
+                    .disabled(!canSkip)
                     Spacer()
                     Button("Skip") {
                         scheduler.skip(repository: repository)
                         onDismiss()
                     }
                     .buttonStyle(.plain)
+                    .disabled(!canSkip)
                 }
                 .padding(24)
             }
@@ -60,6 +67,7 @@ struct BreakOverlayView: View {
             }
         }
         .onAppear {
+            showTime = Date()
             if breakType != .eye {
                 withAnimation(.easeInOut(duration: 4).repeatForever(autoreverses: true)) {
                     breatheScale = 1.0

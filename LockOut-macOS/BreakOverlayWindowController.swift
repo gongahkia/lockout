@@ -12,7 +12,7 @@ final class BreakOverlayWindowController {
         self.repo = repository
     }
 
-    func show(breakType: BreakType, duration: Int) {
+    func show(breakType: BreakType, duration: Int, minDisplaySeconds: Int = 5) {
         guard windows.isEmpty else { return }
         guard !SystemStateService.isScreenLocked() else {
             scheduler.markCompleted(repository: repo)
@@ -43,6 +43,7 @@ final class BreakOverlayWindowController {
             let view = BreakOverlayView(
                 breakType: breakType,
                 duration: duration,
+                minDisplaySeconds: minDisplaySeconds,
                 scheduler: scheduler,
                 repository: repo
             ) { [weak self] in self?.dismiss() }
