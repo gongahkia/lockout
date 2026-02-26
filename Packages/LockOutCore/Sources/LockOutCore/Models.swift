@@ -1,6 +1,33 @@
 import Foundation
 import SwiftData
 
+// MARK: - Custom break type
+public struct CustomBreakType: Codable, Identifiable, Equatable, Sendable {
+    public var id: UUID
+    public var name: String
+    public var intervalMinutes: Int
+    public var durationSeconds: Int
+    public var minDisplaySeconds: Int
+    public var enabled: Bool
+    public var soundName: String?
+    public var message: String?
+    public var tips: [String]
+    public var overlayOpacity: Double
+    public var overlayColorHex: String
+    public var snoozeMinutes: Int
+
+    public init(id: UUID = UUID(), name: String, intervalMinutes: Int, durationSeconds: Int,
+                minDisplaySeconds: Int = 5, enabled: Bool = true, soundName: String? = nil,
+                message: String? = nil, tips: [String] = [], overlayOpacity: Double = 0.85,
+                overlayColorHex: String = "#000000", snoozeMinutes: Int = 5) {
+        self.id = id; self.name = name; self.intervalMinutes = intervalMinutes
+        self.durationSeconds = durationSeconds; self.minDisplaySeconds = minDisplaySeconds
+        self.enabled = enabled; self.soundName = soundName; self.message = message
+        self.tips = tips; self.overlayOpacity = overlayOpacity
+        self.overlayColorHex = overlayColorHex; self.snoozeMinutes = snoozeMinutes
+    }
+}
+
 // MARK: - Enums
 public enum BreakType: String, Codable, CaseIterable, Sendable {
     case eye    // 20-20-20 rule
