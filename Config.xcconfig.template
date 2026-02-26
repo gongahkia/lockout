@@ -1,0 +1,7 @@
+// Copy this file to Config.xcconfig and fill in your values.
+// Config.xcconfig is git-ignored and must not be committed.
+PRODUCT_BUNDLE_IDENTIFIER = com.yourapp.lockout.macos
+DEVELOPMENT_TEAM =
+CLOUDKIT_CONTAINER_ID = iCloud.com.yourapp.lockout
+SPARKLE_FEED_URL = https://your-domain.com/appcast.xml
+SPARKLE_ED_KEY =
