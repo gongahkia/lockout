@@ -3,6 +3,17 @@ import Combine
 import SwiftData
 import LockOutCore
 
+// MARK: - Schema migration stubs
+enum LockOutSchemaV1: VersionedSchema {
+    static var versionIdentifier = Schema.Version(1, 0, 0)
+    static var models: [any PersistentModel.Type] { [BreakSessionRecord.self] }
+}
+
+enum LockOutSchemaMigrationPlan: SchemaMigrationPlan {
+    static var schemas: [any VersionedSchema.Type] { [LockOutSchemaV1.self] }
+    static var stages: [MigrationStage] { [] } // add lightweight/custom stages here for future schema versions
+}
+
 final class AppDelegate: NSObject, NSApplicationDelegate {
     static let shared = AppDelegate()
     private(set) var scheduler: BreakScheduler!
@@ -28,7 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         do {
-            modelContainer = try ModelContainer(for: BreakSessionRecord.self)
+            modelContainer = try ModelContainer(for: BreakSessionRecord.self, migrationPlan: LockOutSchemaMigrationPlan.self)
         } catch {
             let alert = NSAlert()
             alert.messageText = "Database Error"
