@@ -29,6 +29,30 @@ struct SettingsView: View {
                             get: { scheduler.currentSettings.idleThresholdMinutes },
                             set: { scheduler.currentSettings.idleThresholdMinutes = max(1, min(60, $0)) }
                         ), in: 1...60)
+                Toggle("Pause during Focus Mode", isOn: Binding(
+                    get: { scheduler.currentSettings.pauseDuringFocus },
+                    set: { scheduler.currentSettings.pauseDuringFocus = $0 }
+                ))
+                Toggle("Pause during Calendar events", isOn: Binding(
+                    get: { scheduler.currentSettings.pauseDuringCalendarEvents },
+                    set: { scheduler.currentSettings.pauseDuringCalendarEvents = $0 }
+                ))
+            }
+            Section("Workday") {
+                Picker("Start hour", selection: Binding(
+                    get: { scheduler.currentSettings.workdayStartHour ?? -1 },
+                    set: { scheduler.currentSettings.workdayStartHour = $0 >= 0 ? $0 : nil }
+                )) {
+                    Text("Off").tag(-1)
+                    ForEach(0..<24) { Text(String(format: "%02d:00", $0)).tag($0) }
+                }
+                Picker("End hour", selection: Binding(
+                    get: { scheduler.currentSettings.workdayEndHour ?? -1 },
+                    set: { scheduler.currentSettings.workdayEndHour = $0 >= 0 ? $0 : nil }
+                )) {
+                    Text("Off").tag(-1)
+                    ForEach(0..<24) { Text(String(format: "%02d:00", $0)).tag($0) }
+                }
             }
             Toggle("Launch at Login", isOn: Binding(
                 get: { LaunchAtLoginService.isEnabled },

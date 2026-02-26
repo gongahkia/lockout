@@ -33,6 +33,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var calendarTimer: Timer?
     private var calendarPaused = false
     private let ekStore = EKEventStore()
+    private var workdayStartTimer: Timer?
+    private var workdayEndTimer: Timer?
 
     private static let lastFireKey = "last_break_fire_date"
 
@@ -100,6 +102,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         startIdleDetection()
         observeFocusMode()
         startCalendarPolling()
+        scheduleWorkdayTimers()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -114,6 +117,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let elapsed = Date().timeIntervalSince(last)
         scheduler.start(settings: settings, offsetSeconds: elapsed)
+    }
+
+    private func scheduleDailyTimer(hour: Int, action: @escaping () -> Void) -> Timer {
+        let cal = Calendar.current
+        var comps = cal.dateComponents([.year, .month, .day], from: Date())
+        comps.hour = hour; comps.minute = 0; comps.second = 0
+        var fire = cal.date(from: comps) ?? Date()
+        if fire <= Date() { fire = cal.date(byAdding: .day, value: 1, to: fire) ?? fire }
+        return Timer.scheduledTimer(withTimeInterval: fire.timeIntervalSinceNow, repeats: false) { _ in
+            action()
+            // reschedule for next day
+            _ = Timer.scheduledTimer(withTimeInterval: 86400, repeats: true) { _ in action() }
+        }
+    }
+
+    private func scheduleWorkdayTimers() {
+        workdayStartTimer?.invalidate()
+        workdayEndTimer?.invalidate()
+        if let startHour = scheduler.currentSettings.workdayStartHour {
+            workdayStartTimer = scheduleDailyTimer(hour: startHour) { [weak self] in self?.scheduler.resume() }
+        }
+        if let endHour = scheduler.currentSettings.workdayEndHour {
+            workdayEndTimer = scheduleDailyTimer(hour: endHour) { [weak self] in self?.scheduler.pause() }
+        }
     }
 
     private func startCalendarPolling() {
