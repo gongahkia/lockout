@@ -17,6 +17,7 @@ public final class BreakHistoryRepository {
         if let existing = (try? context.fetch(FetchDescriptor<BreakSessionRecord>(predicate: #Predicate { $0.id == session.id })))?.first {
             existing.status = session.status.rawValue
             existing.endedAt = session.endedAt
+            if let name = session.breakTypeName { existing.breakTypeName = name }
         } else {
             context.insert(BreakSessionRecord(from: session))
         }
