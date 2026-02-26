@@ -82,4 +82,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func requestNotificationPermission() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
+
+    static func scheduleNotification(_ request: UNNotificationRequest) {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            guard settings.authorizationStatus == .authorized else { return }
+            UNUserNotificationCenter.current().add(request) { err in
+                if let err { fputs("[UNNotif] \(err)\n", stderr) }
+            }
+        }
+    }
 }
