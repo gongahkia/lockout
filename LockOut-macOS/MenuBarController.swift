@@ -11,6 +11,7 @@ final class MenuBarController {
     private var cancellables = Set<AnyCancellable>()
     private var countdownItem: NSMenuItem!
     private var tickCount = 0
+    private var appSwitchDebounceWork: DispatchWorkItem?
 
     private var scheduler: BreakScheduler { AppDelegate.shared.scheduler }
 
@@ -26,7 +27,10 @@ final class MenuBarController {
     }
 
     @objc private func appSwitched() {
-        updateOverdue() // re-evaluate fullscreen detection on every app switch
+        appSwitchDebounceWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.updateOverdue() }
+        appSwitchDebounceWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1, execute: work)
     }
 
     private func setup() {
