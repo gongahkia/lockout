@@ -1,5 +1,6 @@
 import Foundation
 import CloudKit
+import Combine
 
 public final class CloudKitSyncService {
     private let db: CKDatabase = {
@@ -8,9 +9,29 @@ public final class CloudKitSyncService {
         return CKContainer(identifier: id).privateCloudDatabase
     }()
     private static let lastSyncKey = "ck_last_sync_date"
+    private static let pendingKey = "ckPendingUploads"
     public var onError: ((String) -> Void)?
 
-    public init() {}
+    private var pendingUploads: [BreakSession] {
+        get {
+            guard let data = UserDefaults.standard.data(forKey: Self.pendingKey),
+                  let sessions = try? JSONDecoder().decode([BreakSession].self, from: data) else { return [] }
+            return sessions
+        }
+        set {
+            UserDefaults.standard.set(try? JSONEncoder().encode(newValue), forKey: Self.pendingKey)
+        }
+    }
+
+    private var cancellables = Set<AnyCancellable>()
+
+    public init() {
+        // flush pending queue when network becomes available
+        NetworkMonitor.shared.$isConnected
+            .filter { $0 }
+            .sink { [weak self] _ in Task { await self?.flushPending() } }
+            .store(in: &cancellables)
+    }
 
     private var lastSyncDate: Date {
         get { (UserDefaults.standard.object(forKey: Self.lastSyncKey) as? Date) ?? .distantPast }
@@ -18,6 +39,16 @@ public final class CloudKitSyncService {
     }
 
     public func uploadSession(_ session: BreakSession) async {
+        guard NetworkMonitor.shared.isConnected else {
+            var q = pendingUploads
+            q.append(session)
+            pendingUploads = q
+            return
+        }
+        await uploadWithBackoff(session, attempt: 0)
+    }
+
+    private func uploadWithBackoff(_ session: BreakSession, attempt: Int) async {
         let recordID = CKRecord.ID(recordName: session.id.uuidString)
         let record = CKRecord(recordType: "BreakSession", recordID: recordID)
         record["id"] = session.id.uuidString as CKRecordValue
@@ -26,9 +57,30 @@ public final class CloudKitSyncService {
         record["status"] = session.status.rawValue as CKRecordValue
         do {
             try await db.save(record)
+        } catch let error as CKError where shouldRetry(error) && attempt < 3 {
+            let delay: UInt64 = UInt64(pow(2.0, Double(attempt))) * 1_000_000_000
+            try? await Task.sleep(nanoseconds: delay)
+            await uploadWithBackoff(session, attempt: attempt + 1)
         } catch {
             handle(error: error)
+            var q = pendingUploads
+            q.append(session)
+            pendingUploads = q
         }
+    }
+
+    private func shouldRetry(_ error: CKError) -> Bool {
+        switch error.code {
+        case .serverRecordChanged, .networkUnavailable, .networkFailure, .serviceUnavailable: return true
+        default: return false
+        }
+    }
+
+    private func flushPending() async {
+        let queue = pendingUploads
+        guard !queue.isEmpty else { return }
+        pendingUploads = []
+        for session in queue { await uploadWithBackoff(session, attempt: 0) }
     }
 
     public func fetchSessions(since date: Date) async -> [BreakSession] {
@@ -58,8 +110,7 @@ public final class CloudKitSyncService {
         lastSyncDate = end
     }
 
-    // prefer completed > snoozed > skipped
-    private func resolveConflict(local: BreakSession?, remote: BreakSession) -> BreakSession {
+    public func resolveConflict(local: BreakSession?, remote: BreakSession) -> BreakSession {
         guard let local = local else { return remote }
         guard local.id == remote.id else { return remote }
         let rank: (BreakStatus) -> Int = { s in
@@ -81,21 +132,21 @@ public final class CloudKitSyncService {
 
     private func handle(error: Error) {
         guard let ckError = error as? CKError else {
-            print("[CloudKit] error: \(error)")
+            fputs("[CloudKit] error: \(error)\n", stderr)
             onError?(error.localizedDescription)
             return
         }
         switch ckError.code {
         case .networkUnavailable:
-            print("[CloudKit] non-fatal: \(ckError.code)")
+            fputs("[CloudKit] non-fatal: \(ckError.code)\n", stderr)
         case .quotaExceeded:
-            print("[CloudKit] non-fatal: \(ckError.code)")
+            fputs("[CloudKit] non-fatal: \(ckError.code)\n", stderr)
             onError?(ckError.localizedDescription)
         case .accountTemporarilyUnavailable:
             NotificationCenter.default.post(name: .cloudKitAccountUnavailable, object: nil)
             onError?(ckError.localizedDescription)
         default:
-            print("[CloudKit] error: \(ckError)")
+            fputs("[CloudKit] error: \(ckError)\n", stderr)
             onError?(ckError.localizedDescription)
         }
     }
