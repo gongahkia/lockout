@@ -42,9 +42,53 @@ struct SettingsView: View {
                 Text(err).foregroundStyle(.red).font(.caption)
             }
         }
+        Section("Blocklist") {
+            blocklistSection
+        }
         .padding(24)
         .navigationTitle("Settings")
     }
+
+    @ViewBuilder private var blocklistSection: some View {
+        let running = NSRunningApplication.runningApplications
+            .filter { $0.bundleIdentifier != nil && $0.bundleIdentifier != Bundle.main.bundleIdentifier }
+        let blocklist = Binding(
+            get: { scheduler.currentSettings.blockedBundleIDs },
+            set: { scheduler.currentSettings.blockedBundleIDs = $0 }
+        )
+        VStack(alignment: .leading) {
+            Text("Block break overlay for these apps:").font(.caption).foregroundStyle(.secondary)
+            ForEach(running, id: \.processIdentifier) { app in
+                let bid = app.bundleIdentifier ?? ""
+                Toggle(app.localizedName ?? bid, isOn: Binding(
+                    get: { blocklist.wrappedValue.contains(bid) },
+                    set: { on in
+                        if on { if !blocklist.wrappedValue.contains(bid) { blocklist.wrappedValue.append(bid) } }
+                        else { blocklist.wrappedValue.removeAll { $0 == bid } }
+                    }
+                ))
+            }
+            HStack {
+                TextField("Manual bundle ID", text: $manualBundleID)
+                Button("Add") {
+                    let id = manualBundleID.trimmingCharacters(in: .whitespaces)
+                    guard !id.isEmpty, !blocklist.wrappedValue.contains(id) else { return }
+                    blocklist.wrappedValue.append(id)
+                    manualBundleID = ""
+                }
+            }
+            ForEach(blocklist.wrappedValue, id: \.self) { id in
+                HStack {
+                    Text(id).font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Remove") { blocklist.wrappedValue.removeAll { $0 == id } }
+                        .buttonStyle(.plain).foregroundStyle(.red)
+                }
+            }
+        }
+    }
+
+    @State private var manualBundleID = ""
 
     private func formatted(_ date: Date) -> String {
         let f = DateFormatter()
