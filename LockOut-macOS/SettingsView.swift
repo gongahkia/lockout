@@ -23,6 +23,13 @@ struct SettingsView: View {
                             repo.pruneOldRecords(retentionDays: $0)
                         }
                     ), in: 1...30)
+            Section("Auto-Pause") {
+                Stepper("Idle threshold: \(scheduler.currentSettings.idleThresholdMinutes) min",
+                        value: Binding(
+                            get: { scheduler.currentSettings.idleThresholdMinutes },
+                            set: { scheduler.currentSettings.idleThresholdMinutes = max(1, min(60, $0)) }
+                        ), in: 1...60)
+            }
             Toggle("Launch at Login", isOn: Binding(
                 get: { LaunchAtLoginService.isEnabled },
                 set: { $0 ? LaunchAtLoginService.enable() : LaunchAtLoginService.disable() }

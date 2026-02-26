@@ -26,6 +26,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var menuBarController: MenuBarController?
     var overlayController: BreakOverlayWindowController?
     private var cancellables = Set<AnyCancellable>()
+    private var idleCheckTimer: Timer?
+    private var idlePaused = false
+    private var activityMonitor: Any?
 
     private static let lastFireKey = "last_break_fire_date"
 
@@ -90,6 +93,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             OnboardingWindowController.present()
         }
         requestNotificationPermission()
+        startIdleDetection()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -104,6 +108,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let elapsed = Date().timeIntervalSince(last)
         scheduler.start(settings: settings, offsetSeconds: elapsed)
+    }
+
+    private func startIdleDetection() {
+        idleCheckTimer?.invalidate()
+        idleCheckTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            let threshold = Double(scheduler.currentSettings.idleThresholdMinutes) * 60
+            let idle = CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: CGEventType(rawValue: ~0)!)
+            if idle >= threshold && !idlePaused {
+                idlePaused = true
+                scheduler.pause()
+                activityMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .keyDown]) { [weak self] _ in
+                    guard let self, idlePaused else { return }
+                    idlePaused = false
+                    scheduler.resume()
+                    if let m = activityMonitor { NSEvent.removeMonitor(m); activityMonitor = nil }
+                }
+            }
+        }
     }
 
     private func requestNotificationPermission() {
