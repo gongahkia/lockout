@@ -49,9 +49,15 @@ public final class BreakScheduler: ObservableObject {
         timers.removeAll()
     }
 
-    public func snooze(minutes: Int) {
-        guard minutes > 0 else { return }
-        let clamped = min(minutes, 60)
+    public var currentCustomBreakType: CustomBreakType? {
+        guard let nb = nextBreak else { return nil }
+        return currentSettings.customBreakTypes.first { legacyBreakType(for: $0) == nb.type }
+    }
+
+    public func snooze(minutes: Int? = nil) {
+        let mins = minutes ?? currentCustomBreakType?.snoozeMinutes ?? currentSettings.snoozeDurationMinutes
+        guard mins > 0 else { return }
+        let clamped = min(mins, 60)
         stop()
         guard var nb = nextBreak else { return }
         nb.fireDate = Date().addingTimeInterval(Double(clamped) * 60)

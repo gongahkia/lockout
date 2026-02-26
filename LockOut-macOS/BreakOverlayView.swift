@@ -40,8 +40,8 @@ struct BreakOverlayView: View {
                 .frame(width: 140, height: 140)
                 Spacer()
                 HStack {
-                    Button("Snooze \(scheduler.currentSettings.snoozeDurationMinutes) min") {
-                        scheduler.snooze(minutes: scheduler.currentSettings.snoozeDurationMinutes)
+                    Button("Snooze \(scheduler.currentCustomBreakType?.snoozeMinutes ?? scheduler.currentSettings.snoozeDurationMinutes) min") {
+                        scheduler.snooze()
                         onDismiss()
                     }
                     .buttonStyle(.plain)

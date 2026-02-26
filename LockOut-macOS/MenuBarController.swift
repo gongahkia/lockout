@@ -148,7 +148,7 @@ final class MenuBarController {
     }
 
     @objc private func snooze() {
-        scheduler.snooze(minutes: scheduler.currentSettings.snoozeDurationMinutes)
+        scheduler.snooze() // uses per-break-type snoozeMinutes
     }
 
     @objc private func openApp() {
