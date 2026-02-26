@@ -4,17 +4,19 @@ import LockOutCore
 struct BreakOverlayView: View {
     let breakType: BreakType
     let duration: Int
+    let scheduler: BreakScheduler
+    let repository: BreakHistoryRepository
     let onDismiss: () -> Void
 
     @State private var remaining: Int
     @State private var breatheScale: CGFloat = 0.5
     private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-    private var scheduler: BreakScheduler { AppDelegate.shared.scheduler }
-    private var repo: BreakHistoryRepository { AppDelegate.shared.repository }
 
-    init(breakType: BreakType, duration: Int, onDismiss: @escaping () -> Void) {
+    init(breakType: BreakType, duration: Int, scheduler: BreakScheduler, repository: BreakHistoryRepository, onDismiss: @escaping () -> Void) {
         self.breakType = breakType
         self.duration = duration
+        self.scheduler = scheduler
+        self.repository = repository
         self.onDismiss = onDismiss
         _remaining = State(initialValue: duration)
     }
@@ -40,7 +42,7 @@ struct BreakOverlayView: View {
                     .buttonStyle(.plain)
                     Spacer()
                     Button("Skip") {
-                        scheduler.skip(repository: repo)
+                        scheduler.skip(repository: repository)
                         onDismiss()
                     }
                     .buttonStyle(.plain)
@@ -52,7 +54,7 @@ struct BreakOverlayView: View {
         .onReceive(tick) { _ in
             if remaining > 0 { remaining -= 1 }
             else {
-                scheduler.markCompleted(repository: repo)
+                scheduler.markCompleted(repository: repository)
                 AppDelegate.shared.menuBarController?.updateStreak()
                 onDismiss()
             }

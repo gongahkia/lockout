@@ -4,8 +4,13 @@ import LockOutCore
 
 final class BreakOverlayWindowController {
     private var windows: [NSWindow] = []
-    private var scheduler: BreakScheduler { AppDelegate.shared.scheduler }
-    private var repo: BreakHistoryRepository { AppDelegate.shared.repository }
+    private let scheduler: BreakScheduler
+    private let repo: BreakHistoryRepository
+
+    init(scheduler: BreakScheduler, repository: BreakHistoryRepository) {
+        self.scheduler = scheduler
+        self.repo = repository
+    }
 
     func show(breakType: BreakType, duration: Int) {
         guard windows.isEmpty else { return }
@@ -27,16 +32,20 @@ final class BreakOverlayWindowController {
                 screen: screen
             )
             win.onEscape = { [weak self] in
-                self?.scheduler.skip(repository: self!.repo)
-                self?.dismiss()
+                guard let self else { return }
+                self.scheduler.skip(repository: self.repo)
+                self.dismiss()
             }
             win.level = .screenSaver
             win.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
             win.isOpaque = false
             win.backgroundColor = .clear
-            let view = BreakOverlayView(breakType: breakType, duration: duration) { [weak self] in
-                self?.dismiss()
-            }
+            let view = BreakOverlayView(
+                breakType: breakType,
+                duration: duration,
+                scheduler: scheduler,
+                repository: repo
+            ) { [weak self] in self?.dismiss() }
             win.contentView = NSHostingView(rootView: view)
             win.alphaValue = 0
             win.orderFront(nil)
@@ -61,5 +70,4 @@ final class BreakOverlayWindowController {
             })
         }
     }
-
 }
