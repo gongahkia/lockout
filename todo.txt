@@ -1,9 +1,3 @@
-(B) Replace `try! ModelContainer(for: BreakSessionRecord.self)` in AppDelegate.swift with do/catch; on failure show NSAlert with error description and terminate gracefully +stability
-(B) Add multi-instance guard in App.swift: check NSRunningApplication.runningApplications(withBundleIdentifier:) count > 1 at launch; if so activate existing instance and terminate +stability
-(B) Persist pause state in AppSettings struct as `isPaused: Bool`; call `AppSettingsStore.save()` on every pause/resume toggle so crash-restart restores pause state +stability
-(B) Add `deinit` to BreakScheduler that calls `stop()` to invalidate all entries in the `timers: [BreakType: Timer]` dict +stability
-(B) Explicitly invalidate `midnightTimer` in `MenuBarController.stopObserving()` alongside `tickTimer` +stability
-(B) Audit all `AnyCancellable` sink closures in AppDelegate and MenuBarController; replace `self` strong captures with `[weak self]` to prevent retain cycles +stability
 (B) Move `pruneOldRecords()` call in `AppDelegate.applicationDidFinishLaunching` to a detached `Task` so it does not block the main thread at launch +stability
 (B) Add error handling in `BreakHistoryRepository.pruneOldRecords()`: wrap SwiftData delete in do/catch; write errors to stderr via fputs +stability
 (B) Debounce `reschedule()` calls triggered by ScheduleView stepper/slider changes by 500ms using Combine `.debounce(for: .milliseconds(500), scheduler: RunLoop.main)` +stability
