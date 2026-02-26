@@ -19,6 +19,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private static let lastFireKey = "last_break_fire_date"
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        let bundleID = Bundle.main.bundleIdentifier ?? ""
+        if NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).count > 1 {
+            NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
+                .first(where: { $0 != NSRunningApplication.current })?
+                .activate(options: .activateIgnoringOtherApps)
+            NSApp.terminate(nil)
+            return
+        }
         do {
             modelContainer = try ModelContainer(for: BreakSessionRecord.self)
         } catch {
