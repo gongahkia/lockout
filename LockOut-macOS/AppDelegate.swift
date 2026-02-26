@@ -19,7 +19,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private static let lastFireKey = "last_break_fire_date"
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        modelContainer = try! ModelContainer(for: BreakSessionRecord.self)
+        do {
+            modelContainer = try ModelContainer(for: BreakSessionRecord.self)
+        } catch {
+            let alert = NSAlert()
+            alert.messageText = "Database Error"
+            alert.informativeText = error.localizedDescription
+            alert.alertStyle = .critical
+            alert.addButton(withTitle: "Quit")
+            alert.runModal()
+            NSApp.terminate(nil)
+            return
+        }
         repository = BreakHistoryRepository(modelContext: ModelContext(modelContainer))
         settingsSync = SettingsSyncService()
         cloudSync = CloudKitSyncService()
