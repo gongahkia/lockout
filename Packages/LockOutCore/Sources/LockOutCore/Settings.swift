@@ -19,16 +19,25 @@ public struct AppSettings: Codable, Sendable {
     public var snoozeDurationMinutes: Int
     public var historyRetentionDays: Int
     public var isPaused: Bool
+    public var customBreakTypes: [CustomBreakType]
 
     public init(eyeConfig: BreakConfig, microConfig: BreakConfig, longConfig: BreakConfig,
-                snoozeDurationMinutes: Int = 5, historyRetentionDays: Int = 7, isPaused: Bool = false) {
+                snoozeDurationMinutes: Int = 5, historyRetentionDays: Int = 7, isPaused: Bool = false,
+                customBreakTypes: [CustomBreakType] = AppSettings.defaultCustomBreakTypes) {
         self.eyeConfig = eyeConfig
         self.microConfig = microConfig
         self.longConfig = longConfig
         self.snoozeDurationMinutes = snoozeDurationMinutes
         self.historyRetentionDays = historyRetentionDays
         self.isPaused = isPaused
+        self.customBreakTypes = customBreakTypes
     }
+
+    public static var defaultCustomBreakTypes: [CustomBreakType] {[
+        CustomBreakType(name: "Eye Break", intervalMinutes: 20, durationSeconds: 20, minDisplaySeconds: 5, tips: ["Look 20 feet away for 20 seconds"]),
+        CustomBreakType(name: "Micro Break", intervalMinutes: 45, durationSeconds: 30, minDisplaySeconds: 5, tips: ["Relax and breathe"]),
+        CustomBreakType(name: "Long Break", intervalMinutes: 90, durationSeconds: 900, minDisplaySeconds: 10, tips: ["Stand up and stretch"]),
+    ]}
 
     public static var defaults: AppSettings {
         AppSettings(
