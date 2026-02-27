@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import EventKit
 
 final class OnboardingWindowController: NSWindowController {
     private static var instance: OnboardingWindowController?
@@ -25,12 +26,16 @@ struct OnboardingView: View {
     @State private var page = 0
     @State private var breatheScale: CGFloat = 0.5
 
+    @State private var enableCalendar = false
+    @State private var enableFocus = false
+
     var body: some View {
         TabView(selection: $page) {
             page1.tag(0)
             page2.tag(1)
             pageNotifications.tag(2)
-            page3.tag(3)
+            pageIntegrations.tag(3)
+            page3.tag(4)
         }
         .tabViewStyle(.automatic)
         .frame(width: 480, height: 520)
@@ -64,6 +69,28 @@ struct OnboardingView: View {
         }.padding(40)
     }
 
+    private var pageIntegrations: some View {
+        VStack(spacing: 16) {
+            Spacer()
+            Image(systemName: "arrow.triangle.2.circlepath").font(.system(size: 64))
+            Text("Optional Integrations").font(.title).bold()
+            Text("LockOut can pause during calendar events or Focus Mode.")
+                .multilineTextAlignment(.center).foregroundStyle(.secondary)
+            Toggle("Pause during Calendar events", isOn: $enableCalendar)
+            Toggle("Pause during Focus Mode", isOn: $enableFocus)
+            Spacer()
+            Button("Continue") {
+                let scheduler = AppDelegate.shared.scheduler!
+                scheduler.currentSettings.pauseDuringCalendarEvents = enableCalendar
+                scheduler.currentSettings.pauseDuringFocus = enableFocus
+                if enableCalendar {
+                    EKEventStore().requestFullAccessToEvents { _, _ in }
+                }
+                page = 4
+            }.buttonStyle(.borderedProminent)
+        }.padding(40)
+    }
+
     private var pageNotifications: some View {
         VStack(spacing: 16) {
             Spacer()
@@ -77,7 +104,7 @@ struct OnboardingView: View {
                     .buttonStyle(.bordered)
                 Button("Allow Notifications") {
                     UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
-                    page = 3
+                    DispatchQueue.main.async { page = 3 }
                 }
                 .buttonStyle(.borderedProminent)
             }
