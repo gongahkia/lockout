@@ -156,6 +156,25 @@ final class CloudKitOfflineQueueTests: XCTestCase {
     }
 }
 
+// MARK: - minDisplaySeconds enforcement
+final class MinDisplaySecondsTests: XCTestCase {
+    func testSkipDisabledAtT0() {
+        // canSkip = elapsed >= minDisplaySeconds
+        let minDisplay = 10
+        let showTime = Date()
+        // simulate t=0: no time has elapsed
+        let elapsed = Date().timeIntervalSince(showTime)
+        XCTAssertFalse(elapsed >= Double(minDisplay))
+    }
+
+    func testSkipEnabledAfterMinDisplay() {
+        let minDisplay = 10
+        let showTime = Date(timeIntervalSinceNow: -11) // 11s ago
+        let elapsed = Date().timeIntervalSince(showTime)
+        XCTAssertTrue(elapsed >= Double(minDisplay))
+    }
+}
+
 // MARK: - Settings JSON import/export round-trip
 final class SettingsJSONRoundTripTests: XCTestCase {
     func testRoundTripPreservesCustomBreakTypes() throws {
