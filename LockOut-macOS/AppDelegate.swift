@@ -156,6 +156,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     func scheduleWeeklyComplianceNotification() {
         weeklyNotifTimer?.invalidate()
         weeklyNotifTimer = nil
+        guard scheduler.currentSettings.weeklyNotificationEnabled else { return }
         let cal = Calendar.current
         var comps = DateComponents()
         comps.weekday = 2 // Monday

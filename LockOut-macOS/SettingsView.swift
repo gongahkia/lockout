@@ -72,6 +72,13 @@ struct SettingsView: View {
             if let err = AppDelegate.shared.syncError {
                 Text(err).foregroundStyle(.red).font(.caption)
             }
+            Toggle("Weekly compliance summary", isOn: Binding(
+                get: { scheduler.currentSettings.weeklyNotificationEnabled },
+                set: {
+                    scheduler.currentSettings.weeklyNotificationEnabled = $0
+                    AppDelegate.shared.scheduleWeeklyComplianceNotification()
+                }
+            ))
             Stepper("Notification lead: \(scheduler.currentSettings.notificationLeadMinutes) min",
                     value: Binding(
                         get: { scheduler.currentSettings.notificationLeadMinutes },
