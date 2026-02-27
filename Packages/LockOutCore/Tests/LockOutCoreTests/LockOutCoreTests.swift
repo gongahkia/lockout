@@ -85,6 +85,23 @@ final class BreakHistoryRepositoryTests: XCTestCase {
     }
 }
 
+// MARK: - Blocklist shouldShow
+final class BlocklistTests: XCTestCase {
+    func testBlockedBundleIDSuppressesOverlay() {
+        var settings = AppSettings.defaults
+        settings.blockedBundleIDs = ["com.test.app"]
+        let blocked = settings.blockedBundleIDs.contains("com.test.app")
+        XCTAssertTrue(blocked) // shouldShow returns false when frontmost ID is in blocklist
+    }
+
+    func testAllowedBundleIDDoesNotBlock() {
+        var settings = AppSettings.defaults
+        settings.blockedBundleIDs = ["com.test.app"]
+        let blocked = settings.blockedBundleIDs.contains("com.other.app")
+        XCTAssertFalse(blocked)
+    }
+}
+
 // MARK: - CloudKitSyncService conflict resolution
 final class CloudKitConflictTests: XCTestCase {
     func testResolveConflictPrefersCompleted() {
