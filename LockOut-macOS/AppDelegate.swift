@@ -37,6 +37,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private var workdayStartTimer: Timer?
     private var workdayEndTimer: Timer?
     private var weeklyNotifTimer: Timer?
+    private var eventTap: CFMachPort?
 
     private static let lastFireKey = "last_break_fire_date"
 
@@ -85,7 +86,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         settingsSync.observeChanges { [weak self] remote in
             self?.scheduler.reschedule(with: remote)
         }
-        scheduler.$currentSettings.dropFirst().sink { AppSettingsStore.save($0) }.store(in: &cancellables)
+        scheduler.$currentSettings.dropFirst().sink { [weak self] settings in
+            AppSettingsStore.save(settings)
+            self?.registerGlobalSnoozeHotkey(settings.globalSnoozeHotkey)
+        }.store(in: &cancellables)
         scheduler.$nextBreak.dropFirst().compactMap { $0 }.sink { [weak self] nb in
             guard let self else { return }
             let lead = Double(self.scheduler.currentSettings.notificationLeadMinutes) * 60
@@ -117,6 +121,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         startCalendarPolling()
         scheduleWorkdayTimers()
         scheduleWeeklyComplianceNotification()
+    }
+
+    func registerGlobalSnoozeHotkey(_ hotkey: HotkeyDescriptor?) {
+        if let tap = eventTap {
+            CGEvent.tapEnable(tap: tap, enable: false)
+            eventTap = nil
+        }
+        guard let hotkey else { return }
+        let mask = CGEventMask(1 << CGEventType.keyDown.rawValue)
+        let tap = CGEvent.tapCreate(
+            tap: .cgSessionEventTap,
+            place: .headInsertEventTap,
+            options: .defaultTap,
+            eventsOfInterest: mask,
+            callback: { _, _, event, refcon in
+                guard let refcon else { return Unmanaged.passRetained(event) }
+                let delegate = Unmanaged<AppDelegate>.fromOpaque(refcon).takeUnretainedValue()
+                guard let hotkey = delegate.scheduler.currentSettings.globalSnoozeHotkey else {
+                    return Unmanaged.passRetained(event)
+                }
+                let keyCode = Int(event.getIntegerValueField(.keyboardEventKeycode))
+                let flags = Int(event.flags.rawValue) & 0x00FF0000 // modifier bits
+                if keyCode == hotkey.keyCode && flags == (hotkey.modifierFlags & 0x00FF0000) {
+                    Task { @MainActor in delegate.scheduler.snooze() }
+                    return nil // consume event
+                }
+                return Unmanaged.passRetained(event)
+            },
+            userInfo: Unmanaged.passUnretained(self).toOpaque()
+        )
+        if let tap {
+            let loop = CFRunLoopSourceCreate(nil, 0, nil)
+            _ = loop // tap itself manages the source; use RunLoop.main
+            let src = CFMachPortCreateRunLoopSource(nil, tap, 0)
+            CFRunLoopAddSource(CFRunLoopGetMain(), src, .commonModes)
+            CGEvent.tapEnable(tap: tap, enable: true)
+            eventTap = tap
+        }
     }
 
     private func legacyBreakType(_ ct: LockOutCore.CustomBreakType) -> LockOutCore.BreakType {

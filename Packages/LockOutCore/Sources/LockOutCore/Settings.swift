@@ -1,5 +1,15 @@
 import Foundation
 
+// MARK: - Hotkey
+public struct HotkeyDescriptor: Codable, Equatable, Sendable {
+    public var keyCode: Int
+    public var modifierFlags: Int
+    public init(keyCode: Int, modifierFlags: Int) {
+        self.keyCode = keyCode
+        self.modifierFlags = modifierFlags
+    }
+}
+
 // MARK: - Profiles
 public struct AppProfile: Codable, Identifiable, Sendable {
     public var id: UUID
@@ -45,6 +55,7 @@ public struct AppSettings: Codable, Sendable {
     public var activeProfileId: UUID?
     public var notificationLeadMinutes: Int  // 0-5, minutes before break to fire reminder
     public var weeklyNotificationEnabled: Bool
+    public var globalSnoozeHotkey: HotkeyDescriptor?
 
     public init(eyeConfig: BreakConfig, microConfig: BreakConfig, longConfig: BreakConfig,
                 snoozeDurationMinutes: Int = 5, historyRetentionDays: Int = 7, isPaused: Bool = false,
@@ -52,7 +63,8 @@ public struct AppSettings: Codable, Sendable {
                 blockedBundleIDs: [String] = [], idleThresholdMinutes: Int = 5, pauseDuringFocus: Bool = false,
                 pauseDuringCalendarEvents: Bool = false, workdayStartHour: Int? = nil, workdayEndHour: Int? = nil,
                 profiles: [AppProfile] = [], activeProfileId: UUID? = nil,
-                notificationLeadMinutes: Int = 1, weeklyNotificationEnabled: Bool = false) {
+                notificationLeadMinutes: Int = 1, weeklyNotificationEnabled: Bool = false,
+                globalSnoozeHotkey: HotkeyDescriptor? = nil) {
         self.eyeConfig = eyeConfig
         self.microConfig = microConfig
         self.longConfig = longConfig
@@ -70,6 +82,7 @@ public struct AppSettings: Codable, Sendable {
         self.activeProfileId = activeProfileId
         self.notificationLeadMinutes = max(0, min(5, notificationLeadMinutes))
         self.weeklyNotificationEnabled = weeklyNotificationEnabled
+        self.globalSnoozeHotkey = globalSnoozeHotkey
     }
 
     public static var defaultCustomBreakTypes: [CustomBreakType] {[
