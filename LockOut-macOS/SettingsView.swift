@@ -79,6 +79,20 @@ struct SettingsView: View {
                     AppDelegate.shared.scheduleWeeklyComplianceNotification()
                 }
             ))
+            HStack {
+                Text("Snooze hotkey: \(hotkeyLabel)")
+                Spacer()
+                Button(isRecordingHotkey ? "Press a key…" : "Record") {
+                    isRecordingHotkey = true
+                }
+                if scheduler.currentSettings.globalSnoozeHotkey != nil {
+                    Button("Clear") { scheduler.currentSettings.globalSnoozeHotkey = nil }
+                }
+            }
+            .background(HotkeyRecorderHelper(isRecording: $isRecordingHotkey) { keyCode, flags in
+                scheduler.currentSettings.globalSnoozeHotkey = HotkeyDescriptor(keyCode: keyCode, modifierFlags: flags)
+                isRecordingHotkey = false
+            })
             Stepper("Notification lead: \(scheduler.currentSettings.notificationLeadMinutes) min",
                     value: Binding(
                         get: { scheduler.currentSettings.notificationLeadMinutes },
@@ -137,6 +151,32 @@ struct SettingsView: View {
     }
 
     @State private var manualBundleID = ""
+    @State private var isRecordingHotkey = false
+
+    private var hotkeyLabel: String {
+        guard let hk = scheduler.currentSettings.globalSnoozeHotkey else { return "None" }
+        var parts: [String] = []
+        let mods = NSEvent.ModifierFlags(rawValue: UInt(hk.modifierFlags))
+        if mods.contains(.control) { parts.append("⌃") }
+        if mods.contains(.option) { parts.append("⌥") }
+        if mods.contains(.shift) { parts.append("⇧") }
+        if mods.contains(.command) { parts.append("⌘") }
+        let key = keyCodeToString(hk.keyCode)
+        parts.append(key)
+        return parts.joined()
+    }
+
+    private func keyCodeToString(_ code: Int) -> String {
+        let map: [Int: String] = [
+            0: "A", 1: "S", 2: "D", 3: "F", 4: "H", 5: "G", 6: "Z", 7: "X", 8: "C", 9: "V",
+            11: "B", 12: "Q", 13: "W", 14: "E", 15: "R", 16: "Y", 17: "T", 18: "1", 19: "2",
+            20: "3", 21: "4", 22: "6", 23: "5", 24: "=", 25: "9", 26: "7", 27: "-", 28: "8",
+            29: "0", 30: "]", 31: "O", 32: "U", 33: "[", 34: "I", 35: "P", 36: "↩", 37: "L",
+            38: "J", 39: "'", 40: "K", 41: ";", 42: "\\", 43: ",", 44: "/", 45: "N", 46: "M",
+            47: ".", 48: "⇥", 49: "Space", 51: "⌫", 53: "Esc",
+        ]
+        return map[code] ?? "?\(code)"
+    }
 
     private func importSettings() {
         let panel = NSOpenPanel()
@@ -181,5 +221,23 @@ struct SettingsView: View {
         let f = DateFormatter()
         f.dateStyle = .short; f.timeStyle = .short
         return f.string(from: date)
+    }
+}
+
+struct HotkeyRecorderHelper: NSViewRepresentable {
+    @Binding var isRecording: Bool
+    let onCapture: (Int, Int) -> Void
+
+    func makeNSView(context: Context) -> NSView { NSView() }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        if isRecording {
+            NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+                let keyCode = Int(event.keyCode)
+                let flags = Int(event.modifierFlags.rawValue)
+                self.onCapture(keyCode, flags)
+                return nil // consume
+            }
+        }
     }
 }
