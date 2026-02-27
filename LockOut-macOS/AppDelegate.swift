@@ -3,6 +3,7 @@ import Combine
 import SwiftData
 import LockOutCore
 import EventKit
+import UserNotifications
 
 // MARK: - Schema migration stubs
 enum LockOutSchemaV1: VersionedSchema {
@@ -15,7 +16,7 @@ enum LockOutSchemaMigrationPlan: SchemaMigrationPlan {
     static var stages: [MigrationStage] { [] } // add lightweight/custom stages here for future schema versions
 }
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     static let shared = AppDelegate()
     private(set) var scheduler: BreakScheduler!
     private(set) var repository: BreakHistoryRepository!
@@ -215,7 +216,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func requestNotificationPermission() {
+        let startAction = UNNotificationAction(identifier: "START_BREAK", title: "Start Break Now", options: .foreground)
+        let snoozeAction = UNNotificationAction(identifier: "SNOOZE_BREAK", title: "Snooze", options: [])
+        let category = UNNotificationCategory(identifier: "BREAK_REMINDER",
+                                               actions: [startAction, snoozeAction],
+                                               intentIdentifiers: [], options: [])
+        UNUserNotificationCenter.current().setNotificationCategories([category])
+        UNUserNotificationCenter.current().delegate = self
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+    }
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                 didReceive response: UNNotificationResponse,
+                                 withCompletionHandler completion: @escaping () -> Void) {
+        DispatchQueue.main.async {
+            switch response.actionIdentifier {
+            case "START_BREAK":
+                if let ct = self.scheduler.currentCustomBreakType {
+                    self.overlayController?.show(breakType: self.legacyBreakType(ct),
+                                                 duration: ct.durationSeconds,
+                                                 minDisplaySeconds: ct.minDisplaySeconds)
+                }
+            case "SNOOZE_BREAK":
+                let mins = self.scheduler.currentCustomBreakType?.snoozeMinutes
+                    ?? self.scheduler.currentSettings.snoozeDurationMinutes
+                self.scheduler.snooze(minutes: mins)
+            default: break
+            }
+        }
+        completion()
+    }
+
+    func scheduleBreakReminderNotification(leadSeconds: Double) {
+        guard leadSeconds > 0 else { return }
+        let content = UNMutableNotificationContent()
+        content.title = "Break coming up"
+        content.body = "Your next break starts in \(Int(leadSeconds / 60)) min"
+        content.sound = .default
+        content.categoryIdentifier = "BREAK_REMINDER"
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: leadSeconds, repeats: false)
+        let request = UNNotificationRequest(identifier: "break_reminder", content: content, trigger: trigger)
+        AppDelegate.scheduleNotification(request)
     }
 
     static func scheduleNotification(_ request: UNNotificationRequest) {
