@@ -15,14 +15,19 @@ struct SettingsView: View {
                         get: { scheduler.currentSettings.snoozeDurationMinutes },
                         set: { scheduler.currentSettings.snoozeDurationMinutes = $0 }
                     ), in: 1...30)
-            Stepper("Keep history for \(scheduler.currentSettings.historyRetentionDays) days",
-                    value: Binding(
-                        get: { scheduler.currentSettings.historyRetentionDays },
-                        set: {
-                            scheduler.currentSettings.historyRetentionDays = $0
-                            repo.pruneOldRecords(retentionDays: $0)
-                        }
-                    ), in: 1...30)
+            Picker("Retention period", selection: Binding(
+                get: { scheduler.currentSettings.historyRetentionDays },
+                set: {
+                    scheduler.currentSettings.historyRetentionDays = $0
+                    repo.pruneOldRecords(retentionDays: $0)
+                }
+            )) {
+                Text("30 days").tag(30)
+                Text("60 days").tag(60)
+                Text("90 days").tag(90)
+                Text("1 year").tag(365)
+                Text("Unlimited").tag(0)
+            }
             Section("Auto-Pause") {
                 Stepper("Idle threshold: \(scheduler.currentSettings.idleThresholdMinutes) min",
                         value: Binding(
