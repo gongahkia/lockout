@@ -1,2 +1,0 @@
-(B) Add XCTest for minDisplaySeconds enforcement: show overlay with minDisplaySeconds = 10; assert skip button disabled at t=0 and enabled at t=11 +test
-(B) Add XCTest for idle-pause: set idleThresholdMinutes = 1; inject idle seconds = 61; call idle check handler; assert scheduler.isPaused == true +test
