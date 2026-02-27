@@ -156,6 +156,22 @@ final class CloudKitOfflineQueueTests: XCTestCase {
     }
 }
 
+// MARK: - Settings JSON import/export round-trip
+final class SettingsJSONRoundTripTests: XCTestCase {
+    func testRoundTripPreservesCustomBreakTypes() throws {
+        var settings = AppSettings.defaults
+        let custom = CustomBreakType(name: "My Break", intervalMinutes: 25, durationSeconds: 60,
+                                     tips: ["Take a walk"])
+        settings.customBreakTypes = [custom]
+        let data = try JSONEncoder().encode(settings)
+        let decoded = try JSONDecoder().decode(AppSettings.self, from: data)
+        XCTAssertEqual(decoded.customBreakTypes.count, 1)
+        XCTAssertEqual(decoded.customBreakTypes[0].name, "My Break")
+        XCTAssertEqual(decoded.customBreakTypes[0].tips, ["Take a walk"])
+        XCTAssertEqual(decoded.customBreakTypes[0].intervalMinutes, 25)
+    }
+}
+
 // MARK: - AppSettingsStore round-trip
 final class AppSettingsStoreTests: XCTestCase {
     func testRoundTrip() {
