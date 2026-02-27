@@ -73,11 +73,24 @@ struct StatisticsView: View {
         .font(.caption)
     }
 
+    private var allTypeNames: [String] {
+        Array(Set(stats.flatMap { $0.perTypeCounts.keys })).sorted()
+    }
+
     private func exportJSON() {
-        struct ExportStat: Codable { let date: String; let completed: Int; let skipped: Int }
         let fmt = ISO8601DateFormatter()
-        let rows = stats.map { ExportStat(date: fmt.string(from: $0.date), completed: $0.completed, skipped: $0.skipped) }
-        guard let data = try? JSONEncoder().encode(rows) else { return }
+        let typeNames = allTypeNames
+        let rows = stats.map { s -> [String: Any] in
+            var row: [String: Any] = ["date": fmt.string(from: s.date),
+                                       "completed": s.completed, "skipped": s.skipped]
+            for name in typeNames {
+                let (c, k) = s.perTypeCounts[name] ?? (0, 0)
+                row["\(name)_completed"] = c
+                row["\(name)_skipped"] = k
+            }
+            return row
+        }
+        guard let data = try? JSONSerialization.data(withJSONObject: rows, options: .prettyPrinted) else { return }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.json]
         panel.nameFieldStringValue = "lockout-stats.json"
@@ -90,9 +103,18 @@ struct StatisticsView: View {
         panel.allowedContentTypes = [.commaSeparatedText]
         panel.nameFieldStringValue = "lockout-stats.csv"
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        var csv = "date,completed,skipped\n"
+        let typeNames = allTypeNames
+        let typeHeaders = typeNames.flatMap { ["\($0)_completed", "\($0)_skipped"] }
+        var csv = (["date", "completed", "skipped"] + typeHeaders).joined(separator: ",") + "\n"
         let fmt = ISO8601DateFormatter()
-        for s in stats { csv += "\(fmt.string(from: s.date)),\(s.completed),\(s.skipped)\n" }
+        for s in stats {
+            var row = [fmt.string(from: s.date), "\(s.completed)", "\(s.skipped)"]
+            for name in typeNames {
+                let (c, k) = s.perTypeCounts[name] ?? (0, 0)
+                row += ["\(c)", "\(k)"]
+            }
+            csv += row.joined(separator: ",") + "\n"
+        }
         try? csv.write(to: url, atomically: true, encoding: .utf8)
     }
 

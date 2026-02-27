@@ -4,14 +4,17 @@ public struct DayStat: Sendable {
     public let date: Date
     public let completed: Int
     public let skipped: Int
+    public var perTypeCounts: [String: (completed: Int, skipped: Int)]  // breakTypeName -> counts
     public var complianceRate: Double {
         Double(completed) / Double(max(completed + skipped, 1))
     }
 
-    public init(date: Date, completed: Int, skipped: Int) {
+    public init(date: Date, completed: Int, skipped: Int,
+                perTypeCounts: [String: (completed: Int, skipped: Int)] = [:]) {
         self.date = date
         self.completed = completed
         self.skipped = skipped
+        self.perTypeCounts = perTypeCounts
     }
 }
 
