@@ -106,6 +106,22 @@ final class CloudKitConflictTests: XCTestCase {
     }
 }
 
+// MARK: - CloudKitSyncService offline upload queue
+final class CloudKitOfflineQueueTests: XCTestCase {
+    func testOfflineQueueEnqueuesSession() async {
+        let svc = CloudKitSyncService()
+        NetworkMonitor.shared.forceOffline(true)
+        // drain any pending state
+        UserDefaults.standard.removeObject(forKey: "ckPendingUploads")
+        let session = BreakSession(type: .eye, scheduledAt: Date(), status: .completed)
+        await svc.uploadSession(session)
+        XCTAssertEqual(svc.pendingUploadsCount, 1)
+        // clear queue before restoring online so flush guard returns early (avoids real CK access)
+        UserDefaults.standard.removeObject(forKey: "ckPendingUploads")
+        NetworkMonitor.shared.forceOffline(false)
+    }
+}
+
 // MARK: - AppSettingsStore round-trip
 final class AppSettingsStoreTests: XCTestCase {
     func testRoundTrip() {
