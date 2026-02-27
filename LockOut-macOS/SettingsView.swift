@@ -59,6 +59,17 @@ struct SettingsView: View {
                     ForEach(0..<24) { Text(String(format: "%02d:00", $0)).tag($0) }
                 }
             }
+            Picker("Menu Bar Icon", selection: Binding(
+                get: { scheduler.currentSettings.menuBarIconTheme },
+                set: {
+                    scheduler.currentSettings.menuBarIconTheme = $0
+                    AppDelegate.shared.menuBarController?.updateStreak()
+                }
+            )) {
+                Text("Monochrome").tag(MenuBarIconTheme.monochrome)
+                Text("Color").tag(MenuBarIconTheme.color)
+                Text("Minimal").tag(MenuBarIconTheme.minimal)
+            }
             Toggle("Launch at Login", isOn: Binding(
                 get: { LaunchAtLoginService.isEnabled },
                 set: { $0 ? LaunchAtLoginService.enable() : LaunchAtLoginService.disable() }
