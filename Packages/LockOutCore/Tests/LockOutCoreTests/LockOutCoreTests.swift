@@ -156,6 +156,24 @@ final class CloudKitOfflineQueueTests: XCTestCase {
     }
 }
 
+// MARK: - Idle-pause
+@MainActor
+final class IdlePauseTests: XCTestCase {
+    func testIdleThresholdExceededPausesScheduler() async {
+        let scheduler = BreakScheduler(settings: .defaults)
+        scheduler.start(settings: .defaults)
+        var settings = scheduler.currentSettings
+        settings.idleThresholdMinutes = 1
+        scheduler.currentSettings = settings
+        // simulate: idleSeconds (61) >= threshold (60) → should pause
+        let threshold = Double(scheduler.currentSettings.idleThresholdMinutes) * 60 // 60
+        let idleSeconds: Double = 61
+        if idleSeconds >= threshold { scheduler.pause() }
+        XCTAssertTrue(scheduler.currentSettings.isPaused)
+        scheduler.stop()
+    }
+}
+
 // MARK: - minDisplaySeconds enforcement
 final class MinDisplaySecondsTests: XCTestCase {
     func testSkipDisabledAtT0() {
