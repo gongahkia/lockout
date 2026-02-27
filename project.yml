@@ -54,6 +54,20 @@ targets:
         com.apple.security.cs.allow-unsigned-executable-memory: false
         com.apple.security.cs.disable-library-validation: false
 
+  LockOut-macOSUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: LockOut-macOSUITests
+    dependencies:
+      - target: LockOut-macOS
+    settings:
+      base:
+        SWIFT_VERSION: "5.9"
+        TEST_HOST: ""
+        BUNDLE_LOADER: ""
+
 schemes:
   LockOut-macOS:
     build:
