@@ -32,6 +32,7 @@ public final class BreakHistoryRepository {
     }
 
     public func pruneOldRecords(retentionDays: Int) {
+        guard retentionDays > 0 else { return } // 0 = unlimited, keep all
         let cutoff = Calendar.current.date(byAdding: .day, value: -retentionDays, to: Date()) ?? Date()
         let descriptor = FetchDescriptor<BreakSessionRecord>(predicate: #Predicate { $0.scheduledAt < cutoff })
         do {

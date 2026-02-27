@@ -58,7 +58,7 @@ public struct AppSettings: Codable, Sendable {
     public var globalSnoozeHotkey: HotkeyDescriptor?
 
     public init(eyeConfig: BreakConfig, microConfig: BreakConfig, longConfig: BreakConfig,
-                snoozeDurationMinutes: Int = 5, historyRetentionDays: Int = 7, isPaused: Bool = false,
+                snoozeDurationMinutes: Int = 5, historyRetentionDays: Int = 30, isPaused: Bool = false,
                 customBreakTypes: [CustomBreakType] = AppSettings.defaultCustomBreakTypes,
                 blockedBundleIDs: [String] = [], idleThresholdMinutes: Int = 5, pauseDuringFocus: Bool = false,
                 pauseDuringCalendarEvents: Bool = false, workdayStartHour: Int? = nil, workdayEndHour: Int? = nil,
@@ -99,7 +99,9 @@ public struct AppSettings: Codable, Sendable {
         )
     }
 
+    // valid options: 30, 60, 90, 365, 0 (unlimited)
     public mutating func clampRetention() {
-        historyRetentionDays = max(1, min(historyRetentionDays, 30))
+        let valid = [0, 30, 60, 90, 365]
+        if !valid.contains(historyRetentionDays) { historyRetentionDays = 30 }
     }
 }
