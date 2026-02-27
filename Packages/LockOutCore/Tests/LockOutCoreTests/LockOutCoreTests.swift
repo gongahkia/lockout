@@ -106,6 +106,23 @@ final class CloudKitConflictTests: XCTestCase {
     }
 }
 
+// MARK: - Custom break type scheduling
+@MainActor
+final class CustomBreakTypeSchedulingTests: XCTestCase {
+    func testTwoEnabledTypesCreateTwoTimers() async {
+        let types = [
+            CustomBreakType(name: "Eye Break", intervalMinutes: 20, durationSeconds: 20),
+            CustomBreakType(name: "Micro Break", intervalMinutes: 45, durationSeconds: 30),
+        ]
+        var settings = AppSettings.defaults
+        settings.customBreakTypes = types
+        let scheduler = BreakScheduler(settings: settings)
+        scheduler.start(settings: settings)
+        XCTAssertEqual(scheduler.timers.count, 2)
+        scheduler.stop()
+    }
+}
+
 // MARK: - CloudKitSyncService offline upload queue
 final class CloudKitOfflineQueueTests: XCTestCase {
     func testOfflineQueueEnqueuesSession() async {
