@@ -3,7 +3,7 @@ import CloudKit
 import Combine
 
 public final class CloudKitSyncService {
-    private let db: CKDatabase = {
+    private lazy var db: CKDatabase = {
         let id = Bundle.main.object(forInfoDictionaryKey: "CLOUDKIT_CONTAINER_ID") as? String
             ?? "iCloud.com.yourapp.lockout" // fallback for unit test context
         return CKContainer(identifier: id).privateCloudDatabase

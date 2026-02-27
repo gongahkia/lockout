@@ -85,6 +85,27 @@ final class BreakHistoryRepositoryTests: XCTestCase {
     }
 }
 
+// MARK: - CloudKitSyncService conflict resolution
+final class CloudKitConflictTests: XCTestCase {
+    func testResolveConflictPrefersCompleted() {
+        let svc = CloudKitSyncService()
+        let id = UUID()
+        let completed = BreakSession(id: id, type: .eye, scheduledAt: Date(), status: .completed)
+        let skipped = BreakSession(id: id, type: .eye, scheduledAt: Date(), status: .skipped)
+        let result = svc.resolveConflict(local: skipped, remote: completed)
+        XCTAssertEqual(result.status, .completed)
+    }
+
+    func testResolveConflictLocalCompletedWinsOverRemoteSkipped() {
+        let svc = CloudKitSyncService()
+        let id = UUID()
+        let local = BreakSession(id: id, type: .eye, scheduledAt: Date(), status: .completed)
+        let remote = BreakSession(id: id, type: .eye, scheduledAt: Date(), status: .skipped)
+        let result = svc.resolveConflict(local: local, remote: remote)
+        XCTAssertEqual(result.status, .completed)
+    }
+}
+
 // MARK: - AppSettingsStore round-trip
 final class AppSettingsStoreTests: XCTestCase {
     func testRoundTrip() {
