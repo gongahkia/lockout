@@ -1,5 +1,10 @@
 import Foundation
 
+// MARK: - Menu bar icon theme
+public enum MenuBarIconTheme: String, Codable, CaseIterable, Sendable {
+    case monochrome, color, minimal
+}
+
 // MARK: - Hotkey
 public struct HotkeyDescriptor: Codable, Equatable, Sendable {
     public var keyCode: Int
@@ -56,6 +61,7 @@ public struct AppSettings: Codable, Sendable {
     public var notificationLeadMinutes: Int  // 0-5, minutes before break to fire reminder
     public var weeklyNotificationEnabled: Bool
     public var globalSnoozeHotkey: HotkeyDescriptor?
+    public var menuBarIconTheme: MenuBarIconTheme
 
     public init(eyeConfig: BreakConfig, microConfig: BreakConfig, longConfig: BreakConfig,
                 snoozeDurationMinutes: Int = 5, historyRetentionDays: Int = 30, isPaused: Bool = false,
@@ -64,7 +70,8 @@ public struct AppSettings: Codable, Sendable {
                 pauseDuringCalendarEvents: Bool = false, workdayStartHour: Int? = nil, workdayEndHour: Int? = nil,
                 profiles: [AppProfile] = [], activeProfileId: UUID? = nil,
                 notificationLeadMinutes: Int = 1, weeklyNotificationEnabled: Bool = false,
-                globalSnoozeHotkey: HotkeyDescriptor? = nil) {
+                globalSnoozeHotkey: HotkeyDescriptor? = nil,
+                menuBarIconTheme: MenuBarIconTheme = .monochrome) {
         self.eyeConfig = eyeConfig
         self.microConfig = microConfig
         self.longConfig = longConfig
@@ -83,6 +90,7 @@ public struct AppSettings: Codable, Sendable {
         self.notificationLeadMinutes = max(0, min(5, notificationLeadMinutes))
         self.weeklyNotificationEnabled = weeklyNotificationEnabled
         self.globalSnoozeHotkey = globalSnoozeHotkey
+        self.menuBarIconTheme = menuBarIconTheme
     }
 
     public static var defaultCustomBreakTypes: [CustomBreakType] {[

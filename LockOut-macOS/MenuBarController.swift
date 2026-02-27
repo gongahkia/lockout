@@ -117,11 +117,20 @@ final class MenuBarController {
         countdownItem.title = "Next break in \(String(format: "%d:%02d", mins, secs))"
     }
 
+    private func iconImageName(paused: Bool) -> String {
+        switch scheduler.currentSettings.menuBarIconTheme {
+        case .color: return paused ? "eye.slash.fill" : "eye.fill"
+        case .minimal: return paused ? "pause.circle" : "timer"
+        case .monochrome: return paused ? "eye.slash" : "eye"
+        }
+    }
+
     private func updateIcon() {
         let isPaused = scheduler.currentSettings.isPaused
-        let name = isPaused ? "eye.slash" : "eye"
+        let name = iconImageName(paused: isPaused)
+        let isTemplate = scheduler.currentSettings.menuBarIconTheme != .color
         statusItem.button?.image = NSImage(systemSymbolName: name, accessibilityDescription: "LockOut")
-        statusItem.button?.image?.isTemplate = true
+        statusItem.button?.image?.isTemplate = isTemplate
         if let item = menu.item(withTitle: "Pause Breaks") ?? menu.item(withTitle: "Resume Breaks") {
             item.title = isPaused ? "Resume Breaks" : "Pause Breaks"
         }
