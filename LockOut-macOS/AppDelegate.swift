@@ -60,8 +60,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             NSApp.terminate(nil)
             return
         }
+        let isUITesting = CommandLine.arguments.contains("--uitesting")
         do {
-            modelContainer = try ModelContainer(for: BreakSessionRecord.self, migrationPlan: LockOutSchemaMigrationPlan.self)
+            let config = isUITesting
+                ? ModelConfiguration(isStoredInMemoryOnly: true)
+                : ModelConfiguration()
+            modelContainer = try ModelContainer(for: BreakSessionRecord.self,
+                                                configurations: config)
         } catch {
             let alert = NSAlert()
             alert.messageText = "Database Error"
