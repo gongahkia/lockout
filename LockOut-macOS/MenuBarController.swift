@@ -114,7 +114,7 @@ final class MenuBarController {
         let remaining = max(0, nb.fireDate.timeIntervalSinceNow)
         let mins = Int(remaining) / 60
         let secs = Int(remaining) % 60
-        countdownItem.title = "\(nb.type.rawValue.capitalized) break in \(String(format: "%02d:%02d", mins, secs))"
+        countdownItem.title = "Next break in \(String(format: "%d:%02d", mins, secs))"
     }
 
     private func updateIcon() {
