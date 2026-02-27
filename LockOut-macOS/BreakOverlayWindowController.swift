@@ -1,11 +1,13 @@
 import AppKit
 import SwiftUI
+import AVFoundation
 import LockOutCore
 
 final class BreakOverlayWindowController {
     private var windows: [NSWindow] = []
     private let scheduler: BreakScheduler
     private let repo: BreakHistoryRepository
+    private var audioPlayer: AVAudioPlayer?
 
     init(scheduler: BreakScheduler, repository: BreakHistoryRepository) {
         self.scheduler = scheduler
@@ -27,7 +29,7 @@ final class BreakOverlayWindowController {
             scheduler.markCompleted(repository: repo)
             return
         }
-        NSSound(named: NSSound.Name("Glass"))?.play()
+        playBreakSound(customType?.soundName)
         let customType = scheduler.currentCustomBreakType
         for screen in NSScreen.screens {
             let win = LockOutOverlayWindow(
@@ -71,6 +73,21 @@ final class BreakOverlayWindowController {
             }
             windows.append(win)
         }
+    }
+
+    private func playBreakSound(_ soundName: String?) {
+        // silence.aiff = no-op placeholder; nil/unset defaults to chime
+        let name = soundName == "silence" ? nil : (soundName ?? "chime")
+        guard let name else { return }
+        let url = Bundle.main.url(forResource: name, withExtension: "aiff")
+            ?? Bundle.main.url(forResource: "chime", withExtension: "aiff")
+        guard let url else {
+            NSSound(named: NSSound.Name("Glass"))?.play() // fallback
+            return
+        }
+        // AVAudioPlayer respects system mute state automatically
+        audioPlayer = try? AVAudioPlayer(contentsOf: url)
+        audioPlayer?.play()
     }
 
     private static func materialForString(_ s: String) -> NSVisualEffectView.Material {
