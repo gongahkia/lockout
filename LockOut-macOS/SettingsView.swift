@@ -74,6 +74,7 @@ struct SettingsView: View {
             }
             HStack {
                 Button("Export Settings") { exportSettings() }
+                Button("Import Settings") { importSettings() }
                 Spacer()
             }
         }
@@ -124,6 +125,36 @@ struct SettingsView: View {
     }
 
     @State private var manualBundleID = ""
+
+    private func importSettings() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard let data = try? Data(contentsOf: url),
+              let imported = try? JSONDecoder().decode(AppSettings.self, from: data) else { return }
+        let changes = diffSettingsKeys(old: scheduler.currentSettings, new: imported)
+        let alert = NSAlert()
+        alert.messageText = "Import Settings?"
+        alert.informativeText = changes.isEmpty ? "No changes detected." : "Changed: \(changes.joined(separator: ", "))"
+        alert.addButton(withTitle: "Apply")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        scheduler.reschedule(with: imported)
+    }
+
+    private func diffSettingsKeys(old: AppSettings, new: AppSettings) -> [String] {
+        guard let oldData = try? JSONEncoder().encode(old),
+              let newData = try? JSONEncoder().encode(new),
+              let oldDict = (try? JSONSerialization.jsonObject(with: oldData)) as? [String: Any],
+              let newDict = (try? JSONSerialization.jsonObject(with: newData)) as? [String: Any] else { return [] }
+        return oldDict.keys.filter { key in
+            let o = oldDict[key].flatMap { try? JSONSerialization.data(withJSONObject: $0) }.map { String(data: $0, encoding: .utf8) ?? "" } ?? ""
+            let n = newDict[key].flatMap { try? JSONSerialization.data(withJSONObject: $0) }.map { String(data: $0, encoding: .utf8) ?? "" } ?? ""
+            return o != n
+        }.sorted()
+    }
 
     private func exportSettings() {
         guard let data = try? JSONEncoder().encode(scheduler.currentSettings) else { return }
