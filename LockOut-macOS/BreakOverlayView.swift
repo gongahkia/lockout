@@ -12,7 +12,9 @@ struct BreakOverlayView: View {
     @State private var remaining: Int
     @State private var breatheScale: CGFloat = 0.5
     @State private var showTime = Date()
+    @State private var tipIndex = 0
     private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+    private let tipTick = Timer.publish(every: 5, on: .main, in: .common).autoconnect()
 
     private var canSkip: Bool { Date().timeIntervalSince(showTime) >= Double(minDisplaySeconds) }
 
@@ -66,6 +68,10 @@ struct BreakOverlayView: View {
                 onDismiss()
             }
         }
+        .onReceive(tipTick) { _ in
+            let tips = scheduler.currentCustomBreakType?.tips ?? []
+            if tips.count > 1 { tipIndex = (tipIndex + 1) % tips.count }
+        }
         .onAppear {
             showTime = Date()
             if breakType != .eye {
@@ -78,12 +84,15 @@ struct BreakOverlayView: View {
 
     @ViewBuilder
     private var breakContent: some View {
+        let ct = scheduler.currentCustomBreakType
+        let tips = ct?.tips ?? []
+        let currentTip = tips.isEmpty ? nil : tips[tipIndex % tips.count]
         switch breakType {
         case .eye:
             VStack(spacing: 12) {
                 Image(systemName: "eye").font(.system(size: 64))
-                Text("Eye Break").font(.title).bold()
-                Text("Look at something 20 feet away for 20 seconds")
+                Text(ct?.name ?? "Eye Break").font(.title).bold()
+                Text(currentTip ?? "Look at something 20 feet away for 20 seconds")
                     .font(.body).foregroundStyle(.secondary).multilineTextAlignment(.center)
             }
         case .micro, .long:
@@ -92,8 +101,8 @@ struct BreakOverlayView: View {
                     .fill(Color.blue.opacity(0.3))
                     .frame(width: 80, height: 80)
                     .scaleEffect(breatheScale)
-                Text(breakType == .micro ? "Micro Break" : "Long Break").font(.title).bold()
-                Text("Relax and breathe").font(.body).foregroundStyle(.secondary)
+                Text(ct?.name ?? (breakType == .micro ? "Micro Break" : "Long Break")).font(.title).bold()
+                Text(currentTip ?? "Relax and breathe").font(.body).foregroundStyle(.secondary)
             }
         }
     }
