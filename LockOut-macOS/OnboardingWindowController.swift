@@ -29,7 +29,8 @@ struct OnboardingView: View {
         TabView(selection: $page) {
             page1.tag(0)
             page2.tag(1)
-            page3.tag(2)
+            pageNotifications.tag(2)
+            page3.tag(3)
         }
         .tabViewStyle(.automatic)
         .frame(width: 480, height: 520)
@@ -59,6 +60,27 @@ struct OnboardingView: View {
                 .multilineTextAlignment(.center).foregroundStyle(.secondary)
             Spacer()
             Button("Next") { page = 2 }.buttonStyle(.borderedProminent)
+
+        }.padding(40)
+    }
+
+    private var pageNotifications: some View {
+        VStack(spacing: 16) {
+            Spacer()
+            Image(systemName: "bell.badge").font(.system(size: 64))
+            Text("Break Reminders").font(.title).bold()
+            Text("LockOut sends a reminder before each break so you can wrap up your current task.")
+                .multilineTextAlignment(.center).foregroundStyle(.secondary)
+            Spacer()
+            HStack(spacing: 12) {
+                Button("Skip") { page = 3 }
+                    .buttonStyle(.bordered)
+                Button("Allow Notifications") {
+                    UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+                    page = 3
+                }
+                .buttonStyle(.borderedProminent)
+            }
         }.padding(40)
     }
 
@@ -69,9 +91,6 @@ struct OnboardingView: View {
                 get: { LaunchAtLoginService.isEnabled },
                 set: { $0 ? LaunchAtLoginService.enable() : LaunchAtLoginService.disable() }
             ))
-            Button("Enable Notifications") {
-                UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
-            }.buttonStyle(.bordered)
             Spacer()
             Button("Get Started") {
                 UserDefaults.standard.set(true, forKey: "hasOnboarded")
