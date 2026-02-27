@@ -123,6 +123,7 @@ struct SettingsView: View {
         Section("Blocklist") {
             blocklistSection
         }
+        versionFooter
         .padding(24)
         .navigationTitle("Settings")
     }
@@ -168,6 +169,14 @@ struct SettingsView: View {
 
     @State private var manualBundleID = ""
     @State private var isRecordingHotkey = false
+
+    private var versionFooter: some View {
+        Text("LockOut v\(AppVersion.current)")
+            .font(.caption)
+            .foregroundStyle(.tertiary)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.top, 8)
+    }
 
     private var hotkeyLabel: String {
         guard let hk = scheduler.currentSettings.globalSnoozeHotkey else { return "None" }

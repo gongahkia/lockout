@@ -83,6 +83,9 @@ final class MenuBarController {
         menu.addItem(profileItem)
         rebuildProfileMenu(profileMenu)
         menu.addItem(.separator())
+        let aboutItem = NSMenuItem(title: "About LockOut v\(AppVersion.current)", action: nil, keyEquivalent: "")
+        aboutItem.isEnabled = false
+        menu.addItem(aboutItem)
         let updateItem = NSMenuItem(title: "Check for Updates…", action: #selector(SPUUpdater.checkForUpdates(_:)), keyEquivalent: "")
         updateItem.target = updater.updater
         menu.addItem(updateItem)
