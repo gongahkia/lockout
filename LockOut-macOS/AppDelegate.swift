@@ -92,6 +92,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             showBreak: { [weak self] type, duration in self?.overlayController?.show(breakType: type, duration: duration) }
         )
         overlayController = BreakOverlayWindowController(scheduler: scheduler, repository: repository)
+        scheduler.onBreakTriggered = { [weak self] ct in
+            guard let self else { return }
+            overlayController?.show(breakType: legacyBreakType(ct), duration: ct.durationSeconds, minDisplaySeconds: ct.minDisplaySeconds)
+        }
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [weak self] _ in self?.scheduler.pause() }
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in self?.scheduler.resume() }
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.screensDidSleepNotification, object: nil, queue: .main) { [weak self] _ in self?.overlayController?.dismiss() }
@@ -103,6 +107,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         observeFocusMode()
         startCalendarPolling()
         scheduleWorkdayTimers()
+    }
+
+    private func legacyBreakType(_ ct: LockOutCore.CustomBreakType) -> LockOutCore.BreakType {
+        let l = ct.name.lowercased()
+        if l.contains("micro") { return .micro }
+        if l.contains("long") { return .long }
+        return .eye
     }
 
     func applicationWillTerminate(_ notification: Notification) {

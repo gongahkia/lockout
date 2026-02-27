@@ -64,8 +64,10 @@ final class MenuBarController {
         let pauseTomorrow = NSMenuItem(title: "Pause until tomorrow", action: #selector(pauseUntilTomorrow), keyEquivalent: "")
         pauseTomorrow.target = self
         menu.addItem(pauseTomorrow)
-        let nowItem = NSMenuItem(title: "Take Break Now", action: #selector(takeBreakNow), keyEquivalent: "")
-        nowItem.target = self
+        let nowItem = NSMenuItem(title: "Take Break Now", action: nil, keyEquivalent: "")
+        let breakSubmenu = NSMenu()
+        nowItem.submenu = breakSubmenu
+        rebuildBreakSubmenu(breakSubmenu)
         menu.addItem(nowItem)
         let snoozeItem = NSMenuItem(title: "Snooze 5 min", action: #selector(snooze), keyEquivalent: "")
         snoozeItem.target = self
@@ -161,6 +163,28 @@ final class MenuBarController {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         NSApp.windows.first(where: { $0.title == "LockOut" })?.makeKeyAndOrderFront(nil)
+    }
+
+    private func rebuildBreakSubmenu(_ submenu: NSMenu) {
+        submenu.removeAllItems()
+        for ct in scheduler.currentSettings.customBreakTypes.filter(\.enabled) {
+            let item = NSMenuItem(title: ct.name, action: #selector(triggerCustomBreak(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = ct.id.uuidString
+            submenu.addItem(item)
+        }
+        if submenu.items.isEmpty {
+            let fallback = NSMenuItem(title: "Take Break", action: #selector(takeBreakNow), keyEquivalent: "")
+            fallback.target = self
+            submenu.addItem(fallback)
+        }
+    }
+
+    @objc private func triggerCustomBreak(_ sender: NSMenuItem) {
+        guard let idStr = sender.representedObject as? String,
+              let id = UUID(uuidString: idStr),
+              let ct = scheduler.currentSettings.customBreakTypes.first(where: { $0.id == id }) else { return }
+        scheduler.triggerBreak(ct)
     }
 
     private func rebuildProfileMenu(_ profileMenu: NSMenu) {

@@ -49,6 +49,12 @@ public final class BreakScheduler: ObservableObject {
         timers.removeAll()
     }
 
+    public var onBreakTriggered: ((CustomBreakType) -> Void)?
+
+    public func triggerBreak(_ customType: CustomBreakType) {
+        onBreakTriggered?(customType)
+    }
+
     public var currentCustomBreakType: CustomBreakType? {
         guard let nb = nextBreak else { return nil }
         return currentSettings.customBreakTypes.first { legacyBreakType(for: $0) == nb.type }
