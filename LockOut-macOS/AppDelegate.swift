@@ -36,6 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private let ekStore = EKEventStore()
     private var workdayStartTimer: Timer?
     private var workdayEndTimer: Timer?
+    private var weeklyNotifTimer: Timer?
 
     private static let lastFireKey = "last_break_fire_date"
 
@@ -115,6 +116,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         observeFocusMode()
         startCalendarPolling()
         scheduleWorkdayTimers()
+        scheduleWeeklyComplianceNotification()
     }
 
     private func legacyBreakType(_ ct: LockOutCore.CustomBreakType) -> LockOutCore.BreakType {
@@ -149,6 +151,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             // reschedule for next day
             _ = Timer.scheduledTimer(withTimeInterval: 86400, repeats: true) { _ in action() }
         }
+    }
+
+    func scheduleWeeklyComplianceNotification() {
+        weeklyNotifTimer?.invalidate()
+        weeklyNotifTimer = nil
+        let cal = Calendar.current
+        var comps = DateComponents()
+        comps.weekday = 2 // Monday
+        comps.hour = 9; comps.minute = 0; comps.second = 0
+        guard let nextMonday = cal.nextDate(after: Date(), matching: comps, matchingPolicy: .nextTime) else { return }
+        let interval = nextMonday.timeIntervalSinceNow
+        weeklyNotifTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { [weak self] _ in
+            self?.fireWeeklyComplianceNotification()
+            _ = Timer.scheduledTimer(withTimeInterval: 7 * 86400, repeats: true) { [weak self] _ in
+                self?.fireWeeklyComplianceNotification()
+            }
+        }
+    }
+
+    private func fireWeeklyComplianceNotification() {
+        let stats = repository.dailyStats(for: 7)
+        let rate = Int(ComplianceCalculator.overallRate(stats: stats) * 100)
+        let content = UNMutableNotificationContent()
+        content.title = "Weekly Compliance Summary"
+        content.body = "Last 7 days: \(rate)% compliance"
+        content.sound = .default
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        let request = UNNotificationRequest(identifier: "weekly_compliance", content: content, trigger: trigger)
+        AppDelegate.scheduleNotification(request)
     }
 
     private func scheduleWorkdayTimers() {
