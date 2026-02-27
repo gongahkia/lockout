@@ -43,7 +43,10 @@ struct StatisticsView: View {
             }
         }
             syncStatusRow
-            Button("Export CSV") { exportCSV() }
+            HStack {
+                Button("Export CSV") { exportCSV() }
+                Button("Export JSON") { exportJSON() }
+            }
         }
         .padding(24)
         .navigationTitle("Statistics")
@@ -68,6 +71,18 @@ struct StatisticsView: View {
             }
         }
         .font(.caption)
+    }
+
+    private func exportJSON() {
+        struct ExportStat: Codable { let date: String; let completed: Int; let skipped: Int }
+        let fmt = ISO8601DateFormatter()
+        let rows = stats.map { ExportStat(date: fmt.string(from: $0.date), completed: $0.completed, skipped: $0.skipped) }
+        guard let data = try? JSONEncoder().encode(rows) else { return }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.json]
+        panel.nameFieldStringValue = "lockout-stats.json"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        try? data.write(to: url)
     }
 
     private func exportCSV() {
