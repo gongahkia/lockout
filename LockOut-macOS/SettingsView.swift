@@ -72,6 +72,10 @@ struct SettingsView: View {
             if let err = AppDelegate.shared.syncError {
                 Text(err).foregroundStyle(.red).font(.caption)
             }
+            HStack {
+                Button("Export Settings") { exportSettings() }
+                Spacer()
+            }
         }
         Section("Blocklist") {
             blocklistSection
@@ -120,6 +124,15 @@ struct SettingsView: View {
     }
 
     @State private var manualBundleID = ""
+
+    private func exportSettings() {
+        guard let data = try? JSONEncoder().encode(scheduler.currentSettings) else { return }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.json]
+        panel.nameFieldStringValue = "lockout-settings.json"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        try? data.write(to: url)
+    }
 
     private func formatted(_ date: Date) -> String {
         let f = DateFormatter()
