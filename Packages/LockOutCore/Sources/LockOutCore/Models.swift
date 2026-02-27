@@ -15,16 +15,19 @@ public struct CustomBreakType: Codable, Identifiable, Equatable, Sendable {
     public var overlayOpacity: Double
     public var overlayColorHex: String
     public var snoozeMinutes: Int
+    public var overlayBlurMaterial: String  // ultraThin | thin | medium | hudWindow
 
     public init(id: UUID = UUID(), name: String, intervalMinutes: Int, durationSeconds: Int,
                 minDisplaySeconds: Int = 5, enabled: Bool = true, soundName: String? = nil,
                 message: String? = nil, tips: [String] = [], overlayOpacity: Double = 0.85,
-                overlayColorHex: String = "#000000", snoozeMinutes: Int = 5) {
+                overlayColorHex: String = "#000000", snoozeMinutes: Int = 5,
+                overlayBlurMaterial: String = "hudWindow") {
         self.id = id; self.name = name; self.intervalMinutes = intervalMinutes
         self.durationSeconds = durationSeconds; self.minDisplaySeconds = minDisplaySeconds
         self.enabled = enabled; self.soundName = soundName; self.message = message
         self.tips = tips; self.overlayOpacity = overlayOpacity
         self.overlayColorHex = overlayColorHex; self.snoozeMinutes = snoozeMinutes
+        self.overlayBlurMaterial = overlayBlurMaterial
     }
 }
 

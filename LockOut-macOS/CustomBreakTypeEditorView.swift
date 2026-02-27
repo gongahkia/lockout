@@ -21,6 +21,12 @@ struct CustomBreakTypeEditorView: View {
                 Slider(value: $breakType.overlayOpacity, in: 0.1...1.0) { Text("Opacity") }
                 Text("Opacity: \(Int(breakType.overlayOpacity * 100))%").font(.caption)
                 TextField("Color (hex, e.g. #1A2B3C)", text: $breakType.overlayColorHex)
+                Picker("Blur", selection: $breakType.overlayBlurMaterial) {
+                    Text("Ultra Thin").tag("ultraThin")
+                    Text("Thin").tag("thin")
+                    Text("Medium").tag("medium")
+                    Text("HUD Window").tag("hudWindow")
+                }
             }
             Section("Content") {
                 TextField("Message", text: Binding(

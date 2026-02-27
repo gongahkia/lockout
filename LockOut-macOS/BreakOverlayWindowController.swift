@@ -28,6 +28,7 @@ final class BreakOverlayWindowController {
             return
         }
         NSSound(named: NSSound.Name("Glass"))?.play()
+        let customType = scheduler.currentCustomBreakType
         for screen in NSScreen.screens {
             let win = LockOutOverlayWindow(
                 contentRect: screen.frame,
@@ -52,7 +53,15 @@ final class BreakOverlayWindowController {
                 scheduler: scheduler,
                 repository: repo
             ) { [weak self] in self?.dismiss() }
-            win.contentView = NSHostingView(rootView: view)
+            let hosting = NSHostingView(rootView: view)
+            let effectView = NSVisualEffectView(frame: screen.frame)
+            effectView.material = Self.materialForString(customType?.overlayBlurMaterial ?? "hudWindow")
+            effectView.blendingMode = .behindWindow
+            effectView.state = .active
+            hosting.autoresizingMask = [.width, .height]
+            hosting.frame = effectView.bounds
+            effectView.addSubview(hosting)
+            win.contentView = effectView
             win.alphaValue = 0
             win.orderFront(nil)
             win.makeKey()
@@ -61,6 +70,15 @@ final class BreakOverlayWindowController {
                 win.animator().alphaValue = 1
             }
             windows.append(win)
+        }
+    }
+
+    private static func materialForString(_ s: String) -> NSVisualEffectView.Material {
+        switch s {
+        case "ultraThin": return .underWindowBackground
+        case "thin": return .underPageBackground
+        case "medium": return .contentBackground
+        default: return .hudWindow
         }
     }
 
