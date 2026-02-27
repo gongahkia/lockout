@@ -29,8 +29,11 @@ struct BreakOverlayView: View {
     }
 
     var body: some View {
+        let overlayColor = Color(hex: scheduler.currentCustomBreakType?.overlayColorHex ?? "#000000")
+        let overlayOpacity = scheduler.currentCustomBreakType?.overlayOpacity ?? 0.85
         ZStack {
             VisualEffectBackground().ignoresSafeArea()
+            overlayColor.opacity(overlayOpacity).ignoresSafeArea()
             VStack(spacing: 24) {
                 Spacer()
                 breakContent
@@ -105,6 +108,21 @@ struct BreakOverlayView: View {
                 Text(currentTip ?? "Relax and breathe").font(.body).foregroundStyle(.secondary)
             }
         }
+    }
+}
+
+extension Color {
+    init(hex: String) {
+        let h = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: h).scanHexInt64(&int)
+        let r, g, b, a: UInt64
+        switch h.count {
+        case 6: (r, g, b, a) = (int >> 16, int >> 8 & 0xFF, int & 0xFF, 255)
+        case 8: (r, g, b, a) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default: (r, g, b, a) = (0, 0, 0, 255)
+        }
+        self.init(.sRGB, red: Double(r)/255, green: Double(g)/255, blue: Double(b)/255, opacity: Double(a)/255)
     }
 }
 
