@@ -85,6 +85,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             self?.scheduler.reschedule(with: remote)
         }
         scheduler.$currentSettings.dropFirst().sink { AppSettingsStore.save($0) }.store(in: &cancellables)
+        scheduler.$nextBreak.dropFirst().compactMap { $0 }.sink { [weak self] nb in
+            guard let self else { return }
+            let lead = Double(self.scheduler.currentSettings.notificationLeadMinutes) * 60
+            let interval = nb.fireDate.timeIntervalSinceNow - lead
+            UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["break_reminder"])
+            if interval > 0 { self.scheduleBreakReminderNotification(leadSeconds: interval) }
+        }.store(in: &cancellables)
         menuBarController = MenuBarController(
             scheduler: scheduler,
             repository: repository,

@@ -72,6 +72,11 @@ struct SettingsView: View {
             if let err = AppDelegate.shared.syncError {
                 Text(err).foregroundStyle(.red).font(.caption)
             }
+            Stepper("Notification lead: \(scheduler.currentSettings.notificationLeadMinutes) min",
+                    value: Binding(
+                        get: { scheduler.currentSettings.notificationLeadMinutes },
+                        set: { scheduler.currentSettings.notificationLeadMinutes = max(0, min(5, $0)) }
+                    ), in: 0...5)
             HStack {
                 Button("Export Settings") { exportSettings() }
                 Button("Import Settings") { importSettings() }

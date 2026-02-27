@@ -43,13 +43,15 @@ public struct AppSettings: Codable, Sendable {
     public var workdayEndHour: Int?     // nil = no automatic end
     public var profiles: [AppProfile]
     public var activeProfileId: UUID?
+    public var notificationLeadMinutes: Int  // 0-5, minutes before break to fire reminder
 
     public init(eyeConfig: BreakConfig, microConfig: BreakConfig, longConfig: BreakConfig,
                 snoozeDurationMinutes: Int = 5, historyRetentionDays: Int = 7, isPaused: Bool = false,
                 customBreakTypes: [CustomBreakType] = AppSettings.defaultCustomBreakTypes,
                 blockedBundleIDs: [String] = [], idleThresholdMinutes: Int = 5, pauseDuringFocus: Bool = false,
                 pauseDuringCalendarEvents: Bool = false, workdayStartHour: Int? = nil, workdayEndHour: Int? = nil,
-                profiles: [AppProfile] = [], activeProfileId: UUID? = nil) {
+                profiles: [AppProfile] = [], activeProfileId: UUID? = nil,
+                notificationLeadMinutes: Int = 1) {
         self.eyeConfig = eyeConfig
         self.microConfig = microConfig
         self.longConfig = longConfig
@@ -65,6 +67,7 @@ public struct AppSettings: Codable, Sendable {
         self.workdayEndHour = workdayEndHour
         self.profiles = profiles
         self.activeProfileId = activeProfileId
+        self.notificationLeadMinutes = max(0, min(5, notificationLeadMinutes))
     }
 
     public static var defaultCustomBreakTypes: [CustomBreakType] {[
