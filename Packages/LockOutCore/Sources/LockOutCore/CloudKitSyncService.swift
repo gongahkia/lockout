@@ -69,6 +69,7 @@ public final class CloudKitSyncService {
             record["endedAt"] = nil
         }
         record["breakTypeName"] = (session.breakTypeName ?? session.type.rawValue) as CKRecordValue
+        record["updatedAt"] = (session.updatedAt ?? Date()) as CKRecordValue
         record["status"] = session.status.rawValue as CKRecordValue
         do {
             try await db.save(record)
@@ -155,7 +156,8 @@ public final class CloudKitSyncService {
               let status = BreakStatus(rawValue: statusStr) else { return nil }
         let endedAt = r["endedAt"] as? Date
         let breakTypeName = r["breakTypeName"] as? String
-        return BreakSession(id: id, type: type, scheduledAt: scheduledAt, endedAt: endedAt, status: status, breakTypeName: breakTypeName)
+        let updatedAt = r["updatedAt"] as? Date
+        return BreakSession(id: id, type: type, scheduledAt: scheduledAt, endedAt: endedAt, status: status, breakTypeName: breakTypeName, updatedAt: updatedAt)
     }
 
     func handle(error: Error) {

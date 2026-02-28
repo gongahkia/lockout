@@ -22,6 +22,7 @@ public final class BreakHistoryRepository {
             existing.status = session.status.rawValue
             existing.endedAt = session.endedAt
             if let name = session.breakTypeName { existing.breakTypeName = name }
+            existing.updatedAt = session.updatedAt ?? Date()
         } else {
             context.insert(BreakSessionRecord(from: session))
         }

@@ -130,10 +130,12 @@ final class BreakHistoryRepositoryTests: XCTestCase {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: BreakSessionRecord.self, configurations: config)
         let repo = BreakHistoryRepository(modelContext: ModelContext(container))
-        let session = BreakSession(type: .eye, scheduledAt: Date(), status: .deferred)
+        let updatedAt = Date()
+        let session = BreakSession(type: .eye, scheduledAt: Date(), status: .deferred, updatedAt: updatedAt)
         repo.save(session)
         let loaded = repo.fetchSession(id: session.id)
         XCTAssertEqual(loaded?.status, .deferred)
+        XCTAssertEqual(loaded?.updatedAt, updatedAt)
     }
 }
 
@@ -179,17 +181,20 @@ final class CloudKitConflictTests: XCTestCase {
         let id = UUID()
         let scheduledAt = Date()
         let endedAt = scheduledAt.addingTimeInterval(12)
+        let updatedAt = scheduledAt.addingTimeInterval(20)
         let record = CKRecord(recordType: "BreakSession", recordID: CKRecord.ID(recordName: id.uuidString))
         record["id"] = id.uuidString as CKRecordValue
         record["type"] = BreakType.eye.rawValue as CKRecordValue
         record["scheduledAt"] = scheduledAt as CKRecordValue
         record["endedAt"] = endedAt as CKRecordValue
         record["breakTypeName"] = "Eye Break" as CKRecordValue
+        record["updatedAt"] = updatedAt as CKRecordValue
         record["status"] = BreakStatus.completed.rawValue as CKRecordValue
 
         let mapped = svc.mapRecord(record)
         XCTAssertEqual(mapped?.endedAt, endedAt)
         XCTAssertEqual(mapped?.breakTypeName, "Eye Break")
+        XCTAssertEqual(mapped?.updatedAt, updatedAt)
     }
 }
 

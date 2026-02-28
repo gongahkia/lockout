@@ -50,14 +50,16 @@ public struct BreakSession: Codable, Sendable {
     public var endedAt: Date?
     public var status: BreakStatus
     public var breakTypeName: String?
+    public var updatedAt: Date?
 
-    public init(id: UUID = UUID(), type: BreakType, scheduledAt: Date, endedAt: Date? = nil, status: BreakStatus, breakTypeName: String? = nil) {
+    public init(id: UUID = UUID(), type: BreakType, scheduledAt: Date, endedAt: Date? = nil, status: BreakStatus, breakTypeName: String? = nil, updatedAt: Date? = Date()) {
         self.id = id
         self.type = type
         self.scheduledAt = scheduledAt
         self.endedAt = endedAt
         self.status = status
         self.breakTypeName = breakTypeName
+        self.updatedAt = updatedAt
     }
 }
 
@@ -70,6 +72,7 @@ public final class BreakSessionRecord {
     public var scheduledAt: Date
     public var endedAt: Date?
     public var status: String       // raw BreakStatus
+    public var updatedAt: Date?
 
     public init(from session: BreakSession) {
         self.id = session.id
@@ -78,11 +81,12 @@ public final class BreakSessionRecord {
         self.scheduledAt = session.scheduledAt
         self.endedAt = session.endedAt
         self.status = session.status.rawValue
+        self.updatedAt = session.updatedAt
     }
 
     public func toBreakSession() -> BreakSession? {
         guard let t = BreakType(rawValue: type),
               let s = BreakStatus(rawValue: status) else { return nil }
-        return BreakSession(id: id, type: t, scheduledAt: scheduledAt, endedAt: endedAt, status: s, breakTypeName: breakTypeName)
+        return BreakSession(id: id, type: t, scheduledAt: scheduledAt, endedAt: endedAt, status: s, breakTypeName: breakTypeName, updatedAt: updatedAt)
     }
 }
