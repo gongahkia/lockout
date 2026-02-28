@@ -97,6 +97,7 @@ final class BreakSchedulerTests: XCTestCase {
 }
 
 // MARK: - BreakHistoryRepository idempotency
+@MainActor
 final class BreakHistoryRepositoryTests: XCTestCase {
     func testSaveIdempotency() throws {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)

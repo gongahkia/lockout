@@ -4,6 +4,7 @@ import os
 
 private let logger = Logger(subsystem: "com.yourapp.lockout", category: "BreakHistoryRepository")
 
+@MainActor
 public final class BreakHistoryRepository {
     private let context: ModelContext
 

@@ -113,11 +113,15 @@ public final class CloudKitSyncService {
         guard !isLocalOnlyEnabled else { return }
         let remote = await fetchSessions(since: lastSyncDate)
         for session in remote {
-            let local = repository.fetchSession(id: session.id)
-            repository.save(resolveConflict(local: local, remote: session))
+            await MainActor.run {
+                let local = repository.fetchSession(id: session.id)
+                repository.save(resolveConflict(local: local, remote: session))
+            }
         }
         let end = Date()
-        let local = repository.fetchSessions(from: lastSyncDate, to: end)
+        let local = await MainActor.run {
+            repository.fetchSessions(from: lastSyncDate, to: end)
+        }
         for session in local { await uploadSession(session) }
         lastSyncDate = end
     }
