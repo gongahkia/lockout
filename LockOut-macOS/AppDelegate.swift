@@ -97,7 +97,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             }
         }
         scheduler.$currentSettings.dropFirst().sink { [weak self] settings in
-            AppSettingsStore.save(settings)
+            self?.settingsSync.push(settings)
             self?.registerGlobalSnoozeHotkey(settings.globalSnoozeHotkey)
         }.store(in: &cancellables)
         scheduler.$nextBreak.dropFirst().compactMap { $0 }.sink { [weak self] nb in

@@ -274,3 +274,18 @@ final class AppSettingsStoreTests: XCTestCase {
         XCTAssertEqual(loaded?.longConfig.intervalMinutes, AppSettings.defaults.longConfig.intervalMinutes)
     }
 }
+
+final class SettingsSyncServiceTests: XCTestCase {
+    func testPushPersistsMutatedSettingsLocally() {
+        let svc = SettingsSyncService()
+        var settings = AppSettings.defaults
+        settings.activeRole = .it_managed
+        settings.breakEnforcementMode = .hard_lock
+        settings.localOnlyMode = false
+        svc.push(settings)
+
+        let loaded = AppSettingsStore.load()
+        XCTAssertEqual(loaded?.activeRole, .it_managed)
+        XCTAssertEqual(loaded?.breakEnforcementMode, .hard_lock)
+    }
+}
