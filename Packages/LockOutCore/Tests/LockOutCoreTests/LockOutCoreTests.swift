@@ -177,6 +177,21 @@ final class CustomBreakTypeSchedulingTests: XCTestCase {
         XCTAssertEqual(scheduler.timers.count, 2)
         scheduler.stop()
     }
+
+    func testSimilarNamesDoNotOverwriteTimers() async {
+        let types = [
+            CustomBreakType(name: "Micro Break", intervalMinutes: 20, durationSeconds: 20),
+            CustomBreakType(name: "Micro Break+", intervalMinutes: 25, durationSeconds: 30),
+        ]
+        var settings = AppSettings.defaults
+        settings.customBreakTypes = types
+        let scheduler = BreakScheduler(settings: settings)
+        scheduler.start(settings: settings)
+        XCTAssertEqual(scheduler.timers.count, 2)
+        XCTAssertNotNil(scheduler.timers[types[0].id])
+        XCTAssertNotNil(scheduler.timers[types[1].id])
+        scheduler.stop()
+    }
 }
 
 // MARK: - CloudKitSyncService offline upload queue

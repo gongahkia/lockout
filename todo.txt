@@ -1,4 +1,3 @@
-(B) Add a scheduler test that asserts two custom breaks with similar names do not overwrite each other. +dx +test +scheduler
 (B) Add a settings sync test that asserts local setting mutations call `SettingsSyncService.push`. +dx +test +sync
 (B) Add an app delegate test that asserts workday timers refresh after start or end hour changes. +dx +test +scheduler
 (B) Add an app delegate test that asserts calendar polling starts and stops when the setting toggles. +dx +test +scheduler
