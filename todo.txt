@@ -1,2 +1,0 @@
-(B) Add missing 1024x1024 app icon asset or remove stale app icon catalog reference. +stability +bugfix +build
-(B) Reject invalid enum values and out-of-range numeric settings during JSON import with surfaced UI error. +stability +validation +settings

@@ -238,16 +238,59 @@ struct SettingsView: View {
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        guard let data = try? Data(contentsOf: url),
-              let imported = try? JSONDecoder().decode(AppSettings.self, from: data) else { return }
-        let changes = diffSettingsKeys(old: scheduler.currentSettings, new: imported)
+        do {
+            let data = try Data(contentsOf: url)
+            let imported = try AppSettings.decodeValidatedImportJSON(data)
+            let changes = diffSettingsKeys(old: scheduler.currentSettings, new: imported)
+            let alert = NSAlert()
+            alert.messageText = "Import Settings?"
+            alert.informativeText = changes.isEmpty ? "No changes detected." : "Changed: \(changes.joined(separator: ", "))"
+            alert.addButton(withTitle: "Apply")
+            alert.addButton(withTitle: "Cancel")
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+            scheduler.reschedule(with: imported)
+        } catch {
+            showImportError(error)
+        }
+    }
+
+    private func showImportError(_ error: Error) {
         let alert = NSAlert()
-        alert.messageText = "Import Settings?"
-        alert.informativeText = changes.isEmpty ? "No changes detected." : "Changed: \(changes.joined(separator: ", "))"
-        alert.addButton(withTitle: "Apply")
-        alert.addButton(withTitle: "Cancel")
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-        scheduler.reschedule(with: imported)
+        alert.alertStyle = .warning
+        alert.messageText = "Import Failed"
+        alert.informativeText = importErrorMessage(error)
+        alert.runModal()
+    }
+
+    private func importErrorMessage(_ error: Error) -> String {
+        if let decodingError = error as? DecodingError {
+            return decodingErrorMessage(decodingError)
+        }
+        if let localized = error as? LocalizedError, let message = localized.errorDescription {
+            return message
+        }
+        return error.localizedDescription
+    }
+
+    private func decodingErrorMessage(_ error: DecodingError) -> String {
+        switch error {
+        case let .typeMismatch(_, context):
+            return "Type mismatch at \(codingPathString(context.codingPath)): \(context.debugDescription)"
+        case let .valueNotFound(_, context):
+            return "Missing value at \(codingPathString(context.codingPath)): \(context.debugDescription)"
+        case let .keyNotFound(key, context):
+            let path = (context.codingPath + [key])
+            return "Missing key \(codingPathString(path))."
+        case let .dataCorrupted(context):
+            return "Invalid value at \(codingPathString(context.codingPath)): \(context.debugDescription)"
+        @unknown default:
+            return "Unsupported JSON decoding error."
+        }
+    }
+
+    private func codingPathString(_ codingPath: [CodingKey]) -> String {
+        let path = codingPath.map(\.stringValue).joined(separator: ".")
+        return path.isEmpty ? "<root>" : path
     }
 
     private func diffSettingsKeys(old: AppSettings, new: AppSettings) -> [String] {

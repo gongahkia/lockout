@@ -330,6 +330,39 @@ final class SettingsJSONRoundTripTests: XCTestCase {
         XCTAssertEqual(decoded.customBreakTypes[0].tips, ["Take a walk"])
         XCTAssertEqual(decoded.customBreakTypes[0].intervalMinutes, 25)
     }
+
+    func testImportRejectsOutOfRangeNumericSetting() throws {
+        let data = try makeImportJSON { json in
+            json["notificationLeadMinutes"] = 99
+        }
+
+        XCTAssertThrowsError(try AppSettings.decodeValidatedImportJSON(data)) { error in
+            guard case let AppSettingsImportValidationError.outOfRange(field, _, actual) = error else {
+                return XCTFail("Expected out-of-range validation error, got \(error)")
+            }
+            XCTAssertEqual(field, "notificationLeadMinutes")
+            XCTAssertEqual(actual, "99")
+        }
+    }
+
+    func testImportRejectsInvalidEnumValue() throws {
+        let data = try makeImportJSON { json in
+            json["breakEnforcementMode"] = "lock_everything"
+        }
+
+        XCTAssertThrowsError(try AppSettings.decodeValidatedImportJSON(data)) { error in
+            guard case DecodingError.dataCorrupted = error else {
+                return XCTFail("Expected enum decoding error, got \(error)")
+            }
+        }
+    }
+
+    private func makeImportJSON(mutating mutate: (inout [String: Any]) -> Void) throws -> Data {
+        let data = try JSONEncoder().encode(AppSettings.defaults)
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        mutate(&json)
+        return try JSONSerialization.data(withJSONObject: json)
+    }
 }
 
 // MARK: - AppSettingsStore round-trip

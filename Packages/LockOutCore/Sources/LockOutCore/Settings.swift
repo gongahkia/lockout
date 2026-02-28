@@ -74,6 +74,20 @@ public struct BreakConfig: Codable, Sendable {
     }
 }
 
+public enum AppSettingsImportValidationError: Error, LocalizedError, Equatable, Sendable {
+    case outOfRange(field: String, expected: String, actual: String)
+    case invalidValue(field: String, expected: String, actual: String)
+
+    public var errorDescription: String? {
+        switch self {
+        case let .outOfRange(field, expected, actual):
+            return "Invalid value for \(field): expected \(expected), got \(actual)."
+        case let .invalidValue(field, expected, actual):
+            return "Invalid value for \(field): expected \(expected), got \(actual)."
+        }
+    }
+}
+
 public struct AppSettings: Codable, Sendable {
     public var eyeConfig: BreakConfig
     public var microConfig: BreakConfig
@@ -151,9 +165,102 @@ public struct AppSettings: Codable, Sendable {
         )
     }
 
+    public static func decodeValidatedImportJSON(_ data: Data) throws -> AppSettings {
+        let settings = try JSONDecoder().decode(AppSettings.self, from: data)
+        try settings.validateForImport()
+        return settings
+    }
+
+    public func validateForImport() throws {
+        try Self.validateRange(snoozeDurationMinutes, field: "snoozeDurationMinutes", range: 1...30)
+        try Self.validateRetention(historyRetentionDays)
+        try Self.validateRange(idleThresholdMinutes, field: "idleThresholdMinutes", range: 1...60)
+        try Self.validateRange(notificationLeadMinutes, field: "notificationLeadMinutes", range: 0...5)
+        try Self.validateHour(workdayStartHour, field: "workdayStartHour")
+        try Self.validateHour(workdayEndHour, field: "workdayEndHour")
+
+        try Self.validateBreakConfig(eyeConfig, fieldPrefix: "eyeConfig")
+        try Self.validateBreakConfig(microConfig, fieldPrefix: "microConfig")
+        try Self.validateBreakConfig(longConfig, fieldPrefix: "longConfig")
+
+        for (index, profile) in profiles.enumerated() {
+            try Self.validateRange(profile.idleThresholdMinutes,
+                                   field: "profiles[\(index)].idleThresholdMinutes",
+                                   range: 1...60)
+        }
+
+        for (index, breakType) in customBreakTypes.enumerated() {
+            try Self.validateCustomBreakType(breakType, index: index)
+        }
+    }
+
     // valid options: 30, 60, 90, 365, 0 (unlimited)
     public mutating func clampRetention() {
         let valid = [0, 30, 60, 90, 365]
         if !valid.contains(historyRetentionDays) { historyRetentionDays = 30 }
+    }
+
+    private static func validateBreakConfig(_ config: BreakConfig, fieldPrefix: String) throws {
+        try validateRange(config.intervalMinutes,
+                          field: "\(fieldPrefix).intervalMinutes",
+                          range: 1...480)
+        try validateRange(config.durationSeconds,
+                          field: "\(fieldPrefix).durationSeconds",
+                          range: 10...7200)
+    }
+
+    private static func validateCustomBreakType(_ breakType: CustomBreakType, index: Int) throws {
+        let fieldPrefix = "customBreakTypes[\(index)]"
+        try validateRange(breakType.intervalMinutes,
+                          field: "\(fieldPrefix).intervalMinutes",
+                          range: 1...480)
+        try validateRange(breakType.durationSeconds,
+                          field: "\(fieldPrefix).durationSeconds",
+                          range: 10...7200)
+        try validateRange(breakType.snoozeMinutes,
+                          field: "\(fieldPrefix).snoozeMinutes",
+                          range: 1...60)
+
+        if breakType.minDisplaySeconds < 1 || breakType.minDisplaySeconds > breakType.durationSeconds {
+            throw AppSettingsImportValidationError.outOfRange(
+                field: "\(fieldPrefix).minDisplaySeconds",
+                expected: "an integer in 1...\(breakType.durationSeconds)",
+                actual: "\(breakType.minDisplaySeconds)"
+            )
+        }
+
+        if !breakType.overlayOpacity.isFinite || !(0.1...1.0).contains(breakType.overlayOpacity) {
+            throw AppSettingsImportValidationError.outOfRange(
+                field: "\(fieldPrefix).overlayOpacity",
+                expected: "a number in 0.1...1.0",
+                actual: "\(breakType.overlayOpacity)"
+            )
+        }
+    }
+
+    private static func validateRange(_ value: Int, field: String, range: ClosedRange<Int>) throws {
+        guard range.contains(value) else {
+            throw AppSettingsImportValidationError.outOfRange(
+                field: field,
+                expected: "an integer in \(range.lowerBound)...\(range.upperBound)",
+                actual: "\(value)"
+            )
+        }
+    }
+
+    private static func validateRetention(_ value: Int) throws {
+        let valid = [0, 30, 60, 90, 365]
+        guard valid.contains(value) else {
+            throw AppSettingsImportValidationError.invalidValue(
+                field: "historyRetentionDays",
+                expected: "one of \(valid)",
+                actual: "\(value)"
+            )
+        }
+    }
+
+    private static func validateHour(_ value: Int?, field: String) throws {
+        guard let value else { return }
+        try validateRange(value, field: field, range: 0...23)
     }
 }
