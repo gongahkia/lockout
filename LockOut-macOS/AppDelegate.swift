@@ -4,6 +4,7 @@ import SwiftData
 import LockOutCore
 import EventKit
 import UserNotifications
+import os
 
 // MARK: - Schema migration stubs
 enum LockOutSchemaV1: VersionedSchema {
@@ -18,6 +19,7 @@ enum LockOutSchemaMigrationPlan: SchemaMigrationPlan {
 
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     static let shared = AppDelegate()
+    private static let logger = Logger(subsystem: "com.yourapp.lockout", category: "AppDelegate")
     private(set) var scheduler: BreakScheduler!
     private(set) var repository: BreakHistoryRepository!
     private(set) var settingsSync: SettingsSyncService!
@@ -394,7 +396,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             guard settings.authorizationStatus == .authorized else { return }
             UNUserNotificationCenter.current().add(request) { err in
-                if let err { fputs("[UNNotif] \(err)\n", stderr) }
+                if let err {
+                    logger.error("notification scheduling failed: \(String(describing: err), privacy: .public)")
+                }
             }
         }
     }

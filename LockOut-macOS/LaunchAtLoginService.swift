@@ -1,4 +1,7 @@
 import ServiceManagement
+import os
+
+private let logger = Logger(subsystem: "com.yourapp.lockout", category: "LaunchAtLoginService")
 
 enum LaunchAtLoginService {
     static var isEnabled: Bool {
@@ -9,7 +12,7 @@ enum LaunchAtLoginService {
         do {
             try SMAppService.mainApp.register()
         } catch {
-            print("[LaunchAtLogin] register failed: \(error)")
+            logger.error("register failed: \(String(describing: error), privacy: .public)")
         }
     }
 
@@ -17,7 +20,7 @@ enum LaunchAtLoginService {
         do {
             try SMAppService.mainApp.unregister()
         } catch {
-            print("[LaunchAtLogin] unregister failed: \(error)")
+            logger.error("unregister failed: \(String(describing: error), privacy: .public)")
         }
     }
 }

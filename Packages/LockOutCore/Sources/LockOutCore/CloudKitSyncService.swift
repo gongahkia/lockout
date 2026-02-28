@@ -1,6 +1,9 @@
 import Foundation
 import CloudKit
 import Combine
+import os
+
+private let logger = Logger(subsystem: "com.yourapp.lockout", category: "CloudKitSyncService")
 
 public final class CloudKitSyncService {
     private lazy var db: CKDatabase = {
@@ -145,21 +148,21 @@ public final class CloudKitSyncService {
 
     private func handle(error: Error) {
         guard let ckError = error as? CKError else {
-            fputs("[CloudKit] error: \(error)\n", stderr)
+            logger.error("error: \(String(describing: error), privacy: .public)")
             onError?(error.localizedDescription)
             return
         }
         switch ckError.code {
         case .networkUnavailable:
-            fputs("[CloudKit] non-fatal: \(ckError.code)\n", stderr)
+            logger.notice("non-fatal: \(String(describing: ckError.code), privacy: .public)")
         case .quotaExceeded:
-            fputs("[CloudKit] non-fatal: \(ckError.code)\n", stderr)
+            logger.notice("non-fatal: \(String(describing: ckError.code), privacy: .public)")
             onError?(ckError.localizedDescription)
         case .accountTemporarilyUnavailable:
             NotificationCenter.default.post(name: .cloudKitAccountUnavailable, object: nil)
             onError?(ckError.localizedDescription)
         default:
-            fputs("[CloudKit] error: \(ckError)\n", stderr)
+            logger.error("error: \(String(describing: ckError), privacy: .public)")
             onError?(ckError.localizedDescription)
         }
     }

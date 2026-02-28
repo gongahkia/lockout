@@ -1,5 +1,8 @@
 import Foundation
 import SwiftData
+import os
+
+private let logger = Logger(subsystem: "com.yourapp.lockout", category: "BreakHistoryRepository")
 
 public final class BreakHistoryRepository {
     private let context: ModelContext
@@ -21,7 +24,11 @@ public final class BreakHistoryRepository {
         } else {
             context.insert(BreakSessionRecord(from: session))
         }
-        do { try context.save() } catch { fputs("[SwiftData] \(error)\n", stderr) }
+        do {
+            try context.save()
+        } catch {
+            logger.error("save failed: \(String(describing: error), privacy: .public)")
+        }
     }
 
     public func fetchSessions(from startDate: Date, to endDate: Date) -> [BreakSession] {
@@ -40,7 +47,7 @@ public final class BreakHistoryRepository {
             old.forEach { context.delete($0) }
             try context.save()
         } catch {
-            fputs("[SwiftData] pruneOldRecords: \(error)\n", stderr)
+            logger.error("pruneOldRecords failed: \(String(describing: error), privacy: .public)")
         }
     }
 
