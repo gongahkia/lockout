@@ -18,7 +18,6 @@ enum LockOutSchemaMigrationPlan: SchemaMigrationPlan {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
-    static let shared = AppDelegate()
     private static let logger = Logger(subsystem: "com.yourapp.lockout", category: "AppDelegate")
     private(set) var scheduler: BreakScheduler!
     private(set) var repository: BreakHistoryRepository!

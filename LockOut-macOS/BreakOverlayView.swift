@@ -1,5 +1,6 @@
 import SwiftUI
 import LockOutCore
+import AppKit
 
 struct BreakOverlayView: View {
     let breakType: BreakType
@@ -77,7 +78,7 @@ struct BreakOverlayView: View {
             if remaining > 0 { remaining -= 1 }
             else {
                 scheduler.markCompleted(repository: repository)
-                AppDelegate.shared.menuBarController?.updateStreak()
+                (NSApp.delegate as? AppDelegate)?.menuBarController?.updateStreak()
                 onDismiss()
             }
         }

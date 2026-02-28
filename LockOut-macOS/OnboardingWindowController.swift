@@ -80,7 +80,7 @@ struct OnboardingView: View {
             Toggle("Pause during Focus Mode", isOn: $enableFocus)
             Spacer()
             Button("Continue") {
-                let scheduler = AppDelegate.shared.scheduler!
+                guard let scheduler = (NSApp.delegate as? AppDelegate)?.scheduler else { return }
                 scheduler.currentSettings.pauseDuringCalendarEvents = enableCalendar
                 scheduler.currentSettings.pauseDuringFocus = enableFocus
                 if enableCalendar {

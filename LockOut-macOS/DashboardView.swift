@@ -1,11 +1,12 @@
 import SwiftUI
 import LockOutCore
+import AppKit
 
 struct DashboardView: View {
     @EnvironmentObject var scheduler: BreakScheduler
     @State private var now = Date()
     private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-    private var repo: BreakHistoryRepository { AppDelegate.shared.repository }
+    private var repo: BreakHistoryRepository? { (NSApp.delegate as? AppDelegate)?.repository }
 
     private var remaining: TimeInterval {
         guard let nb = scheduler.nextBreak else { return 0 }
@@ -24,6 +25,7 @@ struct DashboardView: View {
     }
 
     private var todayCompliance: Double {
+        guard let repo else { return 0 }
         let sessions = repo.fetchSessions(from: Calendar.current.startOfDay(for: Date()), to: Date())
         return Double(sessions.filter { $0.status == .completed }.count) / Double(max(sessions.count, 1))
     }

@@ -1,12 +1,14 @@
 import SwiftUI
 import LockOutCore
+import AppKit
 
 struct SettingsView: View {
     @EnvironmentObject var scheduler: BreakScheduler
     @State private var lastSynced: Date? = UserDefaults.standard.object(forKey: "ck_last_sync_date") as? Date
 
-    private var repo: BreakHistoryRepository { AppDelegate.shared.repository }
-    private var cloudSync: CloudKitSyncService { AppDelegate.shared.cloudSync }
+    private var appDelegate: AppDelegate? { NSApp.delegate as? AppDelegate }
+    private var repo: BreakHistoryRepository? { appDelegate?.repository }
+    private var cloudSync: CloudKitSyncService? { appDelegate?.cloudSync }
 
     var body: some View {
         Form {
@@ -19,7 +21,7 @@ struct SettingsView: View {
                 get: { scheduler.currentSettings.historyRetentionDays },
                 set: {
                     scheduler.currentSettings.historyRetentionDays = $0
-                    repo.pruneOldRecords(retentionDays: $0)
+                    repo?.pruneOldRecords(retentionDays: $0)
                 }
             )) {
                 Text("30 days").tag(30)
@@ -81,7 +83,7 @@ struct SettingsView: View {
                 get: { scheduler.currentSettings.menuBarIconTheme },
                 set: {
                     scheduler.currentSettings.menuBarIconTheme = $0
-                    AppDelegate.shared.menuBarController?.updateStreak()
+                    appDelegate?.menuBarController?.updateStreak()
                 }
             )) {
                 Text("Monochrome").tag(MenuBarIconTheme.monochrome)
@@ -102,20 +104,21 @@ struct SettingsView: View {
                 Spacer()
                 Button("Sync Now") {
                     Task {
+                        guard let cloudSync, let repo else { return }
                         await cloudSync.sync(repository: repo)
                         lastSynced = UserDefaults.standard.object(forKey: "ck_last_sync_date") as? Date
                     }
                 }
                 .disabled(scheduler.currentSettings.localOnlyMode)
             }
-            if let err = AppDelegate.shared.syncError {
+            if let err = appDelegate?.syncError {
                 Text(err).foregroundStyle(.red).font(.caption)
             }
             Toggle("Weekly compliance summary", isOn: Binding(
                 get: { scheduler.currentSettings.weeklyNotificationEnabled },
                 set: {
                     scheduler.currentSettings.weeklyNotificationEnabled = $0
-                    AppDelegate.shared.scheduleWeeklyComplianceNotification()
+                    appDelegate?.scheduleWeeklyComplianceNotification()
                 }
             ))
             HStack {

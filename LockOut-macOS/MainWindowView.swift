@@ -20,7 +20,6 @@ enum SidebarItem: String, CaseIterable, Identifiable {
 struct MainWindowView: View {
     @EnvironmentObject var scheduler: BreakScheduler
     @State private var selected: SidebarItem? = .dashboard
-    private var appDelegate: AppDelegate { .shared }
 
     var body: some View {
         NavigationSplitView {
