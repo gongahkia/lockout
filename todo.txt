@@ -1,4 +1,3 @@
-(B) Store and remove local key monitor tokens in `HotkeyRecorderHelper`. +stability +bugfix +input
 (B) Prevent duplicate key monitor registration during repeated SwiftUI view updates. +stability +bugfix +input
 (B) Return `Unmanaged.passUnretained(event)` in event tap callback to prevent key event leaks. +stability +bugfix +performance
 (B) Remove unused `CFRunLoopSourceCreate` allocation in global hotkey registration. +stability +cleanup +performance

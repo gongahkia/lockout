@@ -294,16 +294,40 @@ struct HotkeyRecorderHelper: NSViewRepresentable {
     @Binding var isRecording: Bool
     let onCapture: (Int, Int) -> Void
 
+    final class Coordinator {
+        var monitorToken: Any?
+
+        deinit {
+            if let monitorToken {
+                NSEvent.removeMonitor(monitorToken)
+            }
+        }
+
+        func removeMonitorIfNeeded() {
+            if let monitorToken {
+                NSEvent.removeMonitor(monitorToken)
+                self.monitorToken = nil
+            }
+        }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
     func makeNSView(context: Context) -> NSView { NSView() }
 
     func updateNSView(_ nsView: NSView, context: Context) {
         if isRecording {
-            NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            context.coordinator.removeMonitorIfNeeded()
+            context.coordinator.monitorToken = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
                 let keyCode = Int(event.keyCode)
                 let flags = Int(event.modifierFlags.rawValue)
                 self.onCapture(keyCode, flags)
+                self.isRecording = false
+                context.coordinator.removeMonitorIfNeeded()
                 return nil // consume
             }
+        } else {
+            context.coordinator.removeMonitorIfNeeded()
         }
     }
 }
