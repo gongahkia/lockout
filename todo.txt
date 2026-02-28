@@ -1,4 +1,3 @@
-(B) Add a focus pause test that asserts duplicate DND notifications do not invert pause state incorrectly. +dx +test +scheduler
 (B) Replace `print` and `fputs` calls with structured `Logger` instances per subsystem. +dx +observability +refactor
 (B) Add a test log sink to assert error-path logging in core services. +dx +test +observability
 (B) Add CSV export tests for commas, quotes, and newline escaping. +dx +test +export

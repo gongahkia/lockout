@@ -39,6 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private var weeklyNotifTimer: Timer?
     private var eventTap: CFMachPort?
     private var previousSettings: AppSettings?
+    private var lastKnownFocusModeEnabled: Bool?
 
     private static let lastFireKey = "last_break_fire_date"
 
@@ -300,13 +301,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 guard let ptr = observer else { return }
                 let delegate = Unmanaged<AppDelegate>.fromOpaque(ptr).takeUnretainedValue()
                 guard delegate.scheduler.currentSettings.pauseDuringFocus else { return }
-                // Toggle pause based on DND; presence of notification means state changed.
-                // Re-check current DND state via UserNotifications isn't directly available;
-                // use a heuristic: toggle opposite of current pause state.
-                if delegate.scheduler.currentSettings.isPaused { delegate.scheduler.resume() }
-                else { delegate.scheduler.pause() }
+                guard let isEnabled = delegate.readFocusModeEnabled() else { return }
+                let action = SettingsChangeDetector.focusPauseAction(
+                    previousFocusEnabled: delegate.lastKnownFocusModeEnabled,
+                    currentFocusEnabled: isEnabled,
+                    isPaused: delegate.scheduler.currentSettings.isPaused
+                )
+                delegate.lastKnownFocusModeEnabled = isEnabled
+                switch action {
+                case .pause: delegate.scheduler.pause()
+                case .resume: delegate.scheduler.resume()
+                case .none: break
+                }
             },
             "com.apple.donotdisturb.state.changed" as CFString, nil, .deliverImmediately)
+    }
+
+    private func readFocusModeEnabled() -> Bool? {
+        guard let data = UserDefaults(suiteName: "com.apple.ncprefs")?.data(forKey: "dnd_prefs"),
+              let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any],
+              let userPref = plist["userPref"] as? [String: Any],
+              let enabled = userPref["enabled"] as? Bool else {
+            return nil
+        }
+        return enabled
     }
 
     private func startIdleDetection() {

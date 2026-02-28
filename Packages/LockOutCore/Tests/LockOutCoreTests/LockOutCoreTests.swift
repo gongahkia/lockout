@@ -317,4 +317,20 @@ final class AppDelegateSettingsRefreshTests: XCTestCase {
 
         XCTAssertFalse(SettingsChangeDetector.calendarPollingPreferenceChanged(previous: previous, current: previous))
     }
+
+    func testFocusPauseIgnoresDuplicateNotifications() {
+        let duplicateEnabled = SettingsChangeDetector.focusPauseAction(
+            previousFocusEnabled: true,
+            currentFocusEnabled: true,
+            isPaused: false
+        )
+        XCTAssertEqual(duplicateEnabled, .none)
+
+        let duplicateDisabled = SettingsChangeDetector.focusPauseAction(
+            previousFocusEnabled: false,
+            currentFocusEnabled: false,
+            isPaused: true
+        )
+        XCTAssertEqual(duplicateDisabled, .none)
+    }
 }
