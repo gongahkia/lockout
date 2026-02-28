@@ -1,4 +1,3 @@
-(B) Replace auto-complete behavior on fullscreen apps with a `deferred` break session status. +philosophical +refactor +scheduler
 (B) Replace auto-complete behavior on blocklisted apps with a `deferred` break session status. +philosophical +refactor +scheduler
 (B) Add `deferred` to `BreakStatus` and persist it in `BreakSessionRecord`. +philosophical +refactor +data
 (B) Persist `breakTypeName` for completed, skipped, snoozed, and deferred sessions. +philosophical +refactor +data

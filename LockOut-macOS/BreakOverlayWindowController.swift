@@ -21,7 +21,7 @@ final class BreakOverlayWindowController {
             return
         }
         guard !SystemStateService.frontmostAppIsFullscreen() else {
-            scheduler.markCompleted(repository: repo)
+            scheduler.markDeferred(repository: repo)
             return
         }
         let frontmostID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? ""
