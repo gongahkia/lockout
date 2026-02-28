@@ -1,4 +1,3 @@
-(B) Reconfigure calendar polling immediately when `pauseDuringCalendarEvents` changes at runtime. +stability +bugfix +scheduler
 (B) Reconfigure workday start and end timers immediately when workday hour settings change. +stability +bugfix +scheduler
 (B) Recreate weekly compliance timer when remote settings sync changes weekly notification settings. +stability +bugfix +scheduler
 (B) Store and remove local key monitor tokens in `HotkeyRecorderHelper`. +stability +bugfix +input
