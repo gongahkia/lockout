@@ -306,4 +306,15 @@ final class AppDelegateSettingsRefreshTests: XCTestCase {
 
         XCTAssertFalse(SettingsChangeDetector.workdayTimersNeedRefresh(previous: previous, current: previous))
     }
+
+    func testCalendarPollingRefreshWhenToggleChanges() {
+        var previous = AppSettings.defaults
+        previous.pauseDuringCalendarEvents = false
+
+        var toggled = previous
+        toggled.pauseDuringCalendarEvents = true
+        XCTAssertTrue(SettingsChangeDetector.calendarPollingPreferenceChanged(previous: previous, current: toggled))
+
+        XCTAssertFalse(SettingsChangeDetector.calendarPollingPreferenceChanged(previous: previous, current: previous))
+    }
 }
