@@ -1,4 +1,3 @@
-(B) Render a policy denial message in `BreakOverlayView` when bypass controls are locked. +philosophical +feature +overlay
 (B) Replace auto-complete behavior on locked screen with a `deferred` break session status. +philosophical +refactor +scheduler
 (B) Replace auto-complete behavior on fullscreen apps with a `deferred` break session status. +philosophical +refactor +scheduler
 (B) Replace auto-complete behavior on blocklisted apps with a `deferred` break session status. +philosophical +refactor +scheduler

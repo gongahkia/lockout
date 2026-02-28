@@ -64,6 +64,11 @@ struct BreakOverlayView: View {
                     .buttonStyle(.plain)
                     .disabled(!canSkip || !canBypass)
                 }
+                if !canBypass {
+                    Text("Bypass is disabled for the active role policy.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 .padding(24)
             }
             .padding(40)
