@@ -63,6 +63,12 @@ public final class CloudKitSyncService {
         record["id"] = session.id.uuidString as CKRecordValue
         record["type"] = session.type.rawValue as CKRecordValue
         record["scheduledAt"] = session.scheduledAt as CKRecordValue
+        if let endedAt = session.endedAt {
+            record["endedAt"] = endedAt as CKRecordValue
+        } else {
+            record["endedAt"] = nil
+        }
+        record["breakTypeName"] = (session.breakTypeName ?? session.type.rawValue) as CKRecordValue
         record["status"] = session.status.rawValue as CKRecordValue
         do {
             try await db.save(record)
@@ -139,7 +145,7 @@ public final class CloudKitSyncService {
         return rank(local.status) >= rank(remote.status) ? local : remote
     }
 
-    private func mapRecord(_ r: CKRecord) -> BreakSession? {
+    func mapRecord(_ r: CKRecord) -> BreakSession? {
         guard let idStr = r["id"] as? String,
               let id = UUID(uuidString: idStr),
               let typeStr = r["type"] as? String,
@@ -147,7 +153,9 @@ public final class CloudKitSyncService {
               let scheduledAt = r["scheduledAt"] as? Date,
               let statusStr = r["status"] as? String,
               let status = BreakStatus(rawValue: statusStr) else { return nil }
-        return BreakSession(id: id, type: type, scheduledAt: scheduledAt, status: status)
+        let endedAt = r["endedAt"] as? Date
+        let breakTypeName = r["breakTypeName"] as? String
+        return BreakSession(id: id, type: type, scheduledAt: scheduledAt, endedAt: endedAt, status: status, breakTypeName: breakTypeName)
     }
 
     func handle(error: Error) {

@@ -1,5 +1,6 @@
 import XCTest
 import SwiftData
+import CloudKit
 @testable import LockOutCore
 
 // MARK: - ComplianceCalculator tests
@@ -171,6 +172,24 @@ final class CloudKitConflictTests: XCTestCase {
         let remote = BreakSession(id: id, type: .eye, scheduledAt: Date(), status: .skipped)
         let result = svc.resolveConflict(local: local, remote: remote)
         XCTAssertEqual(result.status, .completed)
+    }
+
+    func testMapRecordDecodesEndedAtAndBreakTypeName() {
+        let svc = CloudKitSyncService()
+        let id = UUID()
+        let scheduledAt = Date()
+        let endedAt = scheduledAt.addingTimeInterval(12)
+        let record = CKRecord(recordType: "BreakSession", recordID: CKRecord.ID(recordName: id.uuidString))
+        record["id"] = id.uuidString as CKRecordValue
+        record["type"] = BreakType.eye.rawValue as CKRecordValue
+        record["scheduledAt"] = scheduledAt as CKRecordValue
+        record["endedAt"] = endedAt as CKRecordValue
+        record["breakTypeName"] = "Eye Break" as CKRecordValue
+        record["status"] = BreakStatus.completed.rawValue as CKRecordValue
+
+        let mapped = svc.mapRecord(record)
+        XCTAssertEqual(mapped?.endedAt, endedAt)
+        XCTAssertEqual(mapped?.breakTypeName, "Eye Break")
     }
 }
 
