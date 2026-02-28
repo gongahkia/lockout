@@ -13,3 +13,5 @@ jobs:
         run: make setup-config
       - name: test
         run: make test
+      - name: build app target
+        run: xcodebuild -scheme LockOut-macOS -project LockOut.xcodeproj -configuration Debug -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO build
