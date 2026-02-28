@@ -5,6 +5,7 @@ build:
 
 test:
 	swift test --package-path Packages/LockOutCore
+	xcodebuild -project LockOut.xcodeproj -scheme LockOut-macOS -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO build
 
 clean:
 	rm -rf build/ dist/
