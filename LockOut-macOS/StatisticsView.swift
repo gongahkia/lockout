@@ -41,7 +41,6 @@ struct StatisticsView: View {
                 summaryCell(value: "\(Int(rate * 100))%", label: "Compliance")
                 summaryCell(value: "\(streak)d", label: "Streak")
             }
-        }
             syncStatusRow
             HStack {
                 Button("Export CSV") { exportCSV() }
