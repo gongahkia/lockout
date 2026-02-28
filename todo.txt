@@ -1,4 +1,3 @@
-(B) Persist active role selection in `AppSettingsStore` and `SettingsSyncService`. +philosophical +feature +settings
 (B) Add active role and enforcement mode controls to `SettingsView`. +philosophical +feature +ui
 (B) Disable overlay skip and snooze actions in `BreakOverlayView` when current role policy denies bypass. +philosophical +feature +overlay
 (B) Render a policy denial message in `BreakOverlayView` when bypass controls are locked. +philosophical +feature +overlay
