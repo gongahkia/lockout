@@ -15,17 +15,20 @@ final class MenuBarController {
 
     private let scheduler: BreakScheduler
     private let repository: BreakHistoryRepository
+    private let cloudSync: CloudKitSyncService
     private let settingsSync: SettingsSyncService
     private let showBreak: (BreakType, Int) -> Void
     private let updater: SPUStandardUpdaterController
 
     init(scheduler: BreakScheduler,
          repository: BreakHistoryRepository,
+         cloudSync: CloudKitSyncService,
          settingsSync: SettingsSyncService,
          updater: SPUStandardUpdaterController,
          showBreak: @escaping (BreakType, Int) -> Void) {
         self.scheduler = scheduler
         self.repository = repository
+        self.cloudSync = cloudSync
         self.settingsSync = settingsSync
         self.updater = updater
         self.showBreak = showBreak
@@ -173,7 +176,7 @@ final class MenuBarController {
     }
 
     @objc private func snooze() {
-        scheduler.snooze(repository: repository) // uses per-break-type snoozeMinutes
+        scheduler.snooze(repository: repository, cloudSync: cloudSync) // uses per-break-type snoozeMinutes
     }
 
     @objc private func openApp() {

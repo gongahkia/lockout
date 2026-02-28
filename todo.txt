@@ -1,4 +1,3 @@
-(B) Deduplicate pending CloudKit upload queue entries by session UUID before persistence. +stability +sync +data
 (B) Cap pending CloudKit upload queue length and discard oldest duplicates first. +stability +sync +performance
 (B) Trigger asynchronous cloud upload after local session save when sync is enabled. +stability +sync +scheduler
 (B) Rebuild menu bar break submenu whenever custom break type settings change. +stability +bugfix +ui

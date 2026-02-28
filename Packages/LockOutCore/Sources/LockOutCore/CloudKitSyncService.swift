@@ -13,6 +13,7 @@ public final class CloudKitSyncService {
     }()
     private static let lastSyncKey = "ck_last_sync_date"
     private static let pendingKey = "ckPendingUploads"
+    private static let maxPendingUploads = 100
     public var onError: ((String) -> Void)?
 
     private var pendingUploads: [BreakSession] {
@@ -49,9 +50,7 @@ public final class CloudKitSyncService {
     public func uploadSession(_ session: BreakSession) async {
         guard !isLocalOnlyEnabled else { return }
         guard NetworkMonitor.shared.isConnected else {
-            var q = pendingUploads
-            q.append(session)
-            pendingUploads = q
+            enqueuePendingUpload(session)
             return
         }
         await uploadWithBackoff(session, attempt: 0)
@@ -79,9 +78,7 @@ public final class CloudKitSyncService {
             await uploadWithBackoff(session, attempt: attempt + 1)
         } catch {
             handle(error: error)
-            var q = pendingUploads
-            q.append(session)
-            pendingUploads = q
+            enqueuePendingUpload(session)
         }
     }
 
@@ -98,6 +95,16 @@ public final class CloudKitSyncService {
         guard !queue.isEmpty else { return }
         pendingUploads = []
         for session in queue { await uploadWithBackoff(session, attempt: 0) }
+    }
+
+    private func enqueuePendingUpload(_ session: BreakSession) {
+        var queue = pendingUploads
+        queue.removeAll { $0.id == session.id }
+        queue.append(session)
+        if queue.count > Self.maxPendingUploads {
+            queue.removeFirst(queue.count - Self.maxPendingUploads)
+        }
+        pendingUploads = queue
     }
 
     public func fetchSessions(since date: Date) async -> [BreakSession] {

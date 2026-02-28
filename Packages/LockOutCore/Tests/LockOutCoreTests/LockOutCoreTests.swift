@@ -235,17 +235,47 @@ final class CustomBreakTypeSchedulingTests: XCTestCase {
 
 // MARK: - CloudKitSyncService offline upload queue
 final class CloudKitOfflineQueueTests: XCTestCase {
+    override func tearDown() {
+        UserDefaults.standard.removeObject(forKey: "ckPendingUploads")
+        NetworkMonitor.shared.forceOffline(false)
+        super.tearDown()
+    }
+
+    private func pendingQueue() -> [BreakSession] {
+        guard let data = UserDefaults.standard.data(forKey: "ckPendingUploads"),
+              let queue = try? JSONDecoder().decode([BreakSession].self, from: data) else { return [] }
+        return queue
+    }
+
     func testOfflineQueueEnqueuesSession() async {
         let svc = CloudKitSyncService()
         NetworkMonitor.shared.forceOffline(true)
-        // drain any pending state
-        UserDefaults.standard.removeObject(forKey: "ckPendingUploads")
         let session = BreakSession(type: .eye, scheduledAt: Date(), status: .completed)
         await svc.uploadSession(session)
         XCTAssertEqual(svc.pendingUploadsCount, 1)
-        // clear queue before restoring online so flush guard returns early (avoids real CK access)
-        UserDefaults.standard.removeObject(forKey: "ckPendingUploads")
-        NetworkMonitor.shared.forceOffline(false)
+    }
+
+    func testOfflineQueueDeduplicatesBySessionID() async {
+        let svc = CloudKitSyncService()
+        NetworkMonitor.shared.forceOffline(true)
+        let id = UUID()
+        let first = BreakSession(id: id, type: .eye, scheduledAt: Date(), status: .skipped)
+        let second = BreakSession(id: id, type: .eye, scheduledAt: Date(), status: .completed)
+        await svc.uploadSession(first)
+        await svc.uploadSession(second)
+        let queue = pendingQueue()
+        XCTAssertEqual(queue.count, 1)
+        XCTAssertEqual(queue.first?.status, .completed)
+    }
+
+    func testOfflineQueueCapDropsOldestEntries() async {
+        let svc = CloudKitSyncService()
+        NetworkMonitor.shared.forceOffline(true)
+        for i in 0..<120 {
+            let session = BreakSession(id: UUID(), type: .eye, scheduledAt: Date().addingTimeInterval(Double(i)), status: .completed)
+            await svc.uploadSession(session)
+        }
+        XCTAssertEqual(svc.pendingUploadsCount, 100)
     }
 }
 

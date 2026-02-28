@@ -7,6 +7,7 @@ struct BreakOverlayView: View {
     let minDisplaySeconds: Int
     let scheduler: BreakScheduler
     let repository: BreakHistoryRepository
+    let cloudSync: CloudKitSyncService
     let onDismiss: () -> Void
 
     @State private var remaining: Int
@@ -23,12 +24,13 @@ struct BreakOverlayView: View {
             .canBypassBreak ?? true
     }
 
-    init(breakType: BreakType, duration: Int, minDisplaySeconds: Int = 5, scheduler: BreakScheduler, repository: BreakHistoryRepository, onDismiss: @escaping () -> Void) {
+    init(breakType: BreakType, duration: Int, minDisplaySeconds: Int = 5, scheduler: BreakScheduler, repository: BreakHistoryRepository, cloudSync: CloudKitSyncService, onDismiss: @escaping () -> Void) {
         self.breakType = breakType
         self.duration = duration
         self.minDisplaySeconds = minDisplaySeconds
         self.scheduler = scheduler
         self.repository = repository
+        self.cloudSync = cloudSync
         self.onDismiss = onDismiss
         _remaining = State(initialValue: duration)
     }
@@ -51,14 +53,14 @@ struct BreakOverlayView: View {
                 Spacer()
                 HStack {
                     Button("Snooze \(scheduler.currentCustomBreakType?.snoozeMinutes ?? scheduler.currentSettings.snoozeDurationMinutes) min") {
-                        scheduler.snooze(repository: repository)
+                        scheduler.snooze(repository: repository, cloudSync: cloudSync)
                         onDismiss()
                     }
                     .buttonStyle(.plain)
                     .disabled(!canSkip || !canBypass)
                     Spacer()
                     Button("Skip") {
-                        scheduler.skip(repository: repository)
+                        scheduler.skip(repository: repository, cloudSync: cloudSync)
                         onDismiss()
                     }
                     .buttonStyle(.plain)
@@ -76,7 +78,7 @@ struct BreakOverlayView: View {
         .onReceive(tick) { _ in
             if remaining > 0 { remaining -= 1 }
             else {
-                scheduler.markCompleted(repository: repository)
+                scheduler.markCompleted(repository: repository, cloudSync: cloudSync)
                 NotificationCenter.default.post(name: .streakDidChange, object: nil)
                 onDismiss()
             }

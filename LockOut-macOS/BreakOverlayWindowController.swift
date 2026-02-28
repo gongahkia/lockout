@@ -7,26 +7,28 @@ final class BreakOverlayWindowController {
     private var windows: [NSWindow] = []
     private let scheduler: BreakScheduler
     private let repo: BreakHistoryRepository
+    private let cloudSync: CloudKitSyncService
     private var audioPlayer: AVAudioPlayer?
 
-    init(scheduler: BreakScheduler, repository: BreakHistoryRepository) {
+    init(scheduler: BreakScheduler, repository: BreakHistoryRepository, cloudSync: CloudKitSyncService) {
         self.scheduler = scheduler
         self.repo = repository
+        self.cloudSync = cloudSync
     }
 
     func show(breakType: BreakType, duration: Int, minDisplaySeconds: Int = 5) {
         guard windows.isEmpty else { return }
         guard !SystemStateService.isScreenLocked() else {
-            scheduler.markDeferred(repository: repo)
+            scheduler.markDeferred(repository: repo, cloudSync: cloudSync)
             return
         }
         guard !SystemStateService.frontmostAppIsFullscreen() else {
-            scheduler.markDeferred(repository: repo)
+            scheduler.markDeferred(repository: repo, cloudSync: cloudSync)
             return
         }
         let frontmostID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? ""
         if scheduler.currentSettings.blockedBundleIDs.contains(frontmostID) {
-            scheduler.markDeferred(repository: repo)
+            scheduler.markDeferred(repository: repo, cloudSync: cloudSync)
             return
         }
         let customType = scheduler.currentCustomBreakType
@@ -41,7 +43,7 @@ final class BreakOverlayWindowController {
             )
             win.onEscape = { [weak self] in
                 guard let self else { return }
-                self.scheduler.skip(repository: self.repo)
+                self.scheduler.skip(repository: self.repo, cloudSync: self.cloudSync)
                 self.dismiss()
             }
             win.level = .screenSaver
@@ -53,7 +55,8 @@ final class BreakOverlayWindowController {
                 duration: duration,
                 minDisplaySeconds: minDisplaySeconds,
                 scheduler: scheduler,
-                repository: repo
+                repository: repo,
+                cloudSync: cloudSync
             ) { [weak self] in self?.dismiss() }
             let hosting = NSHostingView(rootView: view)
             let effectView = NSVisualEffectView(frame: screen.frame)

@@ -73,7 +73,7 @@ public final class BreakScheduler: ObservableObject {
         return currentSettings.customBreakTypes.first { $0.id == customTypeID }
     }
 
-    public func snooze(minutes: Int? = nil, repository: BreakHistoryRepository? = nil) {
+    public func snooze(minutes: Int? = nil, repository: BreakHistoryRepository? = nil, cloudSync: CloudKitSyncService? = nil) {
         let breakTypeName = currentCustomBreakType?.name
         let mins = minutes ?? currentCustomBreakType?.snoozeMinutes ?? currentSettings.snoozeDurationMinutes
         guard mins > 0 else { return }
@@ -81,6 +81,9 @@ public final class BreakScheduler: ObservableObject {
         if let repository, let nb = nextBreak {
             let session = BreakSession(type: legacyBreakType(forCustomTypeID: nb.customTypeID), scheduledAt: nb.fireDate, status: .snoozed, breakTypeName: breakTypeName)
             repository.save(session)
+            if !currentSettings.localOnlyMode, let cloudSync {
+                Task { await cloudSync.uploadSession(session) }
+            }
         }
         stop()
         guard var nb = nextBreak else { return }
@@ -90,24 +93,33 @@ public final class BreakScheduler: ObservableObject {
         scheduleTimer(for: customTypeID, fireDate: nb.fireDate)
     }
 
-    public func skip(repository: BreakHistoryRepository) {
+    public func skip(repository: BreakHistoryRepository, cloudSync: CloudKitSyncService? = nil) {
         guard let nb = nextBreak else { return }
         let session = BreakSession(type: legacyBreakType(forCustomTypeID: nb.customTypeID), scheduledAt: nb.fireDate, status: .skipped, breakTypeName: currentCustomBreakType?.name)
         repository.save(session)
+        if !currentSettings.localOnlyMode, let cloudSync {
+            Task { await cloudSync.uploadSession(session) }
+        }
         reschedule(with: currentSettings)
     }
 
-    public func markCompleted(repository: BreakHistoryRepository) {
+    public func markCompleted(repository: BreakHistoryRepository, cloudSync: CloudKitSyncService? = nil) {
         guard let nb = nextBreak else { return }
         let session = BreakSession(type: legacyBreakType(forCustomTypeID: nb.customTypeID), scheduledAt: nb.fireDate, endedAt: Date(), status: .completed, breakTypeName: currentCustomBreakType?.name)
         repository.save(session)
+        if !currentSettings.localOnlyMode, let cloudSync {
+            Task { await cloudSync.uploadSession(session) }
+        }
         reschedule(with: currentSettings)
     }
 
-    public func markDeferred(repository: BreakHistoryRepository) {
+    public func markDeferred(repository: BreakHistoryRepository, cloudSync: CloudKitSyncService? = nil) {
         guard let nb = nextBreak else { return }
         let session = BreakSession(type: legacyBreakType(forCustomTypeID: nb.customTypeID), scheduledAt: nb.fireDate, status: .deferred, breakTypeName: currentCustomBreakType?.name)
         repository.save(session)
+        if !currentSettings.localOnlyMode, let cloudSync {
+            Task { await cloudSync.uploadSession(session) }
+        }
         reschedule(with: currentSettings)
     }
 

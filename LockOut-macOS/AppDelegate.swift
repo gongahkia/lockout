@@ -132,11 +132,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         menuBarController = MenuBarController(
             scheduler: scheduler,
             repository: repository,
+            cloudSync: cloudSync,
             settingsSync: settingsSync,
             updater: updaterController.updater,
             showBreak: { [weak self] type, duration in self?.overlayController?.show(breakType: type, duration: duration) }
         )
-        overlayController = BreakOverlayWindowController(scheduler: scheduler, repository: repository)
+        overlayController = BreakOverlayWindowController(scheduler: scheduler, repository: repository, cloudSync: cloudSync)
         scheduler.onBreakTriggered = { [weak self] ct in
             guard let self else { return }
             overlayController?.show(breakType: legacyBreakType(ct), duration: ct.durationSeconds, minDisplaySeconds: ct.minDisplaySeconds)
@@ -179,7 +180,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 let keyCode = Int(event.getIntegerValueField(.keyboardEventKeycode))
                 let flags = Int(event.flags.rawValue) & 0x00FF0000 // modifier bits
                 if keyCode == hotkey.keyCode && flags == (hotkey.modifierFlags & 0x00FF0000) {
-                    Task { @MainActor in delegate.scheduler.snooze(repository: delegate.repository) }
+                    Task { @MainActor in delegate.scheduler.snooze(repository: delegate.repository, cloudSync: delegate.cloudSync) }
                     return nil // consume event
                 }
                 return Unmanaged.passUnretained(event)
@@ -382,7 +383,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             case "SNOOZE_BREAK":
                 let mins = self.scheduler.currentCustomBreakType?.snoozeMinutes
                     ?? self.scheduler.currentSettings.snoozeDurationMinutes
-                self.scheduler.snooze(minutes: mins, repository: self.repository)
+                self.scheduler.snooze(minutes: mins, repository: self.repository, cloudSync: self.cloudSync)
             default: break
             }
         }
