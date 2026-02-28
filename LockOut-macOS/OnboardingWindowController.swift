@@ -1,11 +1,12 @@
 import AppKit
 import SwiftUI
 import EventKit
+import LockOutCore
 
 final class OnboardingWindowController: NSWindowController {
     private static var instance: OnboardingWindowController?
 
-    static func present() {
+    static func present(scheduler: BreakScheduler) {
         let win = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 480, height: 520),
             styleMask: [.titled, .closable],
@@ -14,7 +15,7 @@ final class OnboardingWindowController: NSWindowController {
         )
         win.title = "Welcome to LockOut"
         win.center()
-        win.contentView = NSHostingView(rootView: OnboardingView { win.close() })
+        win.contentView = NSHostingView(rootView: OnboardingView(scheduler: scheduler) { win.close() })
         let ctrl = OnboardingWindowController(window: win)
         instance = ctrl
         ctrl.showWindow(nil)
@@ -22,6 +23,7 @@ final class OnboardingWindowController: NSWindowController {
 }
 
 struct OnboardingView: View {
+    let scheduler: BreakScheduler
     let onFinish: () -> Void
     @State private var page = 0
     @State private var breatheScale: CGFloat = 0.5
@@ -80,7 +82,6 @@ struct OnboardingView: View {
             Toggle("Pause during Focus Mode", isOn: $enableFocus)
             Spacer()
             Button("Continue") {
-                guard let scheduler = (NSApp.delegate as? AppDelegate)?.scheduler else { return }
                 scheduler.currentSettings.pauseDuringCalendarEvents = enableCalendar
                 scheduler.currentSettings.pauseDuringFocus = enableFocus
                 if enableCalendar {

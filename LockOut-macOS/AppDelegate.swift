@@ -136,7 +136,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in self?.scheduler.resume() }
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.screensDidSleepNotification, object: nil, queue: .main) { [weak self] _ in self?.overlayController?.dismiss() }
         if !UserDefaults.standard.bool(forKey: "hasOnboarded") {
-            OnboardingWindowController.present()
+            OnboardingWindowController.present(scheduler: scheduler)
         }
         requestNotificationPermission()
         startIdleDetection()
