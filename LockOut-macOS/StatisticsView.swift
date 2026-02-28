@@ -104,7 +104,8 @@ struct StatisticsView: View {
         guard panel.runModal() == .OK, let url = panel.url else { return }
         let typeNames = allTypeNames
         let typeHeaders = typeNames.flatMap { ["\($0)_completed", "\($0)_skipped"] }
-        var csv = (["date", "completed", "skipped"] + typeHeaders).joined(separator: ",") + "\n"
+        let headers = (["date", "completed", "skipped"] + typeHeaders).map(CSVExport.escapedCell)
+        var csv = headers.joined(separator: ",") + "\n"
         let fmt = ISO8601DateFormatter()
         for s in stats {
             var row = [fmt.string(from: s.date), "\(s.completed)", "\(s.skipped)"]
@@ -112,7 +113,7 @@ struct StatisticsView: View {
                 let (c, k) = s.perTypeCounts[name] ?? (0, 0)
                 row += ["\(c)", "\(k)"]
             }
-            csv += row.joined(separator: ",") + "\n"
+            csv += row.map(CSVExport.escapedCell).joined(separator: ",") + "\n"
         }
         try? csv.write(to: url, atomically: true, encoding: .utf8)
     }
