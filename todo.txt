@@ -1,4 +1,3 @@
-(B) Initialize `ModelContainer` with the declared schema migration plan. +stability +data +migration
 (B) Extend `make test` to run app-target compile checks in addition to package tests. +stability +infra +ci
 (B) Add missing 1024x1024 app icon asset or remove stale app icon catalog reference. +stability +bugfix +build
 (B) Reject invalid enum values and out-of-range numeric settings during JSON import with surfaced UI error. +stability +validation +settings

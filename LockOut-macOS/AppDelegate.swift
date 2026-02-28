@@ -69,6 +69,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 ? ModelConfiguration(isStoredInMemoryOnly: true)
                 : ModelConfiguration()
             modelContainer = try ModelContainer(for: BreakSessionRecord.self,
+                                                migrationPlan: LockOutSchemaMigrationPlan.self,
                                                 configurations: config)
         } catch {
             let alert = NSAlert()
