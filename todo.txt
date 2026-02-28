@@ -1,4 +1,3 @@
-(B) Add `localOnlyMode` to `AppSettings` and gate CloudKit and iCloud KVS paths when enabled. +philosophical +feature +security
 (B) Add an app-target CI compile step using `xcodebuild` with `CODE_SIGNING_ALLOWED=NO`. +dx +infra +ci
 (B) Add a UI test CI step for `LockOut-macOSUITests` using the existing `--uitesting` launch argument. +dx +infra +ci
 (B) Add a scheduler test that asserts timer expiry invokes `onBreakTriggered`. +dx +test +scheduler

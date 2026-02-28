@@ -82,14 +82,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         cloudSync = CloudKitSyncService()
         updaterController = UpdaterController()
         cloudSync.onError = { [weak self] msg in DispatchQueue.main.async { self?.syncError = msg } }
-        let settings = settingsSync.pull() ?? AppSettingsStore.load() ?? .defaults
+        let localSettings = AppSettingsStore.load()
+        let settings = (localSettings?.localOnlyMode == true
+            ? localSettings
+            : (settingsSync.pull() ?? localSettings)) ?? .defaults
         scheduler = BreakScheduler(settings: settings)
         let retentionDays = settings.historyRetentionDays
         let repo = repository!
         Task.detached { repo.pruneOldRecords(retentionDays: retentionDays) }
         applyLaunchOffset(settings: settings)
-        settingsSync.observeChanges { [weak self] remote in
-            self?.scheduler.reschedule(with: remote)
+        if !settings.localOnlyMode {
+            settingsSync.observeChanges { [weak self] remote in
+                self?.scheduler.reschedule(with: remote)
+            }
         }
         scheduler.$currentSettings.dropFirst().sink { [weak self] settings in
             AppSettingsStore.save(settings)

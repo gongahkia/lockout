@@ -25,6 +25,10 @@ public final class CloudKitSyncService {
 
     private var cancellables = Set<AnyCancellable>()
 
+    private var isLocalOnlyEnabled: Bool {
+        AppSettingsStore.load()?.localOnlyMode ?? false
+    }
+
     public init() {
         // flush pending queue when network becomes available
         NetworkMonitor.shared.$isConnected
@@ -40,6 +44,7 @@ public final class CloudKitSyncService {
     public var pendingUploadsCount: Int { pendingUploads.count }
 
     public func uploadSession(_ session: BreakSession) async {
+        guard !isLocalOnlyEnabled else { return }
         guard NetworkMonitor.shared.isConnected else {
             var q = pendingUploads
             q.append(session)
@@ -78,6 +83,7 @@ public final class CloudKitSyncService {
     }
 
     private func flushPending() async {
+        guard !isLocalOnlyEnabled else { return }
         let queue = pendingUploads
         guard !queue.isEmpty else { return }
         pendingUploads = []
@@ -85,6 +91,7 @@ public final class CloudKitSyncService {
     }
 
     public func fetchSessions(since date: Date) async -> [BreakSession] {
+        guard !isLocalOnlyEnabled else { return [] }
         let predicate = NSPredicate(format: "modificationDate > %@", date as CVarArg)
         let query = CKQuery(recordType: "BreakSession", predicate: predicate)
         do {
@@ -100,6 +107,7 @@ public final class CloudKitSyncService {
     }
 
     public func sync(repository: BreakHistoryRepository) async {
+        guard !isLocalOnlyEnabled else { return }
         let remote = await fetchSessions(since: lastSyncDate)
         for session in remote {
             let local = repository.fetchSession(id: session.id)

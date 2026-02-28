@@ -92,6 +92,10 @@ struct SettingsView: View {
                 get: { LaunchAtLoginService.isEnabled },
                 set: { $0 ? LaunchAtLoginService.enable() : LaunchAtLoginService.disable() }
             ))
+            Toggle("Local-only mode (disable cloud sync)", isOn: Binding(
+                get: { scheduler.currentSettings.localOnlyMode },
+                set: { scheduler.currentSettings.localOnlyMode = $0 }
+            ))
             HStack {
                 Text("Last synced: \(lastSynced.map { formatted($0) } ?? "Never")")
                     .foregroundStyle(.secondary)
@@ -102,6 +106,7 @@ struct SettingsView: View {
                         lastSynced = UserDefaults.standard.object(forKey: "ck_last_sync_date") as? Date
                     }
                 }
+                .disabled(scheduler.currentSettings.localOnlyMode)
             }
             if let err = AppDelegate.shared.syncError {
                 Text(err).foregroundStyle(.red).font(.caption)

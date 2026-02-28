@@ -6,17 +6,23 @@ public final class SettingsSyncService {
     private static let activeRoleKey = "active_user_role"
     private var observer: NSObjectProtocol?
 
+    private var isLocalOnlyEnabled: Bool {
+        AppSettingsStore.load()?.localOnlyMode ?? false
+    }
+
     public init() {}
 
     public func push(_ settings: AppSettings) {
+        AppSettingsStore.save(settings)
+        guard !settings.localOnlyMode else { return }
         guard let data = try? JSONEncoder().encode(settings) else { return }
         store.set(data, forKey: Self.key)
         store.set(settings.activeRole.rawValue, forKey: Self.activeRoleKey)
         store.synchronize()
-        AppSettingsStore.save(settings)
     }
 
     public func pull() -> AppSettings? {
+        guard !isLocalOnlyEnabled else { return nil }
         guard let data = store.data(forKey: Self.key) else { return nil }
         guard var settings = try? JSONDecoder().decode(AppSettings.self, from: data) else { return nil }
         if let roleRaw = store.string(forKey: Self.activeRoleKey),
@@ -27,6 +33,7 @@ public final class SettingsSyncService {
     }
 
     public func observeChanges(handler: @escaping (AppSettings) -> Void) {
+        guard !isLocalOnlyEnabled else { return }
         observer = NotificationCenter.default.addObserver(
             forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
             object: store,

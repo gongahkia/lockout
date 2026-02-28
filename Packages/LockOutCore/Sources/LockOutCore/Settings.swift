@@ -97,6 +97,7 @@ public struct AppSettings: Codable, Sendable {
     public var breakEnforcementMode: BreakEnforcementMode
     public var rolePolicies: [RolePolicy]
     public var activeRole: UserRole
+    public var localOnlyMode: Bool
 
     public init(eyeConfig: BreakConfig, microConfig: BreakConfig, longConfig: BreakConfig,
                 snoozeDurationMinutes: Int = 5, historyRetentionDays: Int = 30, isPaused: Bool = false,
@@ -109,7 +110,8 @@ public struct AppSettings: Codable, Sendable {
                 menuBarIconTheme: MenuBarIconTheme = .monochrome,
                 breakEnforcementMode: BreakEnforcementMode = .reminder,
                 rolePolicies: [RolePolicy] = RolePolicy.defaults,
-                activeRole: UserRole = .developer) {
+                activeRole: UserRole = .developer,
+                localOnlyMode: Bool = false) {
         self.eyeConfig = eyeConfig
         self.microConfig = microConfig
         self.longConfig = longConfig
@@ -132,6 +134,7 @@ public struct AppSettings: Codable, Sendable {
         self.breakEnforcementMode = breakEnforcementMode
         self.rolePolicies = rolePolicies
         self.activeRole = activeRole
+        self.localOnlyMode = localOnlyMode
     }
 
     public static var defaultCustomBreakTypes: [CustomBreakType] {[
