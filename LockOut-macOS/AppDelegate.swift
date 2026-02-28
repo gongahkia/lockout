@@ -170,10 +170,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             options: .defaultTap,
             eventsOfInterest: mask,
             callback: { _, _, event, refcon in
-                guard let refcon else { return Unmanaged.passRetained(event) }
+                guard let refcon else { return Unmanaged.passUnretained(event) }
                 let delegate = Unmanaged<AppDelegate>.fromOpaque(refcon).takeUnretainedValue()
                 guard let hotkey = delegate.scheduler.currentSettings.globalSnoozeHotkey else {
-                    return Unmanaged.passRetained(event)
+                    return Unmanaged.passUnretained(event)
                 }
                 let keyCode = Int(event.getIntegerValueField(.keyboardEventKeycode))
                 let flags = Int(event.flags.rawValue) & 0x00FF0000 // modifier bits
@@ -181,7 +181,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                     Task { @MainActor in delegate.scheduler.snooze(repository: delegate.repository) }
                     return nil // consume event
                 }
-                return Unmanaged.passRetained(event)
+                return Unmanaged.passUnretained(event)
             },
             userInfo: Unmanaged.passUnretained(self).toOpaque()
         )
