@@ -39,7 +39,7 @@ public enum BreakType: String, Codable, CaseIterable, Sendable {
 }
 
 public enum BreakStatus: String, Codable, Sendable {
-    case completed, skipped, snoozed
+    case completed, skipped, snoozed, deferred
 }
 
 // MARK: - Value types

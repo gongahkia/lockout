@@ -89,6 +89,13 @@ public final class BreakScheduler: ObservableObject {
         reschedule(with: currentSettings)
     }
 
+    public func markDeferred(repository: BreakHistoryRepository) {
+        guard let nb = nextBreak else { return }
+        let session = BreakSession(type: nb.type, scheduledAt: nb.fireDate, status: .deferred)
+        repository.save(session)
+        reschedule(with: currentSettings)
+    }
+
     public func pause() {
         stop()
         currentSettings.isPaused = true

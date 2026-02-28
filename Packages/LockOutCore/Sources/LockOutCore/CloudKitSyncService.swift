@@ -115,7 +115,11 @@ public final class CloudKitSyncService {
         guard let local = local else { return remote }
         guard local.id == remote.id else { return remote }
         let rank: (BreakStatus) -> Int = { s in
-            switch s { case .completed: 2; case .snoozed: 1; case .skipped: 0 }
+            switch s {
+            case .completed: return 2
+            case .snoozed: return 1
+            case .skipped, .deferred: return 0
+            }
         }
         return rank(local.status) >= rank(remote.status) ? local : remote
     }

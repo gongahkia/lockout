@@ -17,7 +17,7 @@ final class BreakOverlayWindowController {
     func show(breakType: BreakType, duration: Int, minDisplaySeconds: Int = 5) {
         guard windows.isEmpty else { return }
         guard !SystemStateService.isScreenLocked() else {
-            scheduler.markCompleted(repository: repo)
+            scheduler.markDeferred(repository: repo)
             return
         }
         guard !SystemStateService.frontmostAppIsFullscreen() else {
