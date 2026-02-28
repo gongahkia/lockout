@@ -135,6 +135,9 @@ public final class BreakScheduler: ObservableObject {
     }
 
     private func timerFired(customTypeID: UUID) {
+        if let customType = currentSettings.customBreakTypes.first(where: { $0.id == customTypeID }) {
+            onBreakTriggered?(customType)
+        }
         timers[customTypeID] = nil
         let pending = timers.compactMap { (id, timer) -> (UUID, Date)? in
             (id, timer.fireDate)

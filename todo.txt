@@ -1,4 +1,3 @@
-(B) Add a scheduler test that asserts timer expiry invokes `onBreakTriggered`. +dx +test +scheduler
 (B) Add a scheduler test that asserts recurring breaks continue over an 8-hour simulated window. +dx +test +scheduler
 (B) Add a scheduler test that asserts two custom breaks with similar names do not overwrite each other. +dx +test +scheduler
 (B) Add a settings sync test that asserts local setting mutations call `SettingsSyncService.push`. +dx +test +sync
