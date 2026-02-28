@@ -117,7 +117,8 @@ final class MenuBarController {
         let remaining = max(0, nb.fireDate.timeIntervalSinceNow)
         let mins = Int(remaining) / 60
         let secs = Int(remaining) % 60
-        countdownItem.title = "Next break in \(String(format: "%d:%02d", mins, secs))"
+        let breakName = scheduler.currentCustomBreakType?.name ?? "Break"
+        countdownItem.title = "Next \(breakName) in \(String(format: "%d:%02d", mins, secs))"
     }
 
     private func iconImageName(paused: Bool) -> String {

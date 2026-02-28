@@ -44,7 +44,7 @@ struct BreakOverlayView: View {
                 breakContent
                 CountdownRing(
                     progress: 1.0 - Double(remaining) / Double(max(duration, 1)),
-                    label: breakType.rawValue.capitalized,
+                    label: scheduler.currentCustomBreakType?.name ?? breakType.rawValue.capitalized,
                     timeString: String(format: "%02d:%02d", remaining / 60, remaining % 60)
                 )
                 .frame(width: 140, height: 140)
