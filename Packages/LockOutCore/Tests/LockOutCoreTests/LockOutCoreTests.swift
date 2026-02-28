@@ -308,6 +308,20 @@ final class ObservabilityTests: XCTestCase {
     }
 }
 
+final class CSVExportTests: XCTestCase {
+    func testEscapesComma() {
+        XCTAssertEqual(CSVExport.escapedCell("hello,world"), "\"hello,world\"")
+    }
+
+    func testEscapesQuote() {
+        XCTAssertEqual(CSVExport.escapedCell("he said \"hi\""), "\"he said \"\"hi\"\"\"")
+    }
+
+    func testEscapesNewline() {
+        XCTAssertEqual(CSVExport.escapedCell("hello\nworld"), "\"hello\nworld\"")
+    }
+}
+
 final class AppDelegateSettingsRefreshTests: XCTestCase {
     func testWorkdayTimerRefreshWhenStartOrEndHourChanges() {
         var previous = AppSettings.defaults
