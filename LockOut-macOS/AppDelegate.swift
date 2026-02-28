@@ -135,6 +135,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [weak self] _ in self?.scheduler.pause() }
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in self?.scheduler.resume() }
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.screensDidSleepNotification, object: nil, queue: .main) { [weak self] _ in self?.overlayController?.dismiss() }
+        NotificationCenter.default.addObserver(forName: .streakDidChange, object: nil, queue: .main) { [weak self] _ in
+            self?.menuBarController?.updateStreak()
+        }
         if !UserDefaults.standard.bool(forKey: "hasOnboarded") {
             OnboardingWindowController.present(scheduler: scheduler)
         }
