@@ -317,7 +317,7 @@ struct HotkeyRecorderHelper: NSViewRepresentable {
 
     func updateNSView(_ nsView: NSView, context: Context) {
         if isRecording {
-            context.coordinator.removeMonitorIfNeeded()
+            guard context.coordinator.monitorToken == nil else { return }
             context.coordinator.monitorToken = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
                 let keyCode = Int(event.keyCode)
                 let flags = Int(event.modifierFlags.rawValue)
