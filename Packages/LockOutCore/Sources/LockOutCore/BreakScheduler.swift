@@ -3,8 +3,7 @@ import Combine
 
 @MainActor
 public final class BreakScheduler: ObservableObject {
-    @Published public var nextBreak: (type: BreakType, fireDate: Date)?
-    @Published public var nextBreakCustomTypeID: UUID?
+    @Published public var nextBreak: (customTypeID: UUID, fireDate: Date)?
     @Published public var currentSettings: AppSettings
 
     var timers: [UUID: Timer] = [:] // internal for testability
@@ -34,10 +33,8 @@ public final class BreakScheduler: ObservableObject {
             if soonest == nil || fireDate < soonest!.fireDate { soonest = (customTypeID: id, fireDate: fireDate) }
         }
         if let soonest {
-            nextBreakCustomTypeID = soonest.customTypeID
-            nextBreak = (type: legacyBreakType(forCustomTypeID: soonest.customTypeID), fireDate: soonest.fireDate)
+            nextBreak = (customTypeID: soonest.customTypeID, fireDate: soonest.fireDate)
         } else {
-            nextBreakCustomTypeID = nil
             nextBreak = nil
         }
     }
@@ -74,7 +71,7 @@ public final class BreakScheduler: ObservableObject {
     }
 
     public var currentCustomBreakType: CustomBreakType? {
-        guard let customTypeID = nextBreakCustomTypeID else { return nil }
+        guard let customTypeID = nextBreak?.customTypeID else { return nil }
         return currentSettings.customBreakTypes.first { $0.id == customTypeID }
     }
 
@@ -84,14 +81,14 @@ public final class BreakScheduler: ObservableObject {
         guard mins > 0 else { return }
         let clamped = min(mins, 60)
         if let repository, let nb = nextBreak {
-            let session = BreakSession(type: nb.type, scheduledAt: nb.fireDate, status: .snoozed, breakTypeName: breakTypeName)
+            let session = BreakSession(type: legacyBreakType(forCustomTypeID: nb.customTypeID), scheduledAt: nb.fireDate, status: .snoozed, breakTypeName: breakTypeName)
             repository.save(session)
         }
         stop()
         guard var nb = nextBreak else { return }
         nb.fireDate = Date().addingTimeInterval(Double(clamped) * 60)
         nextBreak = nb
-        guard let customTypeID = nextBreakCustomTypeID ?? currentCustomBreakType?.id else { return }
+        let customTypeID = nb.customTypeID
         let timer = Timer.scheduledTimer(withTimeInterval: nb.fireDate.timeIntervalSinceNow, repeats: false) { [weak self] _ in
             Task { @MainActor [weak self] in self?.timerFired(customTypeID: customTypeID) }
         }
@@ -100,21 +97,21 @@ public final class BreakScheduler: ObservableObject {
 
     public func skip(repository: BreakHistoryRepository) {
         guard let nb = nextBreak else { return }
-        let session = BreakSession(type: nb.type, scheduledAt: nb.fireDate, status: .skipped, breakTypeName: currentCustomBreakType?.name)
+        let session = BreakSession(type: legacyBreakType(forCustomTypeID: nb.customTypeID), scheduledAt: nb.fireDate, status: .skipped, breakTypeName: currentCustomBreakType?.name)
         repository.save(session)
         reschedule(with: currentSettings)
     }
 
     public func markCompleted(repository: BreakHistoryRepository) {
         guard let nb = nextBreak else { return }
-        let session = BreakSession(type: nb.type, scheduledAt: nb.fireDate, endedAt: Date(), status: .completed, breakTypeName: currentCustomBreakType?.name)
+        let session = BreakSession(type: legacyBreakType(forCustomTypeID: nb.customTypeID), scheduledAt: nb.fireDate, endedAt: Date(), status: .completed, breakTypeName: currentCustomBreakType?.name)
         repository.save(session)
         reschedule(with: currentSettings)
     }
 
     public func markDeferred(repository: BreakHistoryRepository) {
         guard let nb = nextBreak else { return }
-        let session = BreakSession(type: nb.type, scheduledAt: nb.fireDate, status: .deferred, breakTypeName: currentCustomBreakType?.name)
+        let session = BreakSession(type: legacyBreakType(forCustomTypeID: nb.customTypeID), scheduledAt: nb.fireDate, status: .deferred, breakTypeName: currentCustomBreakType?.name)
         repository.save(session)
         reschedule(with: currentSettings)
     }
@@ -123,7 +120,6 @@ public final class BreakScheduler: ObservableObject {
         stop()
         currentSettings.isPaused = true
         nextBreak = nil
-        nextBreakCustomTypeID = nil
         AppSettingsStore.save(currentSettings)
     }
 
@@ -144,11 +140,9 @@ public final class BreakScheduler: ObservableObject {
             (id, timer.fireDate)
         }.min(by: { $0.1 < $1.1 })
         if let (id, d) = pending {
-            nextBreakCustomTypeID = id
-            nextBreak = (type: legacyBreakType(forCustomTypeID: id), fireDate: d)
+            nextBreak = (customTypeID: id, fireDate: d)
         } else {
-            nextBreakCustomTypeID = customTypeID
-            nextBreak = (type: legacyBreakType(forCustomTypeID: customTypeID), fireDate: Date())
+            nextBreak = (customTypeID: customTypeID, fireDate: Date())
         }
     }
 }

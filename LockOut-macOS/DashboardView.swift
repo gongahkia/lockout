@@ -18,10 +18,9 @@ struct DashboardView: View {
     }
 
     private var progress: Double {
-        guard let nb = scheduler.nextBreak else { return 0 }
-        let config = config(for: nb.type)
-        let total = Double(config.intervalMinutes) * 60
-        return 1.0 - (remaining / total)
+        guard scheduler.nextBreak != nil else { return 0 }
+        let total = Double(scheduler.currentCustomBreakType?.intervalMinutes ?? scheduler.currentSettings.eyeConfig.intervalMinutes) * 60
+        return 1.0 - (remaining / max(total, 1))
     }
 
     private var todayCompliance: Double {
@@ -29,19 +28,11 @@ struct DashboardView: View {
         return Double(sessions.filter { $0.status == .completed }.count) / Double(max(sessions.count, 1))
     }
 
-    private func config(for type: BreakType) -> BreakConfig {
-        switch type {
-        case .eye: scheduler.currentSettings.eyeConfig
-        case .micro: scheduler.currentSettings.microConfig
-        case .long: scheduler.currentSettings.longConfig
-        }
-    }
-
     var body: some View {
         VStack(spacing: 24) {
             CountdownRing(
                 progress: progress,
-                label: scheduler.nextBreak?.type.rawValue.capitalized ?? "—",
+                label: scheduler.currentCustomBreakType?.name ?? "—",
                 timeString: timeString
             )
             VStack {

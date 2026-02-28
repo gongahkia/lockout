@@ -164,7 +164,11 @@ final class MenuBarController {
     }
 
     @objc private func takeBreakNow() {
-        showBreak(scheduler.nextBreak?.type ?? .eye, scheduler.currentSettings.eyeConfig.durationSeconds)
+        if let customType = scheduler.currentCustomBreakType {
+            showBreak(scheduler.breakType(for: customType), customType.durationSeconds)
+        } else {
+            showBreak(.eye, scheduler.currentSettings.eyeConfig.durationSeconds)
+        }
     }
 
     @objc private func snooze() {
