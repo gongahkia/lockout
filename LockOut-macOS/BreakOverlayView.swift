@@ -17,6 +17,11 @@ struct BreakOverlayView: View {
     private let tipTick = Timer.publish(every: 5, on: .main, in: .common).autoconnect()
 
     private var canSkip: Bool { Date().timeIntervalSince(showTime) >= Double(minDisplaySeconds) }
+    private var canBypass: Bool {
+        scheduler.currentSettings.rolePolicies
+            .first(where: { $0.role == scheduler.currentSettings.activeRole })?
+            .canBypassBreak ?? true
+    }
 
     init(breakType: BreakType, duration: Int, minDisplaySeconds: Int = 5, scheduler: BreakScheduler, repository: BreakHistoryRepository, onDismiss: @escaping () -> Void) {
         self.breakType = breakType
@@ -50,14 +55,14 @@ struct BreakOverlayView: View {
                         onDismiss()
                     }
                     .buttonStyle(.plain)
-                    .disabled(!canSkip)
+                    .disabled(!canSkip || !canBypass)
                     Spacer()
                     Button("Skip") {
                         scheduler.skip(repository: repository)
                         onDismiss()
                     }
                     .buttonStyle(.plain)
-                    .disabled(!canSkip)
+                    .disabled(!canSkip || !canBypass)
                 }
                 .padding(24)
             }
