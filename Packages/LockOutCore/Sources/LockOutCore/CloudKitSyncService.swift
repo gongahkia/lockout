@@ -146,22 +146,27 @@ public final class CloudKitSyncService {
         return BreakSession(id: id, type: type, scheduledAt: scheduledAt, status: status)
     }
 
-    private func handle(error: Error) {
+    func handle(error: Error) {
         guard let ckError = error as? CKError else {
+            Observability.emit(category: "CloudKitSyncService", message: "error: \(error)")
             logger.error("error: \(String(describing: error), privacy: .public)")
             onError?(error.localizedDescription)
             return
         }
         switch ckError.code {
         case .networkUnavailable:
+            Observability.emit(category: "CloudKitSyncService", message: "non-fatal: \(ckError.code)")
             logger.notice("non-fatal: \(String(describing: ckError.code), privacy: .public)")
         case .quotaExceeded:
+            Observability.emit(category: "CloudKitSyncService", message: "non-fatal: \(ckError.code)")
             logger.notice("non-fatal: \(String(describing: ckError.code), privacy: .public)")
             onError?(ckError.localizedDescription)
         case .accountTemporarilyUnavailable:
+            Observability.emit(category: "CloudKitSyncService", message: "account unavailable: \(ckError.code)")
             NotificationCenter.default.post(name: .cloudKitAccountUnavailable, object: nil)
             onError?(ckError.localizedDescription)
         default:
+            Observability.emit(category: "CloudKitSyncService", message: "error: \(ckError)")
             logger.error("error: \(String(describing: ckError), privacy: .public)")
             onError?(ckError.localizedDescription)
         }

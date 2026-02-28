@@ -27,6 +27,7 @@ public final class BreakHistoryRepository {
         do {
             try context.save()
         } catch {
+            Observability.emit(category: "BreakHistoryRepository", message: "save failed: \(error)")
             logger.error("save failed: \(String(describing: error), privacy: .public)")
         }
     }
@@ -47,6 +48,7 @@ public final class BreakHistoryRepository {
             old.forEach { context.delete($0) }
             try context.save()
         } catch {
+            Observability.emit(category: "BreakHistoryRepository", message: "pruneOldRecords failed: \(error)")
             logger.error("pruneOldRecords failed: \(String(describing: error), privacy: .public)")
         }
     }

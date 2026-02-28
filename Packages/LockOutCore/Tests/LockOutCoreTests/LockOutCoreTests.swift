@@ -290,6 +290,24 @@ final class SettingsSyncServiceTests: XCTestCase {
     }
 }
 
+final class ObservabilityTests: XCTestCase {
+    override func tearDown() {
+        Observability.sink = nil
+        super.tearDown()
+    }
+
+    func testCloudKitErrorPathEmitsDiagnosticToSink() {
+        let service = CloudKitSyncService()
+        var events: [String] = []
+        Observability.sink = { category, message in
+            if category == "CloudKitSyncService" { events.append(message) }
+        }
+
+        service.handle(error: NSError(domain: "test", code: 1, userInfo: [NSLocalizedDescriptionKey: "boom"]))
+        XCTAssertFalse(events.isEmpty)
+    }
+}
+
 final class AppDelegateSettingsRefreshTests: XCTestCase {
     func testWorkdayTimerRefreshWhenStartOrEndHourChanges() {
         var previous = AppSettings.defaults

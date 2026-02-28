@@ -1,4 +1,3 @@
-(B) Add a test log sink to assert error-path logging in core services. +dx +test +observability
 (B) Add CSV export tests for commas, quotes, and newline escaping. +dx +test +export
 (B) Fix brace structure in `LockOut-macOS/StatisticsView.swift` so the app target compiles. +stability +bugfix +ui
 (B) Move custom type lookup above sound playback in `BreakOverlayWindowController.show` to fix use-before-declaration. +stability +bugfix +overlay
