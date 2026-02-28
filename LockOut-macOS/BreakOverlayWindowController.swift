@@ -26,7 +26,7 @@ final class BreakOverlayWindowController {
         }
         let frontmostID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? ""
         if scheduler.currentSettings.blockedBundleIDs.contains(frontmostID) {
-            scheduler.markCompleted(repository: repo)
+            scheduler.markDeferred(repository: repo)
             return
         }
         playBreakSound(customType?.soundName)
