@@ -98,11 +98,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         if !settings.localOnlyMode {
             settingsSync.observeChanges { [weak self] remote in
                 guard let self else { return }
+                let merged = SettingsSyncService.merge(local: self.scheduler.currentSettings, remote: remote)
                 let shouldRefreshWeeklyTimer = SettingsChangeDetector.weeklyNotificationPreferenceChanged(
                     previous: self.scheduler.currentSettings,
-                    current: remote
+                    current: merged
                 )
-                self.scheduler.reschedule(with: remote)
+                self.scheduler.reschedule(with: merged)
                 if shouldRefreshWeeklyTimer {
                     self.scheduleWeeklyComplianceNotification()
                 }

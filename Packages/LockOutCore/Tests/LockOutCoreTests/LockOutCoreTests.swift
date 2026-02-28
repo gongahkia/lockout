@@ -300,6 +300,53 @@ final class SettingsSyncServiceTests: XCTestCase {
         XCTAssertEqual(loaded?.activeRole, .it_managed)
         XCTAssertEqual(loaded?.breakEnforcementMode, .hard_lock)
     }
+
+    func testPushDebouncesCloudCommitAndUsesLatestSettings() async {
+        let svc = SettingsSyncService()
+        var pushed: [Int] = []
+        let exp = expectation(description: "debounced cloud push")
+        exp.expectedFulfillmentCount = 1
+        svc.onCloudPush = { settings in
+            pushed.append(settings.snoozeDurationMinutes)
+            exp.fulfill()
+        }
+
+        var first = AppSettings.defaults
+        first.localOnlyMode = false
+        first.snoozeDurationMinutes = 5
+
+        var second = first
+        second.snoozeDurationMinutes = 9
+
+        svc.push(first)
+        svc.push(second)
+
+        await fulfillment(of: [exp], timeout: 1.0)
+        XCTAssertEqual(pushed, [9])
+    }
+
+    func testMergeUsesConflictSafeReducer() {
+        var local = AppSettings.defaults
+        local.localOnlyMode = true
+        local.isPaused = true
+        local.pauseDuringFocus = true
+        local.breakEnforcementMode = .hard_lock
+        local.blockedBundleIDs = ["com.local.blocked"]
+
+        var remote = AppSettings.defaults
+        remote.localOnlyMode = false
+        remote.isPaused = false
+        remote.pauseDuringFocus = false
+        remote.breakEnforcementMode = .reminder
+        remote.blockedBundleIDs = ["com.remote.blocked"]
+
+        let merged = SettingsSyncService.merge(local: local, remote: remote)
+        XCTAssertTrue(merged.localOnlyMode)
+        XCTAssertTrue(merged.isPaused)
+        XCTAssertTrue(merged.pauseDuringFocus)
+        XCTAssertEqual(merged.breakEnforcementMode, .hard_lock)
+        XCTAssertEqual(Set(merged.blockedBundleIDs), Set(["com.local.blocked", "com.remote.blocked"]))
+    }
 }
 
 final class ObservabilityTests: XCTestCase {
