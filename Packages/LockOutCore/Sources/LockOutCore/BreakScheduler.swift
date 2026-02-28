@@ -60,10 +60,15 @@ public final class BreakScheduler: ObservableObject {
         return currentSettings.customBreakTypes.first { legacyBreakType(for: $0) == nb.type }
     }
 
-    public func snooze(minutes: Int? = nil) {
+    public func snooze(minutes: Int? = nil, repository: BreakHistoryRepository? = nil) {
+        let breakTypeName = currentCustomBreakType?.name
         let mins = minutes ?? currentCustomBreakType?.snoozeMinutes ?? currentSettings.snoozeDurationMinutes
         guard mins > 0 else { return }
         let clamped = min(mins, 60)
+        if let repository, let nb = nextBreak {
+            let session = BreakSession(type: nb.type, scheduledAt: nb.fireDate, status: .snoozed, breakTypeName: breakTypeName)
+            repository.save(session)
+        }
         stop()
         guard var nb = nextBreak else { return }
         nb.fireDate = Date().addingTimeInterval(Double(clamped) * 60)
@@ -77,21 +82,21 @@ public final class BreakScheduler: ObservableObject {
 
     public func skip(repository: BreakHistoryRepository) {
         guard let nb = nextBreak else { return }
-        let session = BreakSession(type: nb.type, scheduledAt: nb.fireDate, status: .skipped)
+        let session = BreakSession(type: nb.type, scheduledAt: nb.fireDate, status: .skipped, breakTypeName: currentCustomBreakType?.name)
         repository.save(session)
         reschedule(with: currentSettings)
     }
 
     public func markCompleted(repository: BreakHistoryRepository) {
         guard let nb = nextBreak else { return }
-        let session = BreakSession(type: nb.type, scheduledAt: nb.fireDate, endedAt: Date(), status: .completed)
+        let session = BreakSession(type: nb.type, scheduledAt: nb.fireDate, endedAt: Date(), status: .completed, breakTypeName: currentCustomBreakType?.name)
         repository.save(session)
         reschedule(with: currentSettings)
     }
 
     public func markDeferred(repository: BreakHistoryRepository) {
         guard let nb = nextBreak else { return }
-        let session = BreakSession(type: nb.type, scheduledAt: nb.fireDate, status: .deferred)
+        let session = BreakSession(type: nb.type, scheduledAt: nb.fireDate, status: .deferred, breakTypeName: currentCustomBreakType?.name)
         repository.save(session)
         reschedule(with: currentSettings)
     }

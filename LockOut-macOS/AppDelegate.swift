@@ -149,7 +149,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 let keyCode = Int(event.getIntegerValueField(.keyboardEventKeycode))
                 let flags = Int(event.flags.rawValue) & 0x00FF0000 // modifier bits
                 if keyCode == hotkey.keyCode && flags == (hotkey.modifierFlags & 0x00FF0000) {
-                    Task { @MainActor in delegate.scheduler.snooze() }
+                    Task { @MainActor in delegate.scheduler.snooze(repository: delegate.repository) }
                     return nil // consume event
                 }
                 return Unmanaged.passRetained(event)
@@ -326,7 +326,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             case "SNOOZE_BREAK":
                 let mins = self.scheduler.currentCustomBreakType?.snoozeMinutes
                     ?? self.scheduler.currentSettings.snoozeDurationMinutes
-                self.scheduler.snooze(minutes: mins)
+                self.scheduler.snooze(minutes: mins, repository: self.repository)
             default: break
             }
         }
