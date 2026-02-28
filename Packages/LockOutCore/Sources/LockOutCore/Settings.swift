@@ -5,6 +5,13 @@ public enum MenuBarIconTheme: String, Codable, CaseIterable, Sendable {
     case monochrome, color, minimal
 }
 
+// MARK: - Break enforcement
+public enum BreakEnforcementMode: String, Codable, CaseIterable, Sendable {
+    case reminder
+    case soft_lock
+    case hard_lock
+}
+
 // MARK: - Hotkey
 public struct HotkeyDescriptor: Codable, Equatable, Sendable {
     public var keyCode: Int
@@ -62,6 +69,7 @@ public struct AppSettings: Codable, Sendable {
     public var weeklyNotificationEnabled: Bool
     public var globalSnoozeHotkey: HotkeyDescriptor?
     public var menuBarIconTheme: MenuBarIconTheme
+    public var breakEnforcementMode: BreakEnforcementMode
 
     public init(eyeConfig: BreakConfig, microConfig: BreakConfig, longConfig: BreakConfig,
                 snoozeDurationMinutes: Int = 5, historyRetentionDays: Int = 30, isPaused: Bool = false,
@@ -71,7 +79,8 @@ public struct AppSettings: Codable, Sendable {
                 profiles: [AppProfile] = [], activeProfileId: UUID? = nil,
                 notificationLeadMinutes: Int = 1, weeklyNotificationEnabled: Bool = false,
                 globalSnoozeHotkey: HotkeyDescriptor? = nil,
-                menuBarIconTheme: MenuBarIconTheme = .monochrome) {
+                menuBarIconTheme: MenuBarIconTheme = .monochrome,
+                breakEnforcementMode: BreakEnforcementMode = .reminder) {
         self.eyeConfig = eyeConfig
         self.microConfig = microConfig
         self.longConfig = longConfig
@@ -91,6 +100,7 @@ public struct AppSettings: Codable, Sendable {
         self.weeklyNotificationEnabled = weeklyNotificationEnabled
         self.globalSnoozeHotkey = globalSnoozeHotkey
         self.menuBarIconTheme = menuBarIconTheme
+        self.breakEnforcementMode = breakEnforcementMode
     }
 
     public static var defaultCustomBreakTypes: [CustomBreakType] {[

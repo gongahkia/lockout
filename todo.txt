@@ -1,0 +1,66 @@
+(B) Add a `RolePolicy` model to `AppSettings` for `developer`, `it_managed`, and `health_conscious` roles. +philosophical +feature +settings
+(B) Add a `canBypassBreak` permission field to each role policy in `RolePolicy`. +philosophical +feature +security
+(B) Persist active role selection in `AppSettingsStore` and `SettingsSyncService`. +philosophical +feature +settings
+(B) Add active role and enforcement mode controls to `SettingsView`. +philosophical +feature +ui
+(B) Disable overlay skip and snooze actions in `BreakOverlayView` when current role policy denies bypass. +philosophical +feature +overlay
+(B) Render a policy denial message in `BreakOverlayView` when bypass controls are locked. +philosophical +feature +overlay
+(B) Replace auto-complete behavior on locked screen with a `deferred` break session status. +philosophical +refactor +scheduler
+(B) Replace auto-complete behavior on fullscreen apps with a `deferred` break session status. +philosophical +refactor +scheduler
+(B) Replace auto-complete behavior on blocklisted apps with a `deferred` break session status. +philosophical +refactor +scheduler
+(B) Add `deferred` to `BreakStatus` and persist it in `BreakSessionRecord`. +philosophical +refactor +data
+(B) Persist `breakTypeName` for completed, skipped, snoozed, and deferred sessions. +philosophical +refactor +data
+(B) Replace name-based legacy break mapping with a first-class custom break type identifier in scheduler state. +philosophical +refactor +scheduler
+(B) Store `nextBreak` as custom type identifier plus fire date in `BreakScheduler`. +philosophical +refactor +scheduler
+(B) Resolve menu bar, dashboard, and overlay labels from custom break type identifier. +philosophical +refactor +ui
+(B) Add `localOnlyMode` to `AppSettings` and gate CloudKit and iCloud KVS paths when enabled. +philosophical +feature +security
+(B) Add an app-target CI compile step using `xcodebuild` with `CODE_SIGNING_ALLOWED=NO`. +dx +infra +ci
+(B) Add a UI test CI step for `LockOut-macOSUITests` using the existing `--uitesting` launch argument. +dx +infra +ci
+(B) Add a scheduler test that asserts timer expiry invokes `onBreakTriggered`. +dx +test +scheduler
+(B) Add a scheduler test that asserts recurring breaks continue over an 8-hour simulated window. +dx +test +scheduler
+(B) Add a scheduler test that asserts two custom breaks with similar names do not overwrite each other. +dx +test +scheduler
+(B) Add a settings sync test that asserts local setting mutations call `SettingsSyncService.push`. +dx +test +sync
+(B) Add an app delegate test that asserts workday timers refresh after start or end hour changes. +dx +test +scheduler
+(B) Add an app delegate test that asserts calendar polling starts and stops when the setting toggles. +dx +test +scheduler
+(B) Add a focus pause test that asserts duplicate DND notifications do not invert pause state incorrectly. +dx +test +scheduler
+(B) Replace `print` and `fputs` calls with structured `Logger` instances per subsystem. +dx +observability +refactor
+(B) Add a test log sink to assert error-path logging in core services. +dx +test +observability
+(B) Add CSV export tests for commas, quotes, and newline escaping. +dx +test +export
+(B) Fix brace structure in `LockOut-macOS/StatisticsView.swift` so the app target compiles. +stability +bugfix +ui
+(B) Move custom type lookup above sound playback in `BreakOverlayWindowController.show` to fix use-before-declaration. +stability +bugfix +overlay
+(B) Remove `AppDelegate.shared` singleton usage and source delegate dependencies from the runtime `NSApp.delegate`. +stability +refactor +architecture
+(B) Inject `BreakHistoryRepository` and `CloudKitSyncService` into dashboard, settings, and statistics views via initializer or environment. +stability +refactor +architecture
+(B) Inject scheduler into onboarding view via initializer and remove force unwrap access to app delegate global state. +stability +refactor +architecture
+(B) Remove `AppDelegate.shared.menuBarController` coupling from `BreakOverlayView` and publish streak updates through shared state. +stability +refactor +architecture
+(B) Constrain `BreakHistoryRepository` to main actor isolation or wrap it in an actor-safe persistence boundary. +stability +concurrency +data
+(B) Replace detached pruning task with a main-actor task when using a main-thread `ModelContext`. +stability +concurrency +data
+(B) Call `onBreakTriggered` from `BreakScheduler.timerFired` with the fired custom break type. +stability +bugfix +scheduler
+(B) Recreate the fired custom break timer in scheduler after each timer fire event. +stability +bugfix +scheduler
+(B) Key scheduler timers by custom break type UUID instead of legacy `BreakType`. +stability +refactor +scheduler
+(B) Resolve `currentCustomBreakType` by stored custom break type UUID instead of name heuristic. +stability +bugfix +scheduler
+(B) Preserve active custom break type UUID through `snooze()` and reschedule that same type. +stability +bugfix +scheduler
+(B) Clamp scheduler fire intervals after sleep or clock jumps to prevent negative or immediate timer storms. +stability +bugfix +scheduler
+(B) Replace focus mode toggle heuristic with explicit current DND state evaluation before pause or resume. +stability +bugfix +scheduler
+(B) Reconfigure calendar polling immediately when `pauseDuringCalendarEvents` changes at runtime. +stability +bugfix +scheduler
+(B) Reconfigure workday start and end timers immediately when workday hour settings change. +stability +bugfix +scheduler
+(B) Recreate weekly compliance timer when remote settings sync changes weekly notification settings. +stability +bugfix +scheduler
+(B) Store and remove local key monitor tokens in `HotkeyRecorderHelper`. +stability +bugfix +input
+(B) Prevent duplicate key monitor registration during repeated SwiftUI view updates. +stability +bugfix +input
+(B) Return `Unmanaged.passUnretained(event)` in event tap callback to prevent key event leaks. +stability +bugfix +performance
+(B) Remove unused `CFRunLoopSourceCreate` allocation in global hotkey registration. +stability +cleanup +performance
+(B) Push local settings to iCloud KVS after local mutations with a debounce window. +stability +sync +settings
+(B) Merge remote settings into local state through a conflict-safe reducer before scheduler reschedule. +stability +sync +settings
+(B) Include `endedAt` and `breakTypeName` in CloudKit record write and decode paths. +stability +sync +data
+(B) Add `updatedAt` to local and cloud break session models for deterministic conflict handling. +stability +sync +data
+(B) Resolve cloud conflicts by latest `updatedAt` with status rank as tie-breaker. +stability +sync +data
+(B) Deduplicate pending CloudKit upload queue entries by session UUID before persistence. +stability +sync +data
+(B) Cap pending CloudKit upload queue length and discard oldest duplicates first. +stability +sync +performance
+(B) Trigger asynchronous cloud upload after local session save when sync is enabled. +stability +sync +scheduler
+(B) Rebuild menu bar break submenu whenever custom break type settings change. +stability +bugfix +ui
+(B) Rebuild menu bar profile submenu whenever profiles or active profile changes. +stability +bugfix +ui
+(B) Restore accessory activation policy after opening the main window from menu bar. +stability +bugfix +ui
+(B) Escape CSV cells in `StatisticsView.exportCSV` before writing rows. +stability +bugfix +export
+(B) Validate manual blocklist bundle IDs against reverse-DNS pattern before insertion. +stability +security +validation
+(B) Initialize `ModelContainer` with the declared schema migration plan. +stability +data +migration
+(B) Extend `make test` to run app-target compile checks in addition to package tests. +stability +infra +ci
+(B) Add missing 1024x1024 app icon asset or remove stale app icon catalog reference. +stability +bugfix +build
+(B) Reject invalid enum values and out-of-range numeric settings during JSON import with surfaced UI error. +stability +validation +settings
