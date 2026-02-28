@@ -289,3 +289,21 @@ final class SettingsSyncServiceTests: XCTestCase {
         XCTAssertEqual(loaded?.breakEnforcementMode, .hard_lock)
     }
 }
+
+final class AppDelegateSettingsRefreshTests: XCTestCase {
+    func testWorkdayTimerRefreshWhenStartOrEndHourChanges() {
+        var previous = AppSettings.defaults
+        previous.workdayStartHour = 9
+        previous.workdayEndHour = 17
+
+        var changedStart = previous
+        changedStart.workdayStartHour = 10
+        XCTAssertTrue(SettingsChangeDetector.workdayTimersNeedRefresh(previous: previous, current: changedStart))
+
+        var changedEnd = previous
+        changedEnd.workdayEndHour = 18
+        XCTAssertTrue(SettingsChangeDetector.workdayTimersNeedRefresh(previous: previous, current: changedEnd))
+
+        XCTAssertFalse(SettingsChangeDetector.workdayTimersNeedRefresh(previous: previous, current: previous))
+    }
+}

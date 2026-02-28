@@ -38,6 +38,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private var workdayEndTimer: Timer?
     private var weeklyNotifTimer: Timer?
     private var eventTap: CFMachPort?
+    private var previousSettings: AppSettings?
 
     private static let lastFireKey = "last_break_fire_date"
 
@@ -87,6 +88,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             ? localSettings
             : (settingsSync.pull() ?? localSettings)) ?? .defaults
         scheduler = BreakScheduler(settings: settings)
+        previousSettings = settings
         let retentionDays = settings.historyRetentionDays
         let repo = repository!
         Task.detached { repo.pruneOldRecords(retentionDays: retentionDays) }
@@ -97,8 +99,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             }
         }
         scheduler.$currentSettings.dropFirst().sink { [weak self] settings in
-            self?.settingsSync.push(settings)
-            self?.registerGlobalSnoozeHotkey(settings.globalSnoozeHotkey)
+            guard let self else { return }
+            self.settingsSync.push(settings)
+            if Self.didWorkdaySettingsChange(previous: self.previousSettings, current: settings) {
+                self.scheduleWorkdayTimers()
+            }
+            if Self.didCalendarPollingPreferenceChange(previous: self.previousSettings, current: settings) {
+                if settings.pauseDuringCalendarEvents { self.startCalendarPolling() }
+                else { self.stopCalendarPolling() }
+            }
+            self.previousSettings = settings
+            self.registerGlobalSnoozeHotkey(settings.globalSnoozeHotkey)
         }.store(in: &cancellables)
         scheduler.$nextBreak.dropFirst().compactMap { $0 }.sink { [weak self] nb in
             guard let self else { return }
@@ -247,12 +258,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     private func startCalendarPolling() {
+        calendarTimer?.invalidate()
+        calendarTimer = nil
         guard scheduler.currentSettings.pauseDuringCalendarEvents else { return }
         ekStore.requestFullAccessToEvents { [weak self] granted, _ in
             guard granted, let self else { return }
             self.calendarTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
                 self?.checkCalendarEvents()
             }
+        }
+    }
+
+    private func stopCalendarPolling() {
+        calendarTimer?.invalidate()
+        calendarTimer = nil
+        if calendarPaused {
+            calendarPaused = false
+            scheduler.resume()
         }
     }
 
@@ -357,5 +379,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 if let err { fputs("[UNNotif] \(err)\n", stderr) }
             }
         }
+    }
+
+    static func didWorkdaySettingsChange(previous: AppSettings?, current: AppSettings) -> Bool {
+        SettingsChangeDetector.workdayTimersNeedRefresh(previous: previous, current: current)
+    }
+
+    static func didCalendarPollingPreferenceChange(previous: AppSettings?, current: AppSettings) -> Bool {
+        SettingsChangeDetector.calendarPollingPreferenceChanged(previous: previous, current: current)
     }
 }
