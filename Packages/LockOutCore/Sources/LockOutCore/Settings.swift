@@ -12,6 +12,25 @@ public enum BreakEnforcementMode: String, Codable, CaseIterable, Sendable {
     case hard_lock
 }
 
+// MARK: - Role policy
+public enum UserRole: String, Codable, CaseIterable, Sendable {
+    case developer
+    case it_managed
+    case health_conscious
+}
+
+public struct RolePolicy: Codable, Sendable {
+    public var role: UserRole
+
+    public init(role: UserRole) {
+        self.role = role
+    }
+
+    public static var defaults: [RolePolicy] {
+        UserRole.allCases.map { RolePolicy(role: $0) }
+    }
+}
+
 // MARK: - Hotkey
 public struct HotkeyDescriptor: Codable, Equatable, Sendable {
     public var keyCode: Int
@@ -70,6 +89,8 @@ public struct AppSettings: Codable, Sendable {
     public var globalSnoozeHotkey: HotkeyDescriptor?
     public var menuBarIconTheme: MenuBarIconTheme
     public var breakEnforcementMode: BreakEnforcementMode
+    public var rolePolicies: [RolePolicy]
+    public var activeRole: UserRole
 
     public init(eyeConfig: BreakConfig, microConfig: BreakConfig, longConfig: BreakConfig,
                 snoozeDurationMinutes: Int = 5, historyRetentionDays: Int = 30, isPaused: Bool = false,
@@ -80,7 +101,9 @@ public struct AppSettings: Codable, Sendable {
                 notificationLeadMinutes: Int = 1, weeklyNotificationEnabled: Bool = false,
                 globalSnoozeHotkey: HotkeyDescriptor? = nil,
                 menuBarIconTheme: MenuBarIconTheme = .monochrome,
-                breakEnforcementMode: BreakEnforcementMode = .reminder) {
+                breakEnforcementMode: BreakEnforcementMode = .reminder,
+                rolePolicies: [RolePolicy] = RolePolicy.defaults,
+                activeRole: UserRole = .developer) {
         self.eyeConfig = eyeConfig
         self.microConfig = microConfig
         self.longConfig = longConfig
@@ -101,6 +124,8 @@ public struct AppSettings: Codable, Sendable {
         self.globalSnoozeHotkey = globalSnoozeHotkey
         self.menuBarIconTheme = menuBarIconTheme
         self.breakEnforcementMode = breakEnforcementMode
+        self.rolePolicies = rolePolicies
+        self.activeRole = activeRole
     }
 
     public static var defaultCustomBreakTypes: [CustomBreakType] {[
