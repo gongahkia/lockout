@@ -77,7 +77,8 @@ final class BreakSchedulerTests: XCTestCase {
             if fired.id == custom.id { exp.fulfill() }
         }
 
-        scheduler.start(settings: settings, offsetSeconds: 120)
+        scheduler.start(settings: settings)
+        scheduler.simulateTimerFireForTesting(customTypeID: custom.id)
         await fulfillment(of: [exp], timeout: 1.0)
     }
 
@@ -93,6 +94,16 @@ final class BreakSchedulerTests: XCTestCase {
             XCTAssertEqual(scheduler.nextBreak?.customTypeID, hourly.id)
             XCTAssertNotNil(scheduler.timers[hourly.id])
         }
+    }
+
+    func testLargeOffsetClampsNextBreakIntoFuture() {
+        let hourly = CustomBreakType(name: "Hourly", intervalMinutes: 60, durationSeconds: 60)
+        var settings = AppSettings.defaults
+        settings.customBreakTypes = [hourly]
+        scheduler = BreakScheduler(settings: settings)
+        scheduler.start(settings: settings, offsetSeconds: 10 * 3600)
+        XCTAssertNotNil(scheduler.nextBreak)
+        XCTAssertGreaterThanOrEqual(scheduler.nextBreak?.fireDate.timeIntervalSinceNow ?? 0, 1)
     }
 }
 

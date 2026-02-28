@@ -24,7 +24,8 @@ public final class BreakScheduler: ObservableObject {
         let now = Date()
         var soonest: (customTypeID: UUID, fireDate: Date)?
         for customType in settings.customBreakTypes.filter(\.enabled) {
-            let fireDate = now.addingTimeInterval(Double(customType.intervalMinutes) * 60 - offsetSeconds)
+            let requested = now.addingTimeInterval(Double(customType.intervalMinutes) * 60 - offsetSeconds)
+            let fireDate = clampedFireDate(for: customType.id, requestedFireDate: requested)
             let id = customType.id
             scheduleTimer(for: id, fireDate: fireDate)
             if soonest == nil || fireDate < soonest!.fireDate { soonest = (customTypeID: id, fireDate: fireDate) }
@@ -133,10 +134,26 @@ public final class BreakScheduler: ObservableObject {
     }
 
     private func scheduleTimer(for customTypeID: UUID, fireDate: Date) {
-        let timer = Timer.scheduledTimer(withTimeInterval: max(0, fireDate.timeIntervalSinceNow), repeats: false) { [weak self] _ in
+        let clampedDate = clampedFireDate(for: customTypeID, requestedFireDate: fireDate)
+        let timer = Timer.scheduledTimer(withTimeInterval: clampedDate.timeIntervalSinceNow, repeats: false) { [weak self] _ in
             Task { @MainActor [weak self] in self?.timerFired(customTypeID: customTypeID) }
         }
         timers[customTypeID] = timer
+    }
+
+    private func clampedFireDate(for customTypeID: UUID, requestedFireDate: Date) -> Date {
+        let now = Date()
+        guard let customType = currentSettings.customBreakTypes.first(where: { $0.id == customTypeID }) else {
+            return max(requestedFireDate, now.addingTimeInterval(1))
+        }
+        let intervalSeconds = max(60, Double(customType.intervalMinutes) * 60)
+        var delay = requestedFireDate.timeIntervalSince(now)
+        if delay < 1 {
+            let missedIntervals = floor((-delay) / intervalSeconds) + 1
+            delay += missedIntervals * intervalSeconds
+        }
+        if delay < 1 { delay = 1 }
+        return now.addingTimeInterval(delay)
     }
 
     private func timerFired(customTypeID: UUID) {
