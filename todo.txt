@@ -1,4 +1,3 @@
-(B) Merge remote settings into local state through a conflict-safe reducer before scheduler reschedule. +stability +sync +settings
 (B) Include `endedAt` and `breakTypeName` in CloudKit record write and decode paths. +stability +sync +data
 (B) Add `updatedAt` to local and cloud break session models for deterministic conflict handling. +stability +sync +data
 (B) Resolve cloud conflicts by latest `updatedAt` with status rank as tie-breaker. +stability +sync +data
