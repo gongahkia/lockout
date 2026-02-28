@@ -29,8 +29,8 @@ final class BreakOverlayWindowController {
             scheduler.markDeferred(repository: repo)
             return
         }
-        playBreakSound(customType?.soundName)
         let customType = scheduler.currentCustomBreakType
+        playBreakSound(customType?.soundName)
         for screen in NSScreen.screens {
             let win = LockOutOverlayWindow(
                 contentRect: screen.frame,
