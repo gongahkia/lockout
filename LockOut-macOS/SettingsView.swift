@@ -176,7 +176,7 @@ struct SettingsView: View {
                 TextField("Manual bundle ID", text: $manualBundleID)
                 Button("Add") {
                     let id = manualBundleID.trimmingCharacters(in: .whitespaces)
-                    guard !id.isEmpty, !blocklist.wrappedValue.contains(id) else { return }
+                    guard !id.isEmpty, !blocklist.wrappedValue.contains(id), isValidBundleID(id) else { return }
                     blocklist.wrappedValue.append(id)
                     manualBundleID = ""
                 }
@@ -226,6 +226,10 @@ struct SettingsView: View {
             47: ".", 48: "⇥", 49: "Space", 51: "⌫", 53: "Esc",
         ]
         return map[code] ?? "?\(code)"
+    }
+
+    private func isValidBundleID(_ id: String) -> Bool {
+        id.range(of: #"^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$"#, options: .regularExpression) != nil
     }
 
     private func importSettings() {
