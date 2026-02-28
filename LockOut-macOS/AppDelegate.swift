@@ -186,8 +186,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             userInfo: Unmanaged.passUnretained(self).toOpaque()
         )
         if let tap {
-            let loop = CFRunLoopSourceCreate(nil, 0, nil)
-            _ = loop // tap itself manages the source; use RunLoop.main
             let src = CFMachPortCreateRunLoopSource(nil, tap, 0)
             CFRunLoopAddSource(CFRunLoopGetMain(), src, .commonModes)
             CGEvent.tapEnable(tap: tap, enable: true)

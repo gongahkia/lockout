@@ -1,4 +1,3 @@
-(B) Remove unused `CFRunLoopSourceCreate` allocation in global hotkey registration. +stability +cleanup +performance
 (B) Push local settings to iCloud KVS after local mutations with a debounce window. +stability +sync +settings
 (B) Merge remote settings into local state through a conflict-safe reducer before scheduler reschedule. +stability +sync +settings
 (B) Include `endedAt` and `breakTypeName` in CloudKit record write and decode paths. +stability +sync +data
