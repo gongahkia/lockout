@@ -21,13 +21,19 @@ public enum UserRole: String, Codable, CaseIterable, Sendable {
 
 public struct RolePolicy: Codable, Sendable {
     public var role: UserRole
+    public var canBypassBreak: Bool
 
-    public init(role: UserRole) {
+    public init(role: UserRole, canBypassBreak: Bool = true) {
         self.role = role
+        self.canBypassBreak = canBypassBreak
     }
 
     public static var defaults: [RolePolicy] {
-        UserRole.allCases.map { RolePolicy(role: $0) }
+        [
+            RolePolicy(role: .developer, canBypassBreak: true),
+            RolePolicy(role: .it_managed, canBypassBreak: false),
+            RolePolicy(role: .health_conscious, canBypassBreak: true),
+        ]
     }
 }
 
