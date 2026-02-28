@@ -1,4 +1,3 @@
-(B) Replace detached pruning task with a main-actor task when using a main-thread `ModelContext`. +stability +concurrency +data
 (B) Call `onBreakTriggered` from `BreakScheduler.timerFired` with the fired custom break type. +stability +bugfix +scheduler
 (B) Recreate the fired custom break timer in scheduler after each timer fire event. +stability +bugfix +scheduler
 (B) Key scheduler timers by custom break type UUID instead of legacy `BreakType`. +stability +refactor +scheduler

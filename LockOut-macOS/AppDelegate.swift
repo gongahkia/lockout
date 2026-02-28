@@ -93,7 +93,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         previousSettings = settings
         let retentionDays = settings.historyRetentionDays
         let repo = repository!
-        Task.detached { repo.pruneOldRecords(retentionDays: retentionDays) }
+        Task { @MainActor in repo.pruneOldRecords(retentionDays: retentionDays) }
         applyLaunchOffset(settings: settings)
         if !settings.localOnlyMode {
             settingsSync.observeChanges { [weak self] remote in
