@@ -193,9 +193,15 @@ final class MenuBarController {
     }
 
     @objc private func openApp() {
+        let priorPolicy = NSApp.activationPolicy()
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         NSApp.windows.first(where: { $0.title == "LockOut" })?.makeKeyAndOrderFront(nil)
+        if priorPolicy == .accessory {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                NSApp.setActivationPolicy(.accessory)
+            }
+        }
     }
 
     private func rebuildBreakSubmenu(_ submenu: NSMenu) {
