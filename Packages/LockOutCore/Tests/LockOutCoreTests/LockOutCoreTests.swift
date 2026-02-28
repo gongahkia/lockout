@@ -377,4 +377,15 @@ final class AppDelegateSettingsRefreshTests: XCTestCase {
         )
         XCTAssertEqual(duplicateDisabled, .none)
     }
+
+    func testWeeklyNotificationRefreshWhenToggleChanges() {
+        var previous = AppSettings.defaults
+        previous.weeklyNotificationEnabled = false
+
+        var toggled = previous
+        toggled.weeklyNotificationEnabled = true
+        XCTAssertTrue(SettingsChangeDetector.weeklyNotificationPreferenceChanged(previous: previous, current: toggled))
+
+        XCTAssertFalse(SettingsChangeDetector.weeklyNotificationPreferenceChanged(previous: previous, current: previous))
+    }
 }

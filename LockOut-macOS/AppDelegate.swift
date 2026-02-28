@@ -97,7 +97,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         applyLaunchOffset(settings: settings)
         if !settings.localOnlyMode {
             settingsSync.observeChanges { [weak self] remote in
-                self?.scheduler.reschedule(with: remote)
+                guard let self else { return }
+                let shouldRefreshWeeklyTimer = SettingsChangeDetector.weeklyNotificationPreferenceChanged(
+                    previous: self.scheduler.currentSettings,
+                    current: remote
+                )
+                self.scheduler.reschedule(with: remote)
+                if shouldRefreshWeeklyTimer {
+                    self.scheduleWeeklyComplianceNotification()
+                }
             }
         }
         scheduler.$currentSettings.dropFirst().sink { [weak self] settings in

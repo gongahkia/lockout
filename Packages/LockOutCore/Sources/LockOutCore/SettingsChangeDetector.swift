@@ -16,6 +16,10 @@ public enum SettingsChangeDetector {
         previous?.pauseDuringCalendarEvents != current.pauseDuringCalendarEvents
     }
 
+    public static func weeklyNotificationPreferenceChanged(previous: AppSettings?, current: AppSettings) -> Bool {
+        previous?.weeklyNotificationEnabled != current.weeklyNotificationEnabled
+    }
+
     public static func focusPauseAction(previousFocusEnabled: Bool?, currentFocusEnabled: Bool, isPaused: Bool) -> FocusPauseAction {
         if previousFocusEnabled == currentFocusEnabled {
             return .none
