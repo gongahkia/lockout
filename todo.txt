@@ -1,4 +1,3 @@
-(B) Key scheduler timers by custom break type UUID instead of legacy `BreakType`. +stability +refactor +scheduler
 (B) Resolve `currentCustomBreakType` by stored custom break type UUID instead of name heuristic. +stability +bugfix +scheduler
 (B) Preserve active custom break type UUID through `snooze()` and reschedule that same type. +stability +bugfix +scheduler
 (B) Clamp scheduler fire intervals after sleep or clock jumps to prevent negative or immediate timer storms. +stability +bugfix +scheduler
