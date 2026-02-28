@@ -1,4 +1,3 @@
-(B) Rebuild menu bar break submenu whenever custom break type settings change. +stability +bugfix +ui
 (B) Rebuild menu bar profile submenu whenever profiles or active profile changes. +stability +bugfix +ui
 (B) Restore accessory activation policy after opening the main window from menu bar. +stability +bugfix +ui
 (B) Escape CSV cells in `StatisticsView.exportCSV` before writing rows. +stability +bugfix +export

@@ -12,6 +12,8 @@ final class MenuBarController {
     private var countdownItem: NSMenuItem!
     private var tickCount = 0
     private var appSwitchDebounceWork: DispatchWorkItem?
+    private var breakSubmenu: NSMenu?
+    private var profileSubmenu: NSMenu?
 
     private let scheduler: BreakScheduler
     private let repository: BreakHistoryRepository
@@ -34,7 +36,16 @@ final class MenuBarController {
         self.showBreak = showBreak
         setup()
         scheduler.objectWillChange.sink { [weak self] in
-            DispatchQueue.main.async { self?.updateIcon() }
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.updateIcon()
+                if let breakSubmenu {
+                    self.rebuildBreakSubmenu(breakSubmenu)
+                }
+                if let profileSubmenu {
+                    self.rebuildProfileMenu(profileSubmenu)
+                }
+            }
         }.store(in: &cancellables)
         NSWorkspace.shared.notificationCenter.addObserver(
             self, selector: #selector(appSwitched), name: NSWorkspace.didActivateApplicationNotification, object: nil
@@ -69,6 +80,7 @@ final class MenuBarController {
         menu.addItem(pauseTomorrow)
         let nowItem = NSMenuItem(title: "Take Break Now", action: nil, keyEquivalent: "")
         let breakSubmenu = NSMenu()
+        self.breakSubmenu = breakSubmenu
         nowItem.submenu = breakSubmenu
         rebuildBreakSubmenu(breakSubmenu)
         menu.addItem(nowItem)
@@ -81,6 +93,7 @@ final class MenuBarController {
         menu.addItem(openItem)
         menu.addItem(.separator())
         let profileMenu = NSMenu()
+        self.profileSubmenu = profileMenu
         let profileItem = NSMenuItem(title: "Profile", action: nil, keyEquivalent: "")
         profileItem.submenu = profileMenu
         menu.addItem(profileItem)
