@@ -80,6 +80,20 @@ final class BreakSchedulerTests: XCTestCase {
         scheduler.start(settings: settings, offsetSeconds: 120)
         await fulfillment(of: [exp], timeout: 1.0)
     }
+
+    func testRecurringBreaksContinueOverEightHourSimulation() async {
+        let hourly = CustomBreakType(name: "Hourly", intervalMinutes: 60, durationSeconds: 60)
+        var settings = AppSettings.defaults
+        settings.customBreakTypes = [hourly]
+        scheduler = BreakScheduler(settings: settings)
+        scheduler.start(settings: settings)
+
+        for _ in 0..<8 {
+            scheduler.simulateTimerFireForTesting(customTypeID: hourly.id)
+            XCTAssertEqual(scheduler.nextBreak?.customTypeID, hourly.id)
+            XCTAssertNotNil(scheduler.timers[hourly.id])
+        }
+    }
 }
 
 // MARK: - BreakHistoryRepository idempotency

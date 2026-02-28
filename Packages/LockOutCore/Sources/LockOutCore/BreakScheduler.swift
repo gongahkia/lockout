@@ -26,10 +26,7 @@ public final class BreakScheduler: ObservableObject {
         for customType in settings.customBreakTypes.filter(\.enabled) {
             let fireDate = now.addingTimeInterval(Double(customType.intervalMinutes) * 60 - offsetSeconds)
             let id = customType.id
-            let timer = Timer.scheduledTimer(withTimeInterval: max(0, fireDate.timeIntervalSinceNow), repeats: false) { [weak self] _ in
-                Task { @MainActor [weak self] in self?.timerFired(customTypeID: id) }
-            }
-            timers[id] = timer
+            scheduleTimer(for: id, fireDate: fireDate)
             if soonest == nil || fireDate < soonest!.fireDate { soonest = (customTypeID: id, fireDate: fireDate) }
         }
         if let soonest {
@@ -89,10 +86,7 @@ public final class BreakScheduler: ObservableObject {
         nb.fireDate = Date().addingTimeInterval(Double(clamped) * 60)
         nextBreak = nb
         let customTypeID = nb.customTypeID
-        let timer = Timer.scheduledTimer(withTimeInterval: nb.fireDate.timeIntervalSinceNow, repeats: false) { [weak self] _ in
-            Task { @MainActor [weak self] in self?.timerFired(customTypeID: customTypeID) }
-        }
-        timers[customTypeID] = timer
+        scheduleTimer(for: customTypeID, fireDate: nb.fireDate)
     }
 
     public func skip(repository: BreakHistoryRepository) {
@@ -134,11 +128,25 @@ public final class BreakScheduler: ObservableObject {
         start(settings: settings)
     }
 
+    func simulateTimerFireForTesting(customTypeID: UUID) {
+        timerFired(customTypeID: customTypeID)
+    }
+
+    private func scheduleTimer(for customTypeID: UUID, fireDate: Date) {
+        let timer = Timer.scheduledTimer(withTimeInterval: max(0, fireDate.timeIntervalSinceNow), repeats: false) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.timerFired(customTypeID: customTypeID) }
+        }
+        timers[customTypeID] = timer
+    }
+
     private func timerFired(customTypeID: UUID) {
         if let customType = currentSettings.customBreakTypes.first(where: { $0.id == customTypeID }) {
             onBreakTriggered?(customType)
+            if customType.enabled && !currentSettings.isPaused {
+                let nextFireDate = Date().addingTimeInterval(Double(customType.intervalMinutes) * 60)
+                scheduleTimer(for: customTypeID, fireDate: nextFireDate)
+            }
         }
-        timers[customTypeID] = nil
         let pending = timers.compactMap { (id, timer) -> (UUID, Date)? in
             (id, timer.fireDate)
         }.min(by: { $0.1 < $1.1 })
