@@ -4,9 +4,10 @@ import Combine
 @MainActor
 public final class BreakScheduler: ObservableObject {
     @Published public var nextBreak: (type: BreakType, fireDate: Date)?
+    @Published public var nextBreakCustomTypeID: UUID?
     @Published public var currentSettings: AppSettings
 
-    var timers: [BreakType: Timer] = [:] // internal for testability
+    var timers: [UUID: Timer] = [:] // internal for testability
 
     public init(settings: AppSettings = .defaults) {
         self.currentSettings = settings
@@ -22,26 +23,43 @@ public final class BreakScheduler: ObservableObject {
         currentSettings = settings
         guard !settings.isPaused else { return }
         let now = Date()
-        var soonest: (type: BreakType, fireDate: Date)?
+        var soonest: (customTypeID: UUID, fireDate: Date)?
         for customType in settings.customBreakTypes.filter(\.enabled) {
             let fireDate = now.addingTimeInterval(Double(customType.intervalMinutes) * 60 - offsetSeconds)
             let id = customType.id
-            let legacyType = legacyBreakType(for: customType)
             let timer = Timer.scheduledTimer(withTimeInterval: max(0, fireDate.timeIntervalSinceNow), repeats: false) { [weak self] _ in
-                Task { @MainActor [weak self] in self?.timerFired(type: legacyType, customTypeID: id) }
+                Task { @MainActor [weak self] in self?.timerFired(customTypeID: id) }
             }
-            timers[legacyType] = timer
-            if soonest == nil || fireDate < soonest!.fireDate { soonest = (type: legacyType, fireDate: fireDate) }
+            timers[id] = timer
+            if soonest == nil || fireDate < soonest!.fireDate { soonest = (customTypeID: id, fireDate: fireDate) }
         }
-        nextBreak = soonest
+        if let soonest {
+            nextBreakCustomTypeID = soonest.customTypeID
+            nextBreak = (type: legacyBreakType(forCustomTypeID: soonest.customTypeID), fireDate: soonest.fireDate)
+        } else {
+            nextBreakCustomTypeID = nil
+            nextBreak = nil
+        }
     }
 
-    // maps customBreakType to nearest legacy BreakType for backward compat; uses name heuristic
-    private func legacyBreakType(for t: CustomBreakType) -> BreakType {
-        let lower = t.name.lowercased()
-        if lower.contains("micro") { return .micro }
-        if lower.contains("long") { return .long }
-        return .eye
+    // maps custom break type IDs to legacy break groups for backward compatibility.
+    private func legacyBreakType(forCustomTypeID id: UUID) -> BreakType {
+        guard let idx = currentSettings.customBreakTypes.firstIndex(where: { $0.id == id }) else {
+            return .eye
+        }
+        switch idx {
+        case 0: return .eye
+        case 1: return .micro
+        case 2: return .long
+        default: return .eye
+        }
+    }
+
+    public func breakType(for customType: CustomBreakType) -> BreakType {
+        guard currentSettings.customBreakTypes.contains(where: { $0.id == customType.id }) else {
+            return .eye
+        }
+        return legacyBreakType(forCustomTypeID: customType.id)
     }
 
     public func stop() {
@@ -56,8 +74,8 @@ public final class BreakScheduler: ObservableObject {
     }
 
     public var currentCustomBreakType: CustomBreakType? {
-        guard let nb = nextBreak else { return nil }
-        return currentSettings.customBreakTypes.first { legacyBreakType(for: $0) == nb.type }
+        guard let customTypeID = nextBreakCustomTypeID else { return nil }
+        return currentSettings.customBreakTypes.first { $0.id == customTypeID }
     }
 
     public func snooze(minutes: Int? = nil, repository: BreakHistoryRepository? = nil) {
@@ -73,11 +91,11 @@ public final class BreakScheduler: ObservableObject {
         guard var nb = nextBreak else { return }
         nb.fireDate = Date().addingTimeInterval(Double(clamped) * 60)
         nextBreak = nb
-        let snoozeType = nb.type
+        guard let customTypeID = nextBreakCustomTypeID ?? currentCustomBreakType?.id else { return }
         let timer = Timer.scheduledTimer(withTimeInterval: nb.fireDate.timeIntervalSinceNow, repeats: false) { [weak self] _ in
-            Task { @MainActor [weak self] in self?.timerFired(type: snoozeType) }
+            Task { @MainActor [weak self] in self?.timerFired(customTypeID: customTypeID) }
         }
-        timers[nb.type] = timer
+        timers[customTypeID] = timer
     }
 
     public func skip(repository: BreakHistoryRepository) {
@@ -105,6 +123,7 @@ public final class BreakScheduler: ObservableObject {
         stop()
         currentSettings.isPaused = true
         nextBreak = nil
+        nextBreakCustomTypeID = nil
         AppSettingsStore.save(currentSettings)
     }
 
@@ -119,15 +138,17 @@ public final class BreakScheduler: ObservableObject {
         start(settings: settings)
     }
 
-    private func timerFired(type: BreakType, customTypeID: UUID? = nil) {
-        timers[type] = nil
-        let pending = timers.compactMap { (t, timer) -> (BreakType, Date)? in
-            (t, timer.fireDate)
+    private func timerFired(customTypeID: UUID) {
+        timers[customTypeID] = nil
+        let pending = timers.compactMap { (id, timer) -> (UUID, Date)? in
+            (id, timer.fireDate)
         }.min(by: { $0.1 < $1.1 })
-        if let (t, d) = pending {
-            nextBreak = (type: t, fireDate: d)
+        if let (id, d) = pending {
+            nextBreakCustomTypeID = id
+            nextBreak = (type: legacyBreakType(forCustomTypeID: id), fireDate: d)
         } else {
-            nextBreak = (type: type, fireDate: Date())
+            nextBreakCustomTypeID = customTypeID
+            nextBreak = (type: legacyBreakType(forCustomTypeID: customTypeID), fireDate: Date())
         }
     }
 }
