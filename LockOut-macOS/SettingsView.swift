@@ -59,6 +59,24 @@ struct SettingsView: View {
                     ForEach(0..<24) { Text(String(format: "%02d:00", $0)).tag($0) }
                 }
             }
+            Section("Policy") {
+                Picker("Active role", selection: Binding(
+                    get: { scheduler.currentSettings.activeRole },
+                    set: { scheduler.currentSettings.activeRole = $0 }
+                )) {
+                    ForEach(UserRole.allCases, id: \.self) { role in
+                        Text(roleLabel(role)).tag(role)
+                    }
+                }
+                Picker("Break enforcement", selection: Binding(
+                    get: { scheduler.currentSettings.breakEnforcementMode },
+                    set: { scheduler.currentSettings.breakEnforcementMode = $0 }
+                )) {
+                    ForEach(BreakEnforcementMode.allCases, id: \.self) { mode in
+                        Text(enforcementLabel(mode)).tag(mode)
+                    }
+                }
+            }
             Picker("Menu Bar Icon", selection: Binding(
                 get: { scheduler.currentSettings.menuBarIconTheme },
                 set: {
@@ -246,6 +264,22 @@ struct SettingsView: View {
         let f = DateFormatter()
         f.dateStyle = .short; f.timeStyle = .short
         return f.string(from: date)
+    }
+
+    private func roleLabel(_ role: UserRole) -> String {
+        switch role {
+        case .developer: return "Developer"
+        case .it_managed: return "IT Managed"
+        case .health_conscious: return "Health Conscious"
+        }
+    }
+
+    private func enforcementLabel(_ mode: BreakEnforcementMode) -> String {
+        switch mode {
+        case .reminder: return "Reminder"
+        case .soft_lock: return "Soft Lock"
+        case .hard_lock: return "Hard Lock"
+        }
     }
 }
 
