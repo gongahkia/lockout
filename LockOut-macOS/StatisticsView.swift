@@ -1,14 +1,12 @@
 import SwiftUI
 import Charts
 import LockOutCore
-import AppKit
 
 struct StatisticsView: View {
+    let repository: BreakHistoryRepository
+    let cloudSync: CloudKitSyncService
     @State private var range = 7
-    private var appDelegate: AppDelegate? { NSApp.delegate as? AppDelegate }
-    private var repo: BreakHistoryRepository? { appDelegate?.repository }
-    private var cloudSync: CloudKitSyncService? { appDelegate?.cloudSync }
-    private var stats: [DayStat] { repo?.dailyStats(for: range) ?? [] }
+    private var stats: [DayStat] { repository.dailyStats(for: range) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -54,8 +52,8 @@ struct StatisticsView: View {
     }
 
     @ViewBuilder private var syncStatusRow: some View {
-        let pending = cloudSync?.pendingUploadsCount ?? 0
-        let lastSync = cloudSync?.lastSyncDate ?? .distantPast
+        let pending = cloudSync.pendingUploadsCount
+        let lastSync = cloudSync.lastSyncDate
         HStack(spacing: 6) {
             if pending > 0 {
                 Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.yellow)

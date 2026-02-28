@@ -3,12 +3,12 @@ import LockOutCore
 import AppKit
 
 struct SettingsView: View {
+    let repository: BreakHistoryRepository
+    let cloudSync: CloudKitSyncService
     @EnvironmentObject var scheduler: BreakScheduler
     @State private var lastSynced: Date? = UserDefaults.standard.object(forKey: "ck_last_sync_date") as? Date
 
     private var appDelegate: AppDelegate? { NSApp.delegate as? AppDelegate }
-    private var repo: BreakHistoryRepository? { appDelegate?.repository }
-    private var cloudSync: CloudKitSyncService? { appDelegate?.cloudSync }
 
     var body: some View {
         Form {
@@ -21,7 +21,7 @@ struct SettingsView: View {
                 get: { scheduler.currentSettings.historyRetentionDays },
                 set: {
                     scheduler.currentSettings.historyRetentionDays = $0
-                    repo?.pruneOldRecords(retentionDays: $0)
+                    repository.pruneOldRecords(retentionDays: $0)
                 }
             )) {
                 Text("30 days").tag(30)
@@ -104,8 +104,7 @@ struct SettingsView: View {
                 Spacer()
                 Button("Sync Now") {
                     Task {
-                        guard let cloudSync, let repo else { return }
-                        await cloudSync.sync(repository: repo)
+                        await cloudSync.sync(repository: repository)
                         lastSynced = UserDefaults.standard.object(forKey: "ck_last_sync_date") as? Date
                     }
                 }

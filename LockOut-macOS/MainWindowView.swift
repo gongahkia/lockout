@@ -18,6 +18,8 @@ enum SidebarItem: String, CaseIterable, Identifiable {
 }
 
 struct MainWindowView: View {
+    let repository: BreakHistoryRepository
+    let cloudSync: CloudKitSyncService
     @EnvironmentObject var scheduler: BreakScheduler
     @State private var selected: SidebarItem? = .dashboard
 
@@ -29,10 +31,10 @@ struct MainWindowView: View {
             .navigationTitle("LockOut")
         } detail: {
             switch selected {
-            case .dashboard: DashboardView()
+            case .dashboard: DashboardView(repository: repository)
             case .schedule: ScheduleView()
-            case .statistics: StatisticsView()
-            case .settings: SettingsView()
+            case .statistics: StatisticsView(repository: repository, cloudSync: cloudSync)
+            case .settings: SettingsView(repository: repository, cloudSync: cloudSync)
             case nil: EmptyView()
             }
         }

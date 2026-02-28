@@ -1,4 +1,3 @@
-(B) Inject `BreakHistoryRepository` and `CloudKitSyncService` into dashboard, settings, and statistics views via initializer or environment. +stability +refactor +architecture
 (B) Inject scheduler into onboarding view via initializer and remove force unwrap access to app delegate global state. +stability +refactor +architecture
 (B) Remove `AppDelegate.shared.menuBarController` coupling from `BreakOverlayView` and publish streak updates through shared state. +stability +refactor +architecture
 (B) Constrain `BreakHistoryRepository` to main actor isolation or wrap it in an actor-safe persistence boundary. +stability +concurrency +data
