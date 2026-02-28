@@ -83,6 +83,16 @@ final class BreakHistoryRepositoryTests: XCTestCase {
         XCTAssertEqual(matching.count, 1)
         XCTAssertEqual(matching.first?.status, .completed)
     }
+
+    func testDeferredStatusRoundTrip() throws {
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: BreakSessionRecord.self, configurations: config)
+        let repo = BreakHistoryRepository(modelContext: ModelContext(container))
+        let session = BreakSession(type: .eye, scheduledAt: Date(), status: .deferred)
+        repo.save(session)
+        let loaded = repo.fetchSession(id: session.id)
+        XCTAssertEqual(loaded?.status, .deferred)
+    }
 }
 
 // MARK: - Blocklist shouldShow
