@@ -161,19 +161,22 @@ final class CloudKitConflictTests: XCTestCase {
     func testResolveConflictPrefersCompleted() {
         let svc = CloudKitSyncService()
         let id = UUID()
-        let completed = BreakSession(id: id, type: .eye, scheduledAt: Date(), status: .completed)
-        let skipped = BreakSession(id: id, type: .eye, scheduledAt: Date(), status: .skipped)
+        let scheduledAt = Date()
+        let updatedAt = scheduledAt.addingTimeInterval(5)
+        let completed = BreakSession(id: id, type: .eye, scheduledAt: scheduledAt, status: .completed, updatedAt: updatedAt)
+        let skipped = BreakSession(id: id, type: .eye, scheduledAt: scheduledAt, status: .skipped, updatedAt: updatedAt)
         let result = svc.resolveConflict(local: skipped, remote: completed)
         XCTAssertEqual(result.status, .completed)
     }
 
-    func testResolveConflictLocalCompletedWinsOverRemoteSkipped() {
+    func testResolveConflictPrefersLatestUpdatedAtBeforeStatusRank() {
         let svc = CloudKitSyncService()
         let id = UUID()
-        let local = BreakSession(id: id, type: .eye, scheduledAt: Date(), status: .completed)
-        let remote = BreakSession(id: id, type: .eye, scheduledAt: Date(), status: .skipped)
+        let now = Date()
+        let local = BreakSession(id: id, type: .eye, scheduledAt: now, status: .completed, updatedAt: now)
+        let remote = BreakSession(id: id, type: .eye, scheduledAt: now, status: .skipped, updatedAt: now.addingTimeInterval(10))
         let result = svc.resolveConflict(local: local, remote: remote)
-        XCTAssertEqual(result.status, .completed)
+        XCTAssertEqual(result.status, .skipped)
     }
 
     func testMapRecordDecodesEndedAtAndBreakTypeName() {

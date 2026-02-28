@@ -136,6 +136,10 @@ public final class CloudKitSyncService {
     public func resolveConflict(local: BreakSession?, remote: BreakSession) -> BreakSession {
         guard let local = local else { return remote }
         guard local.id == remote.id else { return remote }
+        let localUpdatedAt = local.updatedAt ?? local.scheduledAt
+        let remoteUpdatedAt = remote.updatedAt ?? remote.scheduledAt
+        if localUpdatedAt > remoteUpdatedAt { return local }
+        if remoteUpdatedAt > localUpdatedAt { return remote }
         let rank: (BreakStatus) -> Int = { s in
             switch s {
             case .completed: return 2
