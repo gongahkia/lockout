@@ -1,10 +1,8 @@
 import Foundation
-import os
 
 // #29: basic crash/exception logging to file
 // no remote telemetry — writes to the existing FileLogger
 enum CrashReporter {
-    private static var originalExceptionHandler: NSExceptionHandler?
     private static var installed = false
 
     static func install() {
@@ -21,7 +19,6 @@ enum CrashReporter {
             signal(sig) { signum in
                 let log = FileLogger.shared
                 log.log(.error, category: "CRASH", "Fatal signal \(signum) received")
-                // re-raise to get default behavior (core dump / termination)
                 signal(signum, SIG_DFL)
                 raise(signum)
             }
