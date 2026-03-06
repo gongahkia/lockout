@@ -3,6 +3,7 @@ import SwiftUI
 import AVFoundation
 import LockOutCore
 
+@MainActor
 final class BreakOverlayWindowController {
     private var windows: [NSWindow] = []
     private let scheduler: BreakScheduler

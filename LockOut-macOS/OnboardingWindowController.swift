@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import EventKit
+import UserNotifications
 import LockOutCore
 
 final class OnboardingWindowController: NSWindowController {

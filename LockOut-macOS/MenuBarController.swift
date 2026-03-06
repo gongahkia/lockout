@@ -3,6 +3,7 @@ import Combine
 import Sparkle
 import LockOutCore
 
+@MainActor
 final class MenuBarController {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let menu = NSMenu()
@@ -39,10 +40,10 @@ final class MenuBarController {
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.updateIcon()
-                if let breakSubmenu {
+                if let breakSubmenu = self.breakSubmenu {
                     self.rebuildBreakSubmenu(breakSubmenu)
                 }
-                if let profileSubmenu {
+                if let profileSubmenu = self.profileSubmenu {
                     self.rebuildProfileMenu(profileSubmenu)
                 }
             }
@@ -102,8 +103,8 @@ final class MenuBarController {
         let aboutItem = NSMenuItem(title: "About LockOut v\(AppVersion.current)", action: nil, keyEquivalent: "")
         aboutItem.isEnabled = false
         menu.addItem(aboutItem)
-        let updateItem = NSMenuItem(title: "Check for Updates…", action: #selector(SPUUpdater.checkForUpdates(_:)), keyEquivalent: "")
-        updateItem.target = updater.updater
+        let updateItem = NSMenuItem(title: "Check for Updates…", action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)), keyEquivalent: "")
+        updateItem.target = updater
         menu.addItem(updateItem)
         let quitItem = NSMenuItem(title: "Quit LockOut", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         menu.addItem(quitItem)

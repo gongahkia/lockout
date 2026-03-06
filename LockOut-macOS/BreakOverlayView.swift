@@ -70,8 +70,8 @@ struct BreakOverlayView: View {
                     Text("Bypass is disabled for the active role policy.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .padding(.top, 8)
                 }
-                .padding(24)
             }
             .padding(40)
         }

@@ -17,6 +17,7 @@ enum LockOutSchemaMigrationPlan: SchemaMigrationPlan {
     static var stages: [MigrationStage] { [] } // add lightweight/custom stages here for future schema versions
 }
 
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     private static let logger = Logger(subsystem: "com.yourapp.lockout", category: "AppDelegate")
     private(set) var scheduler: BreakScheduler!

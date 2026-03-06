@@ -154,7 +154,7 @@ struct SettingsView: View {
     }
 
     @ViewBuilder private var blocklistSection: some View {
-        let running = NSRunningApplication.runningApplications
+        let running = NSWorkspace.shared.runningApplications
             .filter { $0.bundleIdentifier != nil && $0.bundleIdentifier != Bundle.main.bundleIdentifier }
         let blocklist = Binding(
             get: { scheduler.currentSettings.blockedBundleIDs },
