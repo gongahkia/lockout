@@ -27,6 +27,7 @@ struct MainWindowView: View {
         NavigationSplitView {
             List(SidebarItem.allCases, selection: $selected) { item in
                 Label(item.rawValue, systemImage: item.icon)
+                    .tag(item)
             }
             .navigationTitle("LockOut")
         } detail: {
