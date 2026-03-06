@@ -46,6 +46,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private static let lastFireKey = "last_break_fire_date"
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        let log = FileLogger.shared
+        Observability.sink = { category, message in
+            log.log(.error, category: category, message)
+        }
+        log.log(.info, category: "AppDelegate", "applicationDidFinishLaunching started")
+        log.log(.info, category: "AppDelegate", "bundle=\(Bundle.main.bundleIdentifier ?? "nil") version=\(AppVersion.current)")
+        log.log(.info, category: "AppDelegate", "logFile=\(log.logURL.path)")
         let bundleID = Bundle.main.bundleIdentifier ?? ""
         if bundleID == "com.yourapp.lockout.macos" {
             let alert = NSAlert()
@@ -54,10 +61,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             alert.alertStyle = .warning
             alert.addButton(withTitle: "Quit")
             alert.runModal()
+            log.log(.error, category: "AppDelegate", "terminated: placeholder bundle ID")
             NSApp.terminate(nil)
             return
         }
         if NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).count > 1 {
+            log.log(.warn, category: "AppDelegate", "terminated: another instance already running")
             NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
                 .first(where: { $0 != NSRunningApplication.current })?
                 .activate(options: .activateIgnoringOtherApps)
@@ -73,6 +82,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                                                 migrationPlan: LockOutSchemaMigrationPlan.self,
                                                 configurations: config)
         } catch {
+            log.log(.error, category: "AppDelegate", "SwiftData init failed: \(error)")
             let alert = NSAlert()
             alert.messageText = "Database Error"
             alert.informativeText = error.localizedDescription
@@ -86,6 +96,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         settingsSync = SettingsSyncService()
         cloudSync = CloudKitSyncService()
         updaterController = UpdaterController()
+        log.log(.info, category: "AppDelegate", "core services initialized")
         cloudSync.onError = { [weak self] msg in DispatchQueue.main.async { self?.syncError = msg } }
         let localSettings = AppSettingsStore.load()
         let settings = (localSettings?.localOnlyMode == true
@@ -93,6 +104,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             : (settingsSync.pull() ?? localSettings)) ?? .defaults
         scheduler = BreakScheduler(settings: settings)
         previousSettings = settings
+        log.log(.info, category: "AppDelegate", "scheduler started, \(settings.customBreakTypes.filter(\.enabled).count) break types enabled, localOnly=\(settings.localOnlyMode)")
         let retentionDays = settings.historyRetentionDays
         let repo = repository!
         Task { @MainActor in repo.pruneOldRecords(retentionDays: retentionDays) }
