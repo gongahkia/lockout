@@ -30,6 +30,9 @@ targets:
         SUFeedURL: "$(SPARKLE_FEED_URL)"
         SUPublicEDKey: "$(SPARKLE_ED_KEY)"
         CLOUDKIT_CONTAINER_ID: "$(CLOUDKIT_CONTAINER_ID)"
+    configFiles:
+      Debug: Config.xcconfig
+      Release: Config.xcconfig
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(PRODUCT_BUNDLE_IDENTIFIER)
@@ -40,8 +43,6 @@ targets:
         CODE_SIGN_IDENTITY: "Developer ID Application"
         CODE_SIGN_STYLE: Manual
         DEVELOPMENT_TEAM: $(DEVELOPMENT_TEAM)
-      xcconfigs:
-        base: Config.xcconfig
     entitlements:
       path: LockOut-macOS/LockOut-macOS.entitlements
       properties:
