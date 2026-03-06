@@ -7,13 +7,14 @@ public final class BreakScheduler: ObservableObject {
     @Published public var currentSettings: AppSettings
 
     var timers: [UUID: Timer] = [:] // internal for testability
+    private static let persistedFireDatesKey = "lockout_persisted_fire_dates" // #5
 
     public init(settings: AppSettings = .defaults) {
         self.currentSettings = settings
     }
 
     deinit {
-        timers.values.forEach { $0.invalidate() } // stop() can't be called in deinit due to @MainActor isolation
+        timers.values.forEach { $0.invalidate() }
         timers.removeAll()
     }
 
@@ -26,11 +27,17 @@ public final class BreakScheduler: ObservableObject {
         }
         Observability.emit(category: "BreakScheduler", message: "starting with offset=\(offsetSeconds)s, \(settings.customBreakTypes.filter(\.enabled).count) types")
         let now = Date()
+        let persisted = Self.loadPersistedFireDates() // #5
         var soonest: (customTypeID: UUID, fireDate: Date)?
         for customType in settings.customBreakTypes.filter(\.enabled) {
-            let requested = now.addingTimeInterval(Double(customType.intervalMinutes) * 60 - offsetSeconds)
-            let fireDate = clampedFireDate(for: customType.id, requestedFireDate: requested)
             let id = customType.id
+            let fireDate: Date
+            if let saved = persisted[id.uuidString], saved > now { // #5: reuse persisted date if still in future
+                fireDate = saved
+            } else {
+                let requested = now.addingTimeInterval(Double(customType.intervalMinutes) * 60 - offsetSeconds)
+                fireDate = clampedFireDate(for: id, requestedFireDate: requested)
+            }
             scheduleTimer(for: id, fireDate: fireDate)
             if soonest == nil || fireDate < soonest!.fireDate { soonest = (customTypeID: id, fireDate: fireDate) }
         }
@@ -39,9 +46,9 @@ public final class BreakScheduler: ObservableObject {
         } else {
             nextBreak = nil
         }
+        persistFireDates() // #5
     }
 
-    // maps custom break type IDs to legacy break groups for backward compatibility.
     private func legacyBreakType(forCustomTypeID id: UUID) -> BreakType {
         guard let idx = currentSettings.customBreakTypes.firstIndex(where: { $0.id == id }) else {
             return .eye
@@ -77,13 +84,22 @@ public final class BreakScheduler: ObservableObject {
         return currentSettings.customBreakTypes.first { $0.id == customTypeID }
     }
 
+    // #22: all upcoming fire dates for display
+    public var allUpcomingBreaks: [(customTypeID: UUID, name: String, fireDate: Date)] {
+        timers.compactMap { (id, timer) in
+            guard let ct = currentSettings.customBreakTypes.first(where: { $0.id == id }) else { return nil }
+            return (customTypeID: id, name: ct.name, fireDate: timer.fireDate)
+        }.sorted { $0.fireDate < $1.fireDate }
+    }
+
     public func snooze(minutes: Int? = nil, repository: BreakHistoryRepository? = nil, cloudSync: CloudKitSyncService? = nil) {
+        let savedNextBreak = nextBreak // #23: capture before stop()
         let breakTypeName = currentCustomBreakType?.name
         let mins = minutes ?? currentCustomBreakType?.snoozeMinutes ?? currentSettings.snoozeDurationMinutes
         guard mins > 0 else { return }
         let clamped = min(mins, 60)
         Observability.emit(category: "BreakScheduler", message: "snoozed \(clamped)min break=\(breakTypeName ?? "unknown")")
-        if let repository, let nb = nextBreak {
+        if let repository, let nb = savedNextBreak { // #23: use saved value
             let session = BreakSession(type: legacyBreakType(forCustomTypeID: nb.customTypeID), scheduledAt: nb.fireDate, status: .snoozed, breakTypeName: breakTypeName)
             repository.save(session)
             if !currentSettings.localOnlyMode, let cloudSync {
@@ -91,11 +107,12 @@ public final class BreakScheduler: ObservableObject {
             }
         }
         stop()
-        guard var nb = nextBreak else { return }
+        guard var nb = savedNextBreak else { return } // #23: use saved value
         nb.fireDate = Date().addingTimeInterval(Double(clamped) * 60)
         nextBreak = nb
         let customTypeID = nb.customTypeID
         scheduleTimer(for: customTypeID, fireDate: nb.fireDate)
+        persistFireDates() // #5
     }
 
     public func skip(repository: BreakHistoryRepository, cloudSync: CloudKitSyncService? = nil) {
@@ -137,6 +154,7 @@ public final class BreakScheduler: ObservableObject {
         currentSettings.isPaused = true
         nextBreak = nil
         AppSettingsStore.save(currentSettings)
+        Self.clearPersistedFireDates() // #5
     }
 
     public func resume() {
@@ -195,5 +213,23 @@ public final class BreakScheduler: ObservableObject {
         } else {
             nextBreak = (customTypeID: customTypeID, fireDate: Date())
         }
+        persistFireDates() // #5
+    }
+
+    // MARK: - #5 Persist absolute fire dates
+    private func persistFireDates() {
+        var dict: [String: Date] = [:]
+        for (id, timer) in timers {
+            dict[id.uuidString] = timer.fireDate
+        }
+        UserDefaults.standard.set(dict, forKey: Self.persistedFireDatesKey)
+    }
+
+    private static func loadPersistedFireDates() -> [String: Date] {
+        UserDefaults.standard.dictionary(forKey: persistedFireDatesKey) as? [String: Date] ?? [:]
+    }
+
+    private static func clearPersistedFireDates() {
+        UserDefaults.standard.removeObject(forKey: persistedFireDatesKey)
     }
 }

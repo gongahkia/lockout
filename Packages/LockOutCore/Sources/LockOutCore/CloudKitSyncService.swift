@@ -3,12 +3,12 @@ import CloudKit
 import Combine
 import os
 
-private let logger = Logger(subsystem: "com.yourapp.lockout", category: "CloudKitSyncService")
+private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.lockout", category: "CloudKitSyncService") // #27
 
 public final class CloudKitSyncService {
     private lazy var db: CKDatabase = {
         let id = Bundle.main.object(forInfoDictionaryKey: "CLOUDKIT_CONTAINER_ID") as? String
-            ?? "iCloud.com.yourapp.lockout" // fallback for unit test context
+            ?? "iCloud.com.lockout" // fallback for unit test context
         return CKContainer(identifier: id).privateCloudDatabase
     }()
     private static let lastSyncKey = "ck_last_sync_date"
@@ -28,6 +28,7 @@ public final class CloudKitSyncService {
     }
 
     private var cancellables = Set<AnyCancellable>()
+    private var isSyncing = false // #8: prevent concurrent syncs
 
     private var isLocalOnlyEnabled: Bool {
         AppSettingsStore.load()?.localOnlyMode ?? false
@@ -125,6 +126,12 @@ public final class CloudKitSyncService {
 
     public func sync(repository: BreakHistoryRepository) async {
         guard !isLocalOnlyEnabled else { return }
+        guard !isSyncing else { // #8: skip if already syncing
+            Observability.emit(category: "CloudKitSyncService", message: "sync skipped: already in progress", level: .info)
+            return
+        }
+        isSyncing = true
+        defer { isSyncing = false }
         let remote = await fetchSessions(since: lastSyncDate)
         for session in remote {
             await MainActor.run {

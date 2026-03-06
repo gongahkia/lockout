@@ -40,6 +40,23 @@ struct DashboardView: View {
                     .font(.largeTitle).bold()
                 Text("Today's compliance").font(.caption).foregroundStyle(.secondary)
             }
+            // #22: upcoming schedule
+            let upcoming = scheduler.allUpcomingBreaks
+            if !upcoming.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Upcoming").font(.headline)
+                    ForEach(upcoming, id: \.customTypeID) { b in
+                        HStack {
+                            Text(b.name)
+                            Spacer()
+                            let mins = max(0, Int(b.fireDate.timeIntervalSince(now)) / 60)
+                            Text("in \(mins)m").foregroundStyle(.secondary).monospacedDigit()
+                        }
+                        .font(.callout)
+                    }
+                }
+                .padding(.horizontal)
+            }
             VStack(alignment: .leading, spacing: 8) {
                 Toggle("Eye breaks (20-20-20)", isOn: Binding(
                     get: { scheduler.currentSettings.eyeConfig.isEnabled },

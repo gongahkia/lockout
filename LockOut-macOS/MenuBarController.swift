@@ -11,6 +11,7 @@ final class MenuBarController {
     private var midnightTimer: Timer?
     private var cancellables = Set<AnyCancellable>()
     private var countdownItem: NSMenuItem!
+    private var upcomingItem: NSMenuItem! // #22
     private var tickCount = 0
     private var appSwitchDebounceWork: DispatchWorkItem?
     private var breakSubmenu: NSMenu?
@@ -69,9 +70,19 @@ final class MenuBarController {
     }
 
     private func buildMenu() {
+        // #18: Open LockOut at the top for discoverability
+        let openItem = NSMenuItem(title: "Open LockOut", action: #selector(openApp), keyEquivalent: "o")
+        openItem.target = self
+        menu.addItem(openItem)
+        menu.addItem(.separator())
         countdownItem = NSMenuItem(title: "Next break: --:--", action: nil, keyEquivalent: "")
         countdownItem.isEnabled = false
         menu.addItem(countdownItem)
+        // #22: upcoming schedule item
+        upcomingItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        upcomingItem.isEnabled = false
+        upcomingItem.isHidden = true
+        menu.addItem(upcomingItem)
         menu.addItem(.separator())
         let pauseItem = NSMenuItem(title: "Pause Breaks", action: #selector(togglePause), keyEquivalent: "")
         pauseItem.target = self
@@ -88,10 +99,6 @@ final class MenuBarController {
         let snoozeItem = NSMenuItem(title: "Snooze 5 min", action: #selector(snooze), keyEquivalent: "")
         snoozeItem.target = self
         menu.addItem(snoozeItem)
-        menu.addItem(.separator())
-        let openItem = NSMenuItem(title: "Open LockOut", action: #selector(openApp), keyEquivalent: "")
-        openItem.target = self
-        menu.addItem(openItem)
         menu.addItem(.separator())
         let profileMenu = NSMenu()
         self.profileSubmenu = profileMenu
@@ -110,13 +117,16 @@ final class MenuBarController {
         menu.addItem(quitItem)
     }
 
-    private func startTick() {
+    private func startTick() { // #13: adaptive tick rate
         tickTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             guard let self else { return }
-            tickCount += 1
-            updateCountdown()
-            updateOverdue()
-            if tickCount % 60 == 0 { updateStreak() }
+            self.tickCount += 1
+            let menuVisible = self.statusItem.menu?.highlightedItem != nil
+            if menuVisible || self.tickCount % 5 == 0 { // update countdown every 5s unless menu is open
+                self.updateCountdown()
+            }
+            if self.tickCount % 10 == 0 { self.updateOverdue() } // overdue check every 10s
+            if self.tickCount % 60 == 0 { self.updateStreak() }
         }
     }
 
@@ -129,6 +139,7 @@ final class MenuBarController {
     private func updateCountdown() {
         guard let nb = scheduler.nextBreak else {
             countdownItem.title = "Breaks paused"
+            upcomingItem.isHidden = true
             return
         }
         let remaining = max(0, nb.fireDate.timeIntervalSinceNow)
@@ -136,6 +147,21 @@ final class MenuBarController {
         let secs = Int(remaining) % 60
         let breakName = scheduler.currentCustomBreakType?.name ?? "Break"
         countdownItem.title = "Next \(breakName) in \(String(format: "%d:%02d", mins, secs))"
+        updateUpcoming() // #22
+    }
+
+    private func updateUpcoming() { // #22: show all upcoming breaks
+        let upcoming = scheduler.allUpcomingBreaks
+        if upcoming.count <= 1 {
+            upcomingItem.isHidden = true
+            return
+        }
+        let lines = upcoming.dropFirst().prefix(3).map { b in
+            let mins = max(0, Int(b.fireDate.timeIntervalSinceNow) / 60)
+            return "\(b.name) in \(mins)m"
+        }
+        upcomingItem.title = "Then: " + lines.joined(separator: ", ")
+        upcomingItem.isHidden = false
     }
 
     private func iconImageName(paused: Bool) -> String {

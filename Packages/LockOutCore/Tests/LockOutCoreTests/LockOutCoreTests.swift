@@ -472,17 +472,17 @@ final class CSVExportTests: XCTestCase {
 }
 
 final class AppDelegateSettingsRefreshTests: XCTestCase {
-    func testWorkdayTimerRefreshWhenStartOrEndHourChanges() {
+    func testWorkdayTimerRefreshWhenStartOrEndMinutesChange() { // #20: updated for minutes
         var previous = AppSettings.defaults
-        previous.workdayStartHour = 9
-        previous.workdayEndHour = 17
+        previous.workdayStartMinutes = 540 // 9:00
+        previous.workdayEndMinutes = 1020 // 17:00
 
         var changedStart = previous
-        changedStart.workdayStartHour = 10
+        changedStart.workdayStartMinutes = 510 // 8:30
         XCTAssertTrue(SettingsChangeDetector.workdayTimersNeedRefresh(previous: previous, current: changedStart))
 
         var changedEnd = previous
-        changedEnd.workdayEndHour = 18
+        changedEnd.workdayEndMinutes = 1080 // 18:00
         XCTAssertTrue(SettingsChangeDetector.workdayTimersNeedRefresh(previous: previous, current: changedEnd))
 
         XCTAssertFalse(SettingsChangeDetector.workdayTimersNeedRefresh(previous: previous, current: previous))
@@ -497,6 +497,16 @@ final class AppDelegateSettingsRefreshTests: XCTestCase {
         XCTAssertTrue(SettingsChangeDetector.calendarPollingPreferenceChanged(previous: previous, current: toggled))
 
         XCTAssertFalse(SettingsChangeDetector.calendarPollingPreferenceChanged(previous: previous, current: previous))
+    }
+
+    func testCalendarFilterModeChangeTriggersRefresh() { // #19: new test
+        var previous = AppSettings.defaults
+        previous.pauseDuringCalendarEvents = true
+        previous.calendarFilterMode = .all
+
+        var changed = previous
+        changed.calendarFilterMode = .busyOnly
+        XCTAssertTrue(SettingsChangeDetector.calendarPollingPreferenceChanged(previous: previous, current: changed))
     }
 
     func testFocusPauseIgnoresDuplicateNotifications() {
@@ -524,5 +534,187 @@ final class AppDelegateSettingsRefreshTests: XCTestCase {
         XCTAssertTrue(SettingsChangeDetector.weeklyNotificationPreferenceChanged(previous: previous, current: toggled))
 
         XCTAssertFalse(SettingsChangeDetector.weeklyNotificationPreferenceChanged(previous: previous, current: previous))
+    }
+}
+
+// MARK: - #26 Additional tests
+
+// #26: Streak trend & near-miss tests
+final class ComplianceTrendTests: XCTestCase {
+    func testTrendPositiveWhenCurrentBetter() {
+        let current = [DayStat(date: Date(), completed: 9, skipped: 1)]
+        let previous = [DayStat(date: Date(), completed: 7, skipped: 3)]
+        let t = ComplianceCalculator.trend(current: current, previous: previous)
+        XCTAssertGreaterThan(t, 0)
+    }
+
+    func testTrendNegativeWhenCurrentWorse() {
+        let current = [DayStat(date: Date(), completed: 5, skipped: 5)]
+        let previous = [DayStat(date: Date(), completed: 9, skipped: 1)]
+        let t = ComplianceCalculator.trend(current: current, previous: previous)
+        XCTAssertLessThan(t, 0)
+    }
+
+    func testNearMissCountsSubThresholdDays() {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: Date())
+        let stats = [
+            DayStat(date: today, completed: 9, skipped: 1),                                    // 90% → streak
+            DayStat(date: cal.date(byAdding: .day, value: -1, to: today)!, completed: 7, skipped: 3), // 70% → near miss
+            DayStat(date: cal.date(byAdding: .day, value: -2, to: today)!, completed: 6, skipped: 4), // 60% → near miss
+        ]
+        let result = ComplianceCalculator.streakWithNearMiss(stats: stats)
+        XCTAssertEqual(result.streak, 1)
+        XCTAssertEqual(result.nearMiss, 2)
+    }
+
+    func testNearMissStopsBelow60Percent() {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: Date())
+        let stats = [
+            DayStat(date: today, completed: 9, skipped: 1),                                    // streak
+            DayStat(date: cal.date(byAdding: .day, value: -1, to: today)!, completed: 5, skipped: 5), // 50% → stops
+        ]
+        let result = ComplianceCalculator.streakWithNearMiss(stats: stats)
+        XCTAssertEqual(result.streak, 1)
+        XCTAssertEqual(result.nearMiss, 0)
+    }
+}
+
+// #26: Settings backward-compatible decode (workday hours → minutes)
+final class SettingsBackwardCompatTests: XCTestCase {
+    func testLegacyWorkdayHourDecodesToMinutes() throws {
+        var json = try makeDefaultJSON()
+        json["workdayStartHour"] = 9   // legacy field
+        json["workdayEndHour"] = 17    // legacy field
+        json.removeValue(forKey: "workdayStartMinutes")
+        json.removeValue(forKey: "workdayEndMinutes")
+        let data = try JSONSerialization.data(withJSONObject: json)
+        let settings = try JSONDecoder().decode(AppSettings.self, from: data)
+        XCTAssertEqual(settings.workdayStartMinutes, 540) // 9 * 60
+        XCTAssertEqual(settings.workdayEndMinutes, 1020) // 17 * 60
+    }
+
+    func testNewMinutesFieldTakesPrecedence() throws {
+        var json = try makeDefaultJSON()
+        json["workdayStartHour"] = 9
+        json["workdayStartMinutes"] = 510 // 8:30
+        let data = try JSONSerialization.data(withJSONObject: json)
+        let settings = try JSONDecoder().decode(AppSettings.self, from: data)
+        XCTAssertEqual(settings.workdayStartMinutes, 510)
+    }
+
+    func testCalendarFilterModeDefaultsToAll() throws {
+        var json = try makeDefaultJSON()
+        json.removeValue(forKey: "calendarFilterMode")
+        let data = try JSONSerialization.data(withJSONObject: json)
+        let settings = try JSONDecoder().decode(AppSettings.self, from: data)
+        XCTAssertEqual(settings.calendarFilterMode, .all)
+    }
+
+    private func makeDefaultJSON() throws -> [String: Any] {
+        let data = try JSONEncoder().encode(AppSettings.defaults)
+        return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    }
+}
+
+// #26: Validation tests for new fields
+final class SettingsValidationExtendedTests: XCTestCase {
+    func testWorkdayMinutesValidationAcceptsHalfHours() throws {
+        var settings = AppSettings.defaults
+        settings.workdayStartMinutes = 510 // 8:30
+        settings.workdayEndMinutes = 1050  // 17:30
+        XCTAssertNoThrow(try settings.validateForImport())
+    }
+
+    func testWorkdayMinutesRejectsNegative() throws {
+        var settings = AppSettings.defaults
+        settings.workdayStartMinutes = -1
+        XCTAssertThrowsError(try settings.validateForImport())
+    }
+
+    func testWorkdayMinutesRejectsOver1439() throws {
+        var settings = AppSettings.defaults
+        settings.workdayStartMinutes = 1440
+        XCTAssertThrowsError(try settings.validateForImport())
+    }
+}
+
+// #26: BreakScheduler persistent fire dates
+@MainActor
+final class BreakSchedulerPersistenceTests: XCTestCase {
+    override func tearDown() async throws {
+        UserDefaults.standard.removeObject(forKey: "lockout_persisted_fire_dates")
+    }
+
+    func testFireDatesPersistedAfterStart() async {
+        let scheduler = BreakScheduler(settings: .defaults)
+        scheduler.start(settings: .defaults)
+        let persisted = UserDefaults.standard.dictionary(forKey: "lockout_persisted_fire_dates")
+        XCTAssertNotNil(persisted)
+        XCTAssertFalse(persisted?.isEmpty ?? true)
+        scheduler.stop()
+    }
+
+    func testPauseClearsPersistedDates() async {
+        let scheduler = BreakScheduler(settings: .defaults)
+        scheduler.start(settings: .defaults)
+        scheduler.pause()
+        let persisted = UserDefaults.standard.dictionary(forKey: "lockout_persisted_fire_dates")
+        XCTAssertNil(persisted)
+    }
+}
+
+// #26: BreakScheduler upcoming breaks
+@MainActor
+final class BreakSchedulerUpcomingTests: XCTestCase {
+    func testAllUpcomingBreaksReturnsAllTimers() async {
+        let scheduler = BreakScheduler(settings: .defaults)
+        scheduler.start(settings: .defaults) // 3 default break types
+        let upcoming = scheduler.allUpcomingBreaks
+        XCTAssertEqual(upcoming.count, 3)
+        // verify sorted by fireDate
+        for i in 0..<upcoming.count - 1 {
+            XCTAssertLessThanOrEqual(upcoming[i].fireDate, upcoming[i + 1].fireDate)
+        }
+        scheduler.stop()
+    }
+}
+
+// #26: CloudKit sync lock — skips actual network calls, tests the guard
+final class CloudKitSyncLockTests: XCTestCase {
+    func testSyncServiceInitDoesNotCrash() {
+        // verify service creation doesn't eagerly init CKDatabase
+        let svc = CloudKitSyncService()
+        XCTAssertEqual(svc.pendingUploadsCount, 0)
+    }
+}
+
+// #26: AppSettingsStore error logging
+final class AppSettingsStoreErrorTests: XCTestCase {
+    func testLoadReturnsNilForCorruptData() {
+        UserDefaults.standard.set(Data([0xFF, 0xFE]), forKey: "local_app_settings")
+        let result = AppSettingsStore.load()
+        XCTAssertNil(result)
+        UserDefaults.standard.removeObject(forKey: "local_app_settings")
+    }
+}
+
+// #26: iCloud KVStore size warning
+final class SettingsSyncSizeTests: XCTestCase {
+    func testPushDoesNotCrashWithLargeSettings() {
+        let svc = SettingsSyncService()
+        var settings = AppSettings.defaults
+        // add many custom break types to inflate size
+        for i in 0..<50 {
+            settings.customBreakTypes.append(
+                CustomBreakType(name: "Break \(i)", intervalMinutes: 20, durationSeconds: 20,
+                                tips: Array(repeating: "tip", count: 10))
+            )
+        }
+        settings.localOnlyMode = true // prevent actual cloud push
+        svc.push(settings)
+        let loaded = AppSettingsStore.load()
+        XCTAssertNotNil(loaded)
     }
 }

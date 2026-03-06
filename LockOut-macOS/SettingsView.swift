@@ -45,21 +45,35 @@ struct SettingsView: View {
                     get: { scheduler.currentSettings.pauseDuringCalendarEvents },
                     set: { scheduler.currentSettings.pauseDuringCalendarEvents = $0 }
                 ))
-            }
-            Section("Workday") {
-                Picker("Start hour", selection: Binding(
-                    get: { scheduler.currentSettings.workdayStartHour ?? -1 },
-                    set: { scheduler.currentSettings.workdayStartHour = $0 >= 0 ? $0 : nil }
-                )) {
-                    Text("Off").tag(-1)
-                    ForEach(0..<24) { Text(String(format: "%02d:00", $0)).tag($0) }
+                if scheduler.currentSettings.pauseDuringCalendarEvents { // #19: calendar filter options
+                    Picker("Filter mode", selection: Binding(
+                        get: { scheduler.currentSettings.calendarFilterMode },
+                        set: { scheduler.currentSettings.calendarFilterMode = $0 }
+                    )) {
+                        Text("All events").tag(CalendarFilterMode.all)
+                        Text("Busy events only").tag(CalendarFilterMode.busyOnly)
+                        Text("Selected calendars").tag(CalendarFilterMode.selected)
+                    }
                 }
-                Picker("End hour", selection: Binding(
-                    get: { scheduler.currentSettings.workdayEndHour ?? -1 },
-                    set: { scheduler.currentSettings.workdayEndHour = $0 >= 0 ? $0 : nil }
+            }
+            Section("Workday") { // #20: half-hour granularity
+                Picker("Start time", selection: Binding(
+                    get: { scheduler.currentSettings.workdayStartMinutes ?? -1 },
+                    set: { scheduler.currentSettings.workdayStartMinutes = $0 >= 0 ? $0 : nil }
                 )) {
                     Text("Off").tag(-1)
-                    ForEach(0..<24) { Text(String(format: "%02d:00", $0)).tag($0) }
+                    ForEach(workdayTimeSlots, id: \.self) { mins in
+                        Text(formatMinutes(mins)).tag(mins)
+                    }
+                }
+                Picker("End time", selection: Binding(
+                    get: { scheduler.currentSettings.workdayEndMinutes ?? -1 },
+                    set: { scheduler.currentSettings.workdayEndMinutes = $0 >= 0 ? $0 : nil }
+                )) {
+                    Text("Off").tag(-1)
+                    ForEach(workdayTimeSlots, id: \.self) { mins in
+                        Text(formatMinutes(mins)).tag(mins)
+                    }
                 }
             }
             Section("Policy") {
@@ -229,6 +243,15 @@ struct SettingsView: View {
             47: ".", 48: "⇥", 49: "Space", 51: "⌫", 53: "Esc",
         ]
         return map[code] ?? "?\(code)"
+    }
+
+    // #20: half-hour time slots (0, 30, 60, 90, ... 1410)
+    private var workdayTimeSlots: [Int] {
+        stride(from: 0, to: 1440, by: 30).map { $0 }
+    }
+
+    private func formatMinutes(_ mins: Int) -> String {
+        String(format: "%02d:%02d", mins / 60, mins % 60)
     }
 
     private func isValidBundleID(_ id: String) -> Bool {

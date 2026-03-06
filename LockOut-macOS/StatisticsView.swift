@@ -32,14 +32,36 @@ struct StatisticsView: View {
                 legendDot(color: .green, label: "Completed")
                 legendDot(color: .red, label: "Skipped")
             }
-            // summary
+            // summary (#21: trend + near-miss)
             let total = stats.reduce(0) { $0 + $1.completed + $1.skipped }
             let rate = ComplianceCalculator.overallRate(stats: stats)
-            let streak = ComplianceCalculator.streakDays(stats: stats)
+            let streakInfo = ComplianceCalculator.streakWithNearMiss(stats: repository.dailyStats(for: 30))
+            let previousStats = repository.dailyStats(for: range * 2).prefix(range).map { $0 }
+            let trend = ComplianceCalculator.trend(current: stats, previous: previousStats)
             HStack(spacing: 24) {
                 summaryCell(value: "\(total)", label: "Total")
-                summaryCell(value: "\(Int(rate * 100))%", label: "Compliance")
-                summaryCell(value: "\(streak)d", label: "Streak")
+                VStack {
+                    HStack(spacing: 2) {
+                        Text("\(Int(rate * 100))%").font(.title2).bold()
+                        if trend != 0 {
+                            Image(systemName: trend > 0 ? "arrow.up.right" : "arrow.down.right")
+                                .foregroundStyle(trend > 0 ? .green : .red)
+                                .font(.caption)
+                        }
+                    }
+                    Text("Compliance").font(.caption).foregroundStyle(.secondary)
+                    if trend != 0 {
+                        Text("\(trend > 0 ? "+" : "")\(Int(trend * 100))pp vs prior")
+                            .font(.caption2).foregroundStyle(.secondary)
+                    }
+                }
+                VStack {
+                    Text("\(streakInfo.streak)d").font(.title2).bold()
+                    Text("Streak").font(.caption).foregroundStyle(.secondary)
+                    if streakInfo.nearMiss > 0 {
+                        Text("+\(streakInfo.nearMiss)d near miss").font(.caption2).foregroundStyle(.orange)
+                    }
+                }
             }
             syncStatusRow
             HStack {

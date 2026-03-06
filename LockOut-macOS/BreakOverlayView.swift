@@ -17,12 +17,15 @@ struct BreakOverlayView: View {
     private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     private let tipTick = Timer.publish(every: 5, on: .main, in: .common).autoconnect()
 
-    private var canSkip: Bool { Date().timeIntervalSince(showTime) >= Double(minDisplaySeconds) }
+    private var elapsed: TimeInterval { Date().timeIntervalSince(showTime) }
+    private var canSkip: Bool { elapsed >= Double(minDisplaySeconds) }
     private var canBypass: Bool {
         scheduler.currentSettings.rolePolicies
             .first(where: { $0.role == scheduler.currentSettings.activeRole })?
             .canBypassBreak ?? true
     }
+    // #14: emergency escape always available after 30s regardless of enforcement/role
+    private var emergencyEscapeAvailable: Bool { elapsed >= 30 }
 
     init(breakType: BreakType, duration: Int, minDisplaySeconds: Int = 5, scheduler: BreakScheduler, repository: BreakHistoryRepository, cloudSync: CloudKitSyncService, onDismiss: @escaping () -> Void) {
         self.breakType = breakType
@@ -66,11 +69,21 @@ struct BreakOverlayView: View {
                     .buttonStyle(.plain)
                     .disabled(!canSkip || !canBypass)
                 }
-                if !canBypass {
-                    Text("Bypass is disabled for the active role policy.")
+                if !canBypass && !emergencyEscapeAvailable {
+                    Text("Bypass disabled. Emergency exit available in \(max(0, 30 - Int(elapsed)))s.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .padding(.top, 8)
+                }
+                if !canBypass && emergencyEscapeAvailable { // #14: emergency escape
+                    Button("Emergency Exit") {
+                        scheduler.skip(repository: repository, cloudSync: cloudSync)
+                        onDismiss()
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.red.opacity(0.7))
+                    .font(.caption)
+                    .padding(.top, 4)
                 }
             }
             .padding(40)

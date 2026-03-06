@@ -5,21 +5,32 @@ import LockOutCore
 import EventKit
 import UserNotifications
 import os
+import ApplicationServices // #7: AXIsProcessTrusted
 
-// MARK: - Schema migration stubs
+// MARK: - Schema migration (#12)
 enum LockOutSchemaV1: VersionedSchema {
     static var versionIdentifier = Schema.Version(1, 0, 0)
     static var models: [any PersistentModel.Type] { [BreakSessionRecord.self] }
 }
 
+// future schema versions: copy V1, change model, add to schemas + stages
+// enum LockOutSchemaV2: VersionedSchema {
+//     static var versionIdentifier = Schema.Version(2, 0, 0)
+//     static var models: [any PersistentModel.Type] { [BreakSessionRecord.self] }
+// }
+
 enum LockOutSchemaMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] { [LockOutSchemaV1.self] }
-    static var stages: [MigrationStage] { [] } // add lightweight/custom stages here for future schema versions
+    static var stages: [MigrationStage] {
+        // add .lightweight(fromVersion:toVersion:) or .custom(fromVersion:toVersion:willMigrate:didMigrate:) here
+        // example: .lightweight(fromVersion: LockOutSchemaV1.self, toVersion: LockOutSchemaV2.self)
+        []
+    }
 }
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
-    private static let logger = Logger(subsystem: "com.yourapp.lockout", category: "AppDelegate")
+    private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.lockout", category: "AppDelegate") // #27
     private(set) var scheduler: BreakScheduler!
     private(set) var repository: BreakHistoryRepository!
     private(set) var settingsSync: SettingsSyncService!
@@ -46,6 +57,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private static let lastFireKey = "last_break_fire_date"
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        CrashReporter.install() // #29
         let log = FileLogger.shared
         Observability.levelSink = { level, category, message in
             let mapped: FileLogger.Level
@@ -171,6 +183,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
         if !UserDefaults.standard.bool(forKey: "hasOnboarded") {
             OnboardingWindowController.present(scheduler: scheduler)
+        } else if !UserDefaults.standard.bool(forKey: "hasSeenMainWindow") { // #18: show main window once
+            UserDefaults.standard.set(true, forKey: "hasSeenMainWindow")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                NSApp.setActivationPolicy(.regular)
+                NSApp.activate(ignoringOtherApps: true)
+            }
         }
         requestNotificationPermission()
         startIdleDetection()
@@ -188,6 +206,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             eventTap = nil
         }
         guard let hotkey else { return }
+        // #7: check Accessibility permission before creating event tap
+        if !AXIsProcessTrusted() {
+            let opts = [kAXTrustedCheckOptionPrompt.takeRetainedValue(): true] as CFDictionary
+            AXIsProcessTrustedWithOptions(opts)
+            FileLogger.shared.log(.warn, category: "AppDelegate", "Accessibility permission not granted; global hotkey disabled")
+            return
+        }
         let mask = CGEventMask(1 << CGEventType.keyDown.rawValue)
         let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
@@ -240,15 +265,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         scheduler.start(settings: settings, offsetSeconds: elapsed)
     }
 
-    private func scheduleDailyTimer(hour: Int, action: @escaping () -> Void) -> Timer {
+    private func scheduleDailyTimer(minutesFromMidnight: Int, action: @escaping () -> Void) -> Timer { // #20
         let cal = Calendar.current
         var comps = cal.dateComponents([.year, .month, .day], from: Date())
-        comps.hour = hour; comps.minute = 0; comps.second = 0
+        comps.hour = minutesFromMidnight / 60
+        comps.minute = minutesFromMidnight % 60
+        comps.second = 0
         var fire = cal.date(from: comps) ?? Date()
         if fire <= Date() { fire = cal.date(byAdding: .day, value: 1, to: fire) ?? fire }
         return Timer.scheduledTimer(withTimeInterval: fire.timeIntervalSinceNow, repeats: false) { _ in
             action()
-            // reschedule for next day
             _ = Timer.scheduledTimer(withTimeInterval: 86400, repeats: true) { _ in action() }
         }
     }
@@ -283,14 +309,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         AppDelegate.scheduleNotification(request)
     }
 
-    private func scheduleWorkdayTimers() {
+    private func scheduleWorkdayTimers() { // #20: uses minutes from midnight
         workdayStartTimer?.invalidate()
         workdayEndTimer?.invalidate()
-        if let startHour = scheduler.currentSettings.workdayStartHour {
-            workdayStartTimer = scheduleDailyTimer(hour: startHour) { [weak self] in self?.scheduler.resume() }
+        if let startMins = scheduler.currentSettings.workdayStartMinutes {
+            workdayStartTimer = scheduleDailyTimer(minutesFromMidnight: startMins) { [weak self] in self?.scheduler.resume() }
         }
-        if let endHour = scheduler.currentSettings.workdayEndHour {
-            workdayEndTimer = scheduleDailyTimer(hour: endHour) { [weak self] in self?.scheduler.pause() }
+        if let endMins = scheduler.currentSettings.workdayEndMinutes {
+            workdayEndTimer = scheduleDailyTimer(minutesFromMidnight: endMins) { [weak self] in self?.scheduler.pause() }
         }
     }
 
@@ -318,9 +344,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private func checkCalendarEvents() {
         guard scheduler.currentSettings.pauseDuringCalendarEvents else { return }
         let now = Date()
-        let cals = ekStore.calendars(for: .event)
+        let filterMode = scheduler.currentSettings.calendarFilterMode
+        let filteredIDs = Set(scheduler.currentSettings.filteredCalendarIDs)
+        var cals = ekStore.calendars(for: .event)
+        if filterMode == .selected && !filteredIDs.isEmpty { // #19: filter to selected calendars
+            cals = cals.filter { filteredIDs.contains($0.calendarIdentifier) }
+        }
         let pred = ekStore.predicateForEvents(withStart: now.addingTimeInterval(-1), end: now.addingTimeInterval(1), calendars: cals)
-        let active = ekStore.events(matching: pred).contains { $0.startDate <= now && $0.endDate >= now }
+        let events = ekStore.events(matching: pred).filter { $0.startDate <= now && $0.endDate >= now }
+        let active: Bool
+        switch filterMode {
+        case .busyOnly: // #19: only pause for busy events
+            active = events.contains { $0.availability == .busy || $0.availability == .unavailable }
+        case .all, .selected:
+            active = !events.isEmpty
+        }
         if active && !calendarPaused {
             calendarPaused = true
             scheduler.pause()
@@ -354,13 +392,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     private func readFocusModeEnabled() -> Bool? {
-        guard let data = UserDefaults(suiteName: "com.apple.ncprefs")?.data(forKey: "dnd_prefs"),
-              let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any],
-              let userPref = plist["userPref"] as? [String: Any],
-              let enabled = userPref["enabled"] as? Bool else {
+        // #6: private API; may break across macOS versions. Fail gracefully.
+        do {
+            guard let defaults = UserDefaults(suiteName: "com.apple.ncprefs"),
+                  let data = defaults.data(forKey: "dnd_prefs") else {
+                return nil
+            }
+            guard let plist = try PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any],
+                  let userPref = plist["userPref"] as? [String: Any],
+                  let enabled = userPref["enabled"] as? Bool else {
+                return nil
+            }
+            return enabled
+        } catch {
+            FileLogger.shared.log(.warn, category: "AppDelegate", "Focus Mode detection failed (private API may have changed): \(error)")
             return nil
         }
-        return enabled
     }
 
     private func startIdleDetection() {

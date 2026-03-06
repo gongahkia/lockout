@@ -1,7 +1,8 @@
 // Copy this file to Config.xcconfig and fill in your values.
 // Config.xcconfig is git-ignored and must not be committed.
-PRODUCT_BUNDLE_IDENTIFIER = com.yourapp.lockout.macos
+// All bundle ID / container references derive from PRODUCT_BUNDLE_IDENTIFIER below.
+PRODUCT_BUNDLE_IDENTIFIER = com.yourcompany.lockout
 DEVELOPMENT_TEAM =
-CLOUDKIT_CONTAINER_ID = iCloud.com.yourapp.lockout
+CLOUDKIT_CONTAINER_ID = iCloud.$(PRODUCT_BUNDLE_IDENTIFIER)
 SPARKLE_FEED_URL = https://your-domain.com/appcast.xml
 SPARKLE_ED_KEY =

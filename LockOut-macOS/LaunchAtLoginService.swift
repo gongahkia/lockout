@@ -1,7 +1,7 @@
 import ServiceManagement
 import os
 
-private let logger = Logger(subsystem: "com.yourapp.lockout", category: "LaunchAtLoginService")
+private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.lockout", category: "LaunchAtLoginService") // #27
 
 enum LaunchAtLoginService {
     static var isEnabled: Bool {

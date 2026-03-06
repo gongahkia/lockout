@@ -4,6 +4,7 @@ import LockOutCore
 enum SidebarItem: String, CaseIterable, Identifiable {
     case dashboard = "Dashboard"
     case schedule = "Schedule"
+    case profiles = "Profiles" // #16
     case statistics = "Statistics"
     case settings = "Settings"
     var id: String { rawValue }
@@ -11,6 +12,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         switch self {
         case .dashboard: "house"
         case .schedule: "clock"
+        case .profiles: "person.2"
         case .statistics: "chart.bar"
         case .settings: "gear"
         }
@@ -34,6 +36,7 @@ struct MainWindowView: View {
             switch selected {
             case .dashboard: DashboardView(repository: repository)
             case .schedule: ScheduleView()
+            case .profiles: ProfileEditorView() // #16
             case .statistics: StatisticsView(repository: repository, cloudSync: cloudSync)
             case .settings: SettingsView(repository: repository, cloudSync: cloudSync)
             case nil: EmptyView()

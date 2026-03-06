@@ -49,6 +49,8 @@ final class BreakOverlayWindowController {
                 defer: false,
                 screen: screen
             )
+            win.enforcementMode = scheduler.currentSettings.breakEnforcementMode // #14
+            win.showTime = Date() // #14
             win.onEscape = { [weak self] in
                 guard let self else { return }
                 self.scheduler.skip(repository: self.repo, cloudSync: self.cloudSync)

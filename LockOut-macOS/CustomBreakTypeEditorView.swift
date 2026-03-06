@@ -1,6 +1,8 @@
 import SwiftUI
 import LockOutCore
 
+// Color(hex:) is defined in BreakOverlayView.swift and available in this target
+
 struct CustomBreakTypeEditorView: View {
     @Binding var breakType: CustomBreakType
     @State private var newTip = ""
@@ -54,6 +56,19 @@ struct CustomBreakTypeEditorView: View {
             }
             Section {
                 Toggle("Enabled", isOn: $breakType.enabled)
+            }
+            // #15: live overlay preview
+            Section("Preview") {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color(hex: breakType.overlayColorHex).opacity(breakType.overlayOpacity))
+                    VStack(spacing: 8) {
+                        Image(systemName: "eye").font(.title2).foregroundStyle(.white)
+                        Text(breakType.name).font(.headline).foregroundStyle(.white)
+                        Text("00:20").font(.title3.monospacedDigit()).foregroundStyle(.white.opacity(0.8))
+                    }
+                }
+                .frame(height: 120)
             }
             if let err = validationError {
                 Text(err).foregroundStyle(.red).font(.caption)

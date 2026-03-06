@@ -31,8 +31,19 @@ public final class SettingsSyncService {
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.pushDebounceSeconds, execute: workItem)
     }
 
+    private static let kvStoreWarnThreshold = 900_000 // #9: warn at ~900KB of 1MB limit
+
     private func commitCloudPush(_ settings: AppSettings) {
-        guard let data = try? JSONEncoder().encode(settings) else { return }
+        let data: Data
+        do { // #10: log encode failures
+            data = try JSONEncoder().encode(settings)
+        } catch {
+            Observability.emit(category: "SettingsSyncService", message: "encode failed: \(error)", level: .error)
+            return
+        }
+        if data.count > Self.kvStoreWarnThreshold { // #9: size warning
+            Observability.emit(category: "SettingsSyncService", message: "iCloud KVStore payload \(data.count) bytes approaching 1MB limit", level: .warn)
+        }
         store.set(data, forKey: Self.key)
         store.set(settings.activeRole.rawValue, forKey: Self.activeRoleKey)
         store.synchronize()
@@ -42,12 +53,17 @@ public final class SettingsSyncService {
     public func pull() -> AppSettings? {
         guard !isLocalOnlyEnabled else { return nil }
         guard let data = store.data(forKey: Self.key) else { return nil }
-        guard var settings = try? JSONDecoder().decode(AppSettings.self, from: data) else { return nil }
-        if let roleRaw = store.string(forKey: Self.activeRoleKey),
-           let role = UserRole(rawValue: roleRaw) {
-            settings.activeRole = role
+        do {
+            var settings = try JSONDecoder().decode(AppSettings.self, from: data)
+            if let roleRaw = store.string(forKey: Self.activeRoleKey),
+               let role = UserRole(rawValue: roleRaw) {
+                settings.activeRole = role
+            }
+            return settings
+        } catch { // #10
+            Observability.emit(category: "SettingsSyncService", message: "pull decode failed: \(error)", level: .error)
+            return nil
         }
-        return settings
     }
 
     public func observeChanges(handler: @escaping (AppSettings) -> Void) {

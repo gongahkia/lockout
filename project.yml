@@ -1,6 +1,6 @@
 name: LockOut
 options:
-  bundleIdPrefix: com.yourapp
+  bundleIdPrefix: com.lockout
   createIntermediateGroups: true
   deploymentTarget:
     macOS: "14.0"
@@ -43,17 +43,7 @@ targets:
         CODE_SIGN_IDENTITY: "Developer ID Application"
         CODE_SIGN_STYLE: Manual
         DEVELOPMENT_TEAM: $(DEVELOPMENT_TEAM)
-    entitlements:
-      path: LockOut-macOS/LockOut-macOS.entitlements
-      properties:
-        com.apple.developer.icloud-container-identifiers:
-          - iCloud.com.yourapp.lockout
-        com.apple.developer.icloud-services:
-          - CloudKit
-        com.apple.developer.ubiquity-kvstore-identifier: $(TeamIdentifierPrefix)com.yourapp.lockout
-        com.apple.security.hardened-runtime: true
-        com.apple.security.cs.allow-unsigned-executable-memory: false
-        com.apple.security.cs.disable-library-validation: false
+        CODE_SIGN_ENTITLEMENTS: LockOut-macOS/LockOut-macOS.entitlements
 
   LockOut-macOSUITests:
     type: bundle.ui-testing

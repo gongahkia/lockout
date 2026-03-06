@@ -8,12 +8,14 @@ public enum SettingsChangeDetector {
     }
 
     public static func workdayTimersNeedRefresh(previous: AppSettings?, current: AppSettings) -> Bool {
-        previous?.workdayStartHour != current.workdayStartHour ||
-        previous?.workdayEndHour != current.workdayEndHour
+        previous?.workdayStartMinutes != current.workdayStartMinutes ||
+        previous?.workdayEndMinutes != current.workdayEndMinutes
     }
 
     public static func calendarPollingPreferenceChanged(previous: AppSettings?, current: AppSettings) -> Bool {
-        previous?.pauseDuringCalendarEvents != current.pauseDuringCalendarEvents
+        previous?.pauseDuringCalendarEvents != current.pauseDuringCalendarEvents ||
+        previous?.calendarFilterMode != current.calendarFilterMode ||
+        previous?.filteredCalendarIDs != current.filteredCalendarIDs
     }
 
     public static func weeklyNotificationPreferenceChanged(previous: AppSettings?, current: AppSettings) -> Bool {

@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 import os
 
-private let logger = Logger(subsystem: "com.yourapp.lockout", category: "BreakHistoryRepository")
+private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.lockout", category: "BreakHistoryRepository") // #27
 
 @MainActor
 public final class BreakHistoryRepository {
