@@ -11,6 +11,7 @@ struct SettingsView: View {
     private var appDelegate: AppDelegate? { NSApp.delegate as? AppDelegate }
 
     var body: some View {
+        ScrollView {
         Form {
             Stepper("Snooze duration: \(scheduler.currentSettings.snoozeDurationMinutes) min",
                     value: Binding(
@@ -144,23 +145,25 @@ struct SettingsView: View {
                 Button("Import Settings") { importSettings() }
                 Spacer()
             }
+            Section("Blocklist") {
+                blocklistSection
+            }
+            versionFooter
         }
-        Section("Blocklist") {
-            blocklistSection
         }
-        versionFooter
         .padding(24)
         .navigationTitle("Settings")
     }
 
     @ViewBuilder private var blocklistSection: some View {
         let running = NSWorkspace.shared.runningApplications
-            .filter { $0.bundleIdentifier != nil && $0.bundleIdentifier != Bundle.main.bundleIdentifier }
+            .filter { $0.activationPolicy == .regular && $0.bundleIdentifier != nil && $0.bundleIdentifier != Bundle.main.bundleIdentifier }
+            .sorted { ($0.localizedName ?? "") < ($1.localizedName ?? "") }
         let blocklist = Binding(
             get: { scheduler.currentSettings.blockedBundleIDs },
             set: { scheduler.currentSettings.blockedBundleIDs = $0 }
         )
-        VStack(alignment: .leading) {
+        VStack(alignment: .leading, spacing: 6) {
             Text("Block break overlay for these apps:").font(.caption).foregroundStyle(.secondary)
             ForEach(running, id: \.processIdentifier) { app in
                 let bid = app.bundleIdentifier ?? ""
