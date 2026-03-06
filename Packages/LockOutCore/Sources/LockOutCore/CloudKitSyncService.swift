@@ -173,25 +173,25 @@ public final class CloudKitSyncService {
 
     func handle(error: Error) {
         guard let ckError = error as? CKError else {
-            Observability.emit(category: "CloudKitSyncService", message: "error: \(error)")
+            Observability.emit(category: "CloudKitSyncService", message: "error: \(error)", level: .error)
             logger.error("error: \(String(describing: error), privacy: .public)")
             onError?(error.localizedDescription)
             return
         }
         switch ckError.code {
         case .networkUnavailable:
-            Observability.emit(category: "CloudKitSyncService", message: "non-fatal: \(ckError.code)")
+            Observability.emit(category: "CloudKitSyncService", message: "non-fatal: \(ckError.code)", level: .warn)
             logger.notice("non-fatal: \(String(describing: ckError.code), privacy: .public)")
         case .quotaExceeded:
-            Observability.emit(category: "CloudKitSyncService", message: "non-fatal: \(ckError.code)")
+            Observability.emit(category: "CloudKitSyncService", message: "non-fatal: \(ckError.code)", level: .warn)
             logger.notice("non-fatal: \(String(describing: ckError.code), privacy: .public)")
             onError?(ckError.localizedDescription)
         case .accountTemporarilyUnavailable:
-            Observability.emit(category: "CloudKitSyncService", message: "account unavailable: \(ckError.code)")
+            Observability.emit(category: "CloudKitSyncService", message: "account unavailable: \(ckError.code)", level: .warn)
             NotificationCenter.default.post(name: .cloudKitAccountUnavailable, object: nil)
             onError?(ckError.localizedDescription)
         default:
-            Observability.emit(category: "CloudKitSyncService", message: "error: \(ckError)")
+            Observability.emit(category: "CloudKitSyncService", message: "error: \(ckError)", level: .error)
             logger.error("error: \(String(describing: ckError), privacy: .public)")
             onError?(ckError.localizedDescription)
         }

@@ -99,6 +99,7 @@ public final class BreakScheduler: ObservableObject {
     }
 
     public func skip(repository: BreakHistoryRepository, cloudSync: CloudKitSyncService? = nil) {
+        Observability.emit(category: "BreakScheduler", message: "skipped break=\(currentCustomBreakType?.name ?? "unknown")")
         guard let nb = nextBreak else { return }
         let session = BreakSession(type: legacyBreakType(forCustomTypeID: nb.customTypeID), scheduledAt: nb.fireDate, status: .skipped, breakTypeName: currentCustomBreakType?.name)
         repository.save(session)
@@ -109,6 +110,7 @@ public final class BreakScheduler: ObservableObject {
     }
 
     public func markCompleted(repository: BreakHistoryRepository, cloudSync: CloudKitSyncService? = nil) {
+        Observability.emit(category: "BreakScheduler", message: "completed break=\(currentCustomBreakType?.name ?? "unknown")")
         guard let nb = nextBreak else { return }
         let session = BreakSession(type: legacyBreakType(forCustomTypeID: nb.customTypeID), scheduledAt: nb.fireDate, endedAt: Date(), status: .completed, breakTypeName: currentCustomBreakType?.name)
         repository.save(session)
@@ -119,6 +121,7 @@ public final class BreakScheduler: ObservableObject {
     }
 
     public func markDeferred(repository: BreakHistoryRepository, cloudSync: CloudKitSyncService? = nil) {
+        Observability.emit(category: "BreakScheduler", message: "deferred break=\(currentCustomBreakType?.name ?? "unknown")")
         guard let nb = nextBreak else { return }
         let session = BreakSession(type: legacyBreakType(forCustomTypeID: nb.customTypeID), scheduledAt: nb.fireDate, status: .deferred, breakTypeName: currentCustomBreakType?.name)
         repository.save(session)
@@ -129,6 +132,7 @@ public final class BreakScheduler: ObservableObject {
     }
 
     public func pause() {
+        Observability.emit(category: "BreakScheduler", message: "paused")
         stop()
         currentSettings.isPaused = true
         nextBreak = nil
@@ -136,6 +140,7 @@ public final class BreakScheduler: ObservableObject {
     }
 
     public func resume() {
+        Observability.emit(category: "BreakScheduler", message: "resumed")
         currentSettings.isPaused = false
         AppSettingsStore.save(currentSettings)
         start(settings: currentSettings)
@@ -175,6 +180,7 @@ public final class BreakScheduler: ObservableObject {
 
     private func timerFired(customTypeID: UUID) {
         if let customType = currentSettings.customBreakTypes.first(where: { $0.id == customTypeID }) {
+            Observability.emit(category: "BreakScheduler", message: "timer fired: \(customType.name) (interval=\(customType.intervalMinutes)min)")
             onBreakTriggered?(customType)
             if customType.enabled && !currentSettings.isPaused {
                 let nextFireDate = Date().addingTimeInterval(Double(customType.intervalMinutes) * 60)

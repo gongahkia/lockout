@@ -47,8 +47,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let log = FileLogger.shared
-        Observability.sink = { category, message in
-            log.log(.error, category: category, message)
+        Observability.levelSink = { level, category, message in
+            let mapped: FileLogger.Level
+            switch level {
+            case .debug: mapped = .debug
+            case .info: mapped = .info
+            case .warn: mapped = .warn
+            case .error: mapped = .error
+            }
+            log.log(mapped, category: category, message)
         }
         log.log(.info, category: "AppDelegate", "applicationDidFinishLaunching started")
         log.log(.info, category: "AppDelegate", "bundle=\(Bundle.main.bundleIdentifier ?? "nil") version=\(AppVersion.current)")
@@ -172,6 +179,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         scheduleWorkdayTimers()
         scheduleWeeklyComplianceNotification()
         log.log(.info, category: "AppDelegate", "applicationDidFinishLaunching completed")
+        NotificationCenter.default.post(name: .appDidFinishSetup, object: nil)
     }
 
     func registerGlobalSnoozeHotkey(_ hotkey: HotkeyDescriptor?) {
