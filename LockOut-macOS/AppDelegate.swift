@@ -171,6 +171,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         startCalendarPolling()
         scheduleWorkdayTimers()
         scheduleWeeklyComplianceNotification()
+        log.log(.info, category: "AppDelegate", "applicationDidFinishLaunching completed")
     }
 
     func registerGlobalSnoozeHotkey(_ hotkey: HotkeyDescriptor?) {
@@ -217,6 +218,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        FileLogger.shared.log(.info, category: "AppDelegate", "applicationWillTerminate")
         UserDefaults.standard.set(Date(), forKey: Self.lastFireKey)
         settingsSync.stopObserving()
     }

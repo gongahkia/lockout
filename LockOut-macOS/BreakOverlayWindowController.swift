@@ -18,20 +18,27 @@ final class BreakOverlayWindowController {
     }
 
     func show(breakType: BreakType, duration: Int, minDisplaySeconds: Int = 5) {
-        guard windows.isEmpty else { return }
+        guard windows.isEmpty else {
+            FileLogger.shared.log(.debug, category: "Overlay", "show skipped: overlay already visible")
+            return
+        }
         guard !SystemStateService.isScreenLocked() else {
+            FileLogger.shared.log(.info, category: "Overlay", "deferred: screen locked")
             scheduler.markDeferred(repository: repo, cloudSync: cloudSync)
             return
         }
         guard !SystemStateService.frontmostAppIsFullscreen() else {
+            FileLogger.shared.log(.info, category: "Overlay", "deferred: fullscreen app active")
             scheduler.markDeferred(repository: repo, cloudSync: cloudSync)
             return
         }
         let frontmostID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? ""
         if scheduler.currentSettings.blockedBundleIDs.contains(frontmostID) {
+            FileLogger.shared.log(.info, category: "Overlay", "deferred: blocked app \(frontmostID)")
             scheduler.markDeferred(repository: repo, cloudSync: cloudSync)
             return
         }
+        FileLogger.shared.log(.info, category: "Overlay", "showing break=\(breakType.rawValue) duration=\(duration)s screens=\(NSScreen.screens.count)")
         let customType = scheduler.currentCustomBreakType
         playBreakSound(customType?.soundName)
         for screen in NSScreen.screens {
@@ -104,6 +111,7 @@ final class BreakOverlayWindowController {
     }
 
     func dismiss() {
+        FileLogger.shared.log(.info, category: "Overlay", "dismissed")
         let current = windows
         windows.removeAll()
         for win in current {

@@ -20,7 +20,11 @@ public final class BreakScheduler: ObservableObject {
     public func start(settings: AppSettings, offsetSeconds: TimeInterval = 0) {
         stop()
         currentSettings = settings
-        guard !settings.isPaused else { return }
+        guard !settings.isPaused else {
+            Observability.emit(category: "BreakScheduler", message: "start skipped: paused")
+            return
+        }
+        Observability.emit(category: "BreakScheduler", message: "starting with offset=\(offsetSeconds)s, \(settings.customBreakTypes.filter(\.enabled).count) types")
         let now = Date()
         var soonest: (customTypeID: UUID, fireDate: Date)?
         for customType in settings.customBreakTypes.filter(\.enabled) {
@@ -78,6 +82,7 @@ public final class BreakScheduler: ObservableObject {
         let mins = minutes ?? currentCustomBreakType?.snoozeMinutes ?? currentSettings.snoozeDurationMinutes
         guard mins > 0 else { return }
         let clamped = min(mins, 60)
+        Observability.emit(category: "BreakScheduler", message: "snoozed \(clamped)min break=\(breakTypeName ?? "unknown")")
         if let repository, let nb = nextBreak {
             let session = BreakSession(type: legacyBreakType(forCustomTypeID: nb.customTypeID), scheduledAt: nb.fireDate, status: .snoozed, breakTypeName: breakTypeName)
             repository.save(session)
