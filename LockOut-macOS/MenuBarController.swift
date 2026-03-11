@@ -9,6 +9,7 @@ final class MenuBarController {
     private let menu = NSMenu()
     private var tickTimer: Timer?
     private var midnightTimer: Timer?
+    private var manualResumeTimer: Timer?
     private var cancellables = Set<AnyCancellable>()
     private var countdownItem: NSMenuItem!
     private var upcomingItem: NSMenuItem! // #22
@@ -87,6 +88,12 @@ final class MenuBarController {
         let pauseItem = NSMenuItem(title: "Pause Breaks", action: #selector(togglePause), keyEquivalent: "")
         pauseItem.target = self
         menu.addItem(pauseItem)
+        let pause30 = NSMenuItem(title: "Pause 30 min", action: #selector(pauseThirtyMinutes), keyEquivalent: "")
+        pause30.target = self
+        menu.addItem(pause30)
+        let pause60 = NSMenuItem(title: "Pause 60 min", action: #selector(pauseSixtyMinutes), keyEquivalent: "")
+        pause60.target = self
+        menu.addItem(pause60)
         let pauseTomorrow = NSMenuItem(title: "Pause until tomorrow", action: #selector(pauseUntilTomorrow), keyEquivalent: "")
         pauseTomorrow.target = self
         menu.addItem(pauseTomorrow)
@@ -137,16 +144,27 @@ final class MenuBarController {
     }
 
     private func updateCountdown() {
-        guard let nb = scheduler.nextBreak else {
-            countdownItem.title = "Breaks paused"
+        if let pauseStatus = scheduler.pauseStatusLabel {
+            countdownItem.title = pauseStatus
+            upcomingItem.title = scheduler.pendingDeferredSummary ?? ""
+            upcomingItem.isHidden = scheduler.pendingDeferredSummary == nil
+            return
+        }
+        if let pending = scheduler.pendingDeferredSummary {
+            countdownItem.title = pending
+        } else if let nb = scheduler.nextBreak {
+            let remaining = max(0, nb.fireDate.timeIntervalSinceNow)
+            let mins = Int(remaining) / 60
+            let secs = Int(remaining) % 60
+            let breakName = scheduler.currentCustomBreakType?.name ?? "Break"
+            countdownItem.title = "Next \(breakName) in \(String(format: "%d:%02d", mins, secs))"
+        } else {
+            countdownItem.title = "No breaks scheduled"
+        }
+        if scheduler.pendingDeferredSummary != nil {
             upcomingItem.isHidden = true
             return
         }
-        let remaining = max(0, nb.fireDate.timeIntervalSinceNow)
-        let mins = Int(remaining) / 60
-        let secs = Int(remaining) % 60
-        let breakName = scheduler.currentCustomBreakType?.name ?? "Break"
-        countdownItem.title = "Next \(breakName) in \(String(format: "%d:%02d", mins, secs))"
         updateUpcoming() // #22
     }
 
@@ -173,7 +191,7 @@ final class MenuBarController {
     }
 
     private func updateIcon() {
-        let isPaused = scheduler.currentSettings.isPaused
+        let isPaused = scheduler.isPaused
         let name = iconImageName(paused: isPaused)
         let isTemplate = scheduler.currentSettings.menuBarIconTheme != .color
         statusItem.button?.image = NSImage(systemSymbolName: name, accessibilityDescription: "LockOut")
@@ -192,24 +210,47 @@ final class MenuBarController {
     }
 
     @objc private func pauseUntilTomorrow() {
-        scheduler.pause()
-        midnightTimer?.invalidate()
-        let cal = Calendar.current
-        guard let midnight = cal.nextDate(after: Date(), matching: DateComponents(hour: 0, minute: 0, second: 0), matchingPolicy: .nextTime) else { return }
-        midnightTimer = Timer.scheduledTimer(withTimeInterval: midnight.timeIntervalSinceNow, repeats: false) { [weak self] _ in
-            self?.scheduler.resume()
+        scheduleManualResume(at: Calendar.current.nextDate(after: Date(), matching: DateComponents(hour: 0, minute: 0, second: 0), matchingPolicy: .nextTime))
+    }
+
+    @objc private func pauseThirtyMinutes() {
+        scheduleManualResume(after: 30 * 60)
+    }
+
+    @objc private func pauseSixtyMinutes() {
+        scheduleManualResume(after: 60 * 60)
+    }
+
+    private func scheduleManualResume(after interval: TimeInterval) {
+        scheduler.pause(reason: .manual)
+        manualResumeTimer?.invalidate()
+        manualResumeTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { [weak self] _ in
+            self?.scheduler.resume(reason: .manual)
+        }
+        updateIcon()
+    }
+
+    private func scheduleManualResume(at date: Date?) {
+        guard let date else { return }
+        scheduler.pause(reason: .manual)
+        manualResumeTimer?.invalidate()
+        manualResumeTimer = Timer.scheduledTimer(withTimeInterval: max(date.timeIntervalSinceNow, 1), repeats: false) { [weak self] _ in
+            self?.scheduler.resume(reason: .manual)
         }
         updateIcon()
     }
 
     @objc private func togglePause() {
-        if scheduler.currentSettings.isPaused { scheduler.resume() } else { scheduler.pause() }
+        manualResumeTimer?.invalidate()
+        if scheduler.isPaused { scheduler.resume(reason: .manual) } else { scheduler.pause(reason: .manual) }
         updateIcon()
     }
 
     @objc private func takeBreakNow() {
         if let customType = scheduler.currentCustomBreakType {
-            showBreak(scheduler.breakType(for: customType), customType.durationSeconds)
+            scheduler.triggerBreak(customType)
+        } else if let customType = scheduler.currentSettings.customBreakTypes.first(where: \.enabled) ?? scheduler.currentSettings.customBreakTypes.first {
+            scheduler.triggerBreak(customType)
         } else {
             showBreak(.eye, scheduler.currentSettings.eyeConfig.durationSeconds)
         }
@@ -280,6 +321,8 @@ final class MenuBarController {
         tickTimer = nil
         midnightTimer?.invalidate()
         midnightTimer = nil
+        manualResumeTimer?.invalidate()
+        manualResumeTimer = nil
         cancellables.removeAll()
     }
 }

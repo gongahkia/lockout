@@ -5,11 +5,11 @@ public enum MenuBarIconTheme: String, Codable, CaseIterable, Sendable {
     case monochrome, color, minimal
 }
 
-// MARK: - Calendar filter mode (#19)
+// MARK: - Calendar filter mode
 public enum CalendarFilterMode: String, Codable, CaseIterable, Sendable {
-    case all        // pause during any event
-    case busyOnly   // pause only during busy (not free/tentative) events
-    case selected   // pause only for events on selected calendars
+    case all
+    case busyOnly
+    case selected
 }
 
 // MARK: - Break enforcement
@@ -19,6 +19,25 @@ public enum BreakEnforcementMode: String, Codable, CaseIterable, Sendable {
     case hard_lock
 }
 
+// MARK: - Pause reason
+public enum PauseReason: String, Codable, CaseIterable, Hashable, Sendable {
+    case manual
+    case idle
+    case focus
+    case calendar
+    case workday
+
+    public var displayName: String {
+        switch self {
+        case .manual: return "Manual"
+        case .idle: return "Idle"
+        case .focus: return "Focus Mode"
+        case .calendar: return "Calendar"
+        case .workday: return "Workday"
+        }
+    }
+}
+
 // MARK: - Role policy
 public enum UserRole: String, Codable, CaseIterable, Sendable {
     case developer
@@ -26,7 +45,7 @@ public enum UserRole: String, Codable, CaseIterable, Sendable {
     case health_conscious
 }
 
-public struct RolePolicy: Codable, Sendable {
+public struct RolePolicy: Codable, Equatable, Sendable {
     public var role: UserRole
     public var canBypassBreak: Bool
 
@@ -48,28 +67,15 @@ public struct RolePolicy: Codable, Sendable {
 public struct HotkeyDescriptor: Codable, Equatable, Sendable {
     public var keyCode: Int
     public var modifierFlags: Int
+
     public init(keyCode: Int, modifierFlags: Int) {
         self.keyCode = keyCode
         self.modifierFlags = modifierFlags
     }
 }
 
-// MARK: - Profiles
-public struct AppProfile: Codable, Identifiable, Sendable {
-    public var id: UUID
-    public var name: String
-    public var customBreakTypes: [CustomBreakType]
-    public var blockedBundleIDs: [String]
-    public var idleThresholdMinutes: Int
-
-    public init(id: UUID = UUID(), name: String, customBreakTypes: [CustomBreakType] = AppSettings.defaultCustomBreakTypes,
-                blockedBundleIDs: [String] = [], idleThresholdMinutes: Int = 5) {
-        self.id = id; self.name = name; self.customBreakTypes = customBreakTypes
-        self.blockedBundleIDs = blockedBundleIDs; self.idleThresholdMinutes = idleThresholdMinutes
-    }
-}
-
-public struct BreakConfig: Codable, Sendable {
+// MARK: - Break config
+public struct BreakConfig: Codable, Equatable, Sendable {
     public var intervalMinutes: Int
     public var durationSeconds: Int
     public var isEnabled: Bool
@@ -78,6 +84,99 @@ public struct BreakConfig: Codable, Sendable {
         self.intervalMinutes = intervalMinutes
         self.durationSeconds = durationSeconds
         self.isEnabled = isEnabled
+    }
+}
+
+// MARK: - Profiles
+public struct AppProfile: Codable, Equatable, Identifiable, Sendable {
+    public var id: UUID
+    public var name: String
+    public var customBreakTypes: [CustomBreakType]
+    public var blockedBundleIDs: [String]
+    public var idleThresholdMinutes: Int
+    public var pauseDuringFocus: Bool
+    public var pauseDuringCalendarEvents: Bool
+    public var calendarFilterMode: CalendarFilterMode
+    public var filteredCalendarIDs: [String]
+    public var workdayStartMinutes: Int?
+    public var workdayEndMinutes: Int?
+    public var notificationLeadMinutes: Int
+    public var breakEnforcementMode: BreakEnforcementMode
+    public var snoozeDurationMinutes: Int
+
+    public init(
+        id: UUID = UUID(),
+        name: String,
+        customBreakTypes: [CustomBreakType] = AppSettings.defaultCustomBreakTypes,
+        blockedBundleIDs: [String] = [],
+        idleThresholdMinutes: Int = 5,
+        pauseDuringFocus: Bool = false,
+        pauseDuringCalendarEvents: Bool = false,
+        calendarFilterMode: CalendarFilterMode = .all,
+        filteredCalendarIDs: [String] = [],
+        workdayStartMinutes: Int? = nil,
+        workdayEndMinutes: Int? = nil,
+        notificationLeadMinutes: Int = 1,
+        breakEnforcementMode: BreakEnforcementMode = .reminder,
+        snoozeDurationMinutes: Int = 5
+    ) {
+        self.id = id
+        self.name = name
+        self.customBreakTypes = customBreakTypes
+        self.blockedBundleIDs = blockedBundleIDs
+        self.idleThresholdMinutes = idleThresholdMinutes
+        self.pauseDuringFocus = pauseDuringFocus
+        self.pauseDuringCalendarEvents = pauseDuringCalendarEvents
+        self.calendarFilterMode = calendarFilterMode
+        self.filteredCalendarIDs = filteredCalendarIDs
+        self.workdayStartMinutes = workdayStartMinutes
+        self.workdayEndMinutes = workdayEndMinutes
+        self.notificationLeadMinutes = notificationLeadMinutes
+        self.breakEnforcementMode = breakEnforcementMode
+        self.snoozeDurationMinutes = snoozeDurationMinutes
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        customBreakTypes = try c.decodeIfPresent([CustomBreakType].self, forKey: .customBreakTypes) ?? AppSettings.defaultCustomBreakTypes
+        blockedBundleIDs = try c.decodeIfPresent([String].self, forKey: .blockedBundleIDs) ?? []
+        idleThresholdMinutes = try c.decodeIfPresent(Int.self, forKey: .idleThresholdMinutes) ?? 5
+        pauseDuringFocus = try c.decodeIfPresent(Bool.self, forKey: .pauseDuringFocus) ?? false
+        pauseDuringCalendarEvents = try c.decodeIfPresent(Bool.self, forKey: .pauseDuringCalendarEvents) ?? false
+        calendarFilterMode = try c.decodeIfPresent(CalendarFilterMode.self, forKey: .calendarFilterMode) ?? .all
+        filteredCalendarIDs = try c.decodeIfPresent([String].self, forKey: .filteredCalendarIDs) ?? []
+        workdayStartMinutes = try c.decodeIfPresent(Int.self, forKey: .workdayStartMinutes)
+        workdayEndMinutes = try c.decodeIfPresent(Int.self, forKey: .workdayEndMinutes)
+        notificationLeadMinutes = try c.decodeIfPresent(Int.self, forKey: .notificationLeadMinutes) ?? 1
+        breakEnforcementMode = try c.decodeIfPresent(BreakEnforcementMode.self, forKey: .breakEnforcementMode) ?? .reminder
+        snoozeDurationMinutes = try c.decodeIfPresent(Int.self, forKey: .snoozeDurationMinutes) ?? 5
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(name, forKey: .name)
+        try c.encode(customBreakTypes, forKey: .customBreakTypes)
+        try c.encode(blockedBundleIDs, forKey: .blockedBundleIDs)
+        try c.encode(idleThresholdMinutes, forKey: .idleThresholdMinutes)
+        try c.encode(pauseDuringFocus, forKey: .pauseDuringFocus)
+        try c.encode(pauseDuringCalendarEvents, forKey: .pauseDuringCalendarEvents)
+        try c.encode(calendarFilterMode, forKey: .calendarFilterMode)
+        try c.encode(filteredCalendarIDs, forKey: .filteredCalendarIDs)
+        try c.encodeIfPresent(workdayStartMinutes, forKey: .workdayStartMinutes)
+        try c.encodeIfPresent(workdayEndMinutes, forKey: .workdayEndMinutes)
+        try c.encode(notificationLeadMinutes, forKey: .notificationLeadMinutes)
+        try c.encode(breakEnforcementMode, forKey: .breakEnforcementMode)
+        try c.encode(snoozeDurationMinutes, forKey: .snoozeDurationMinutes)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, customBreakTypes, blockedBundleIDs, idleThresholdMinutes
+        case pauseDuringFocus, pauseDuringCalendarEvents, calendarFilterMode, filteredCalendarIDs
+        case workdayStartMinutes, workdayEndMinutes, notificationLeadMinutes
+        case breakEnforcementMode, snoozeDurationMinutes
     }
 }
 
@@ -95,7 +194,7 @@ public enum AppSettingsImportValidationError: Error, LocalizedError, Equatable, 
     }
 }
 
-public struct AppSettings: Codable, Sendable {
+public struct AppSettings: Codable, Equatable, Sendable {
     public var eyeConfig: BreakConfig
     public var microConfig: BreakConfig
     public var longConfig: BreakConfig
@@ -107,13 +206,13 @@ public struct AppSettings: Codable, Sendable {
     public var idleThresholdMinutes: Int
     public var pauseDuringFocus: Bool
     public var pauseDuringCalendarEvents: Bool
-    public var calendarFilterMode: CalendarFilterMode // #19 calendar filtering
-    public var filteredCalendarIDs: [String] // #19 specific calendar IDs to honor
-    public var workdayStartMinutes: Int?   // nil = no automatic start; minutes from midnight (e.g. 510 = 8:30)
-    public var workdayEndMinutes: Int?     // nil = no automatic end
+    public var calendarFilterMode: CalendarFilterMode
+    public var filteredCalendarIDs: [String]
+    public var workdayStartMinutes: Int?
+    public var workdayEndMinutes: Int?
     public var profiles: [AppProfile]
     public var activeProfileId: UUID?
-    public var notificationLeadMinutes: Int  // 0-5, minutes before break to fire reminder
+    public var notificationLeadMinutes: Int
     public var weeklyNotificationEnabled: Bool
     public var globalSnoozeHotkey: HotkeyDescriptor?
     public var menuBarIconTheme: MenuBarIconTheme
@@ -122,22 +221,33 @@ public struct AppSettings: Codable, Sendable {
     public var activeRole: UserRole
     public var localOnlyMode: Bool
 
-    public init(eyeConfig: BreakConfig, microConfig: BreakConfig, longConfig: BreakConfig,
-                snoozeDurationMinutes: Int = 5, historyRetentionDays: Int = 30, isPaused: Bool = false,
-                customBreakTypes: [CustomBreakType] = AppSettings.defaultCustomBreakTypes,
-                blockedBundleIDs: [String] = [], idleThresholdMinutes: Int = 5, pauseDuringFocus: Bool = false,
-                pauseDuringCalendarEvents: Bool = false,
-                calendarFilterMode: CalendarFilterMode = .all,
-                filteredCalendarIDs: [String] = [],
-                workdayStartMinutes: Int? = nil, workdayEndMinutes: Int? = nil,
-                profiles: [AppProfile] = [], activeProfileId: UUID? = nil,
-                notificationLeadMinutes: Int = 1, weeklyNotificationEnabled: Bool = false,
-                globalSnoozeHotkey: HotkeyDescriptor? = nil,
-                menuBarIconTheme: MenuBarIconTheme = .monochrome,
-                breakEnforcementMode: BreakEnforcementMode = .reminder,
-                rolePolicies: [RolePolicy] = RolePolicy.defaults,
-                activeRole: UserRole = .developer,
-                localOnlyMode: Bool = false) {
+    public init(
+        eyeConfig: BreakConfig,
+        microConfig: BreakConfig,
+        longConfig: BreakConfig,
+        snoozeDurationMinutes: Int = 5,
+        historyRetentionDays: Int = 30,
+        isPaused: Bool = false,
+        customBreakTypes: [CustomBreakType] = AppSettings.defaultCustomBreakTypes,
+        blockedBundleIDs: [String] = [],
+        idleThresholdMinutes: Int = 5,
+        pauseDuringFocus: Bool = false,
+        pauseDuringCalendarEvents: Bool = false,
+        calendarFilterMode: CalendarFilterMode = .all,
+        filteredCalendarIDs: [String] = [],
+        workdayStartMinutes: Int? = nil,
+        workdayEndMinutes: Int? = nil,
+        profiles: [AppProfile] = [],
+        activeProfileId: UUID? = nil,
+        notificationLeadMinutes: Int = 1,
+        weeklyNotificationEnabled: Bool = false,
+        globalSnoozeHotkey: HotkeyDescriptor? = nil,
+        menuBarIconTheme: MenuBarIconTheme = .monochrome,
+        breakEnforcementMode: BreakEnforcementMode = .reminder,
+        rolePolicies: [RolePolicy] = RolePolicy.defaults,
+        activeRole: UserRole = .developer,
+        localOnlyMode: Bool = false
+    ) {
         self.eyeConfig = eyeConfig
         self.microConfig = microConfig
         self.longConfig = longConfig
@@ -165,7 +275,6 @@ public struct AppSettings: Codable, Sendable {
         self.localOnlyMode = localOnlyMode
     }
 
-    // backward-compatible decoding: old workdayStartHour/workdayEndHour → workdayStartMinutes/workdayEndMinutes
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         eyeConfig = try c.decode(BreakConfig.self, forKey: .eyeConfig)
@@ -181,7 +290,6 @@ public struct AppSettings: Codable, Sendable {
         pauseDuringCalendarEvents = try c.decode(Bool.self, forKey: .pauseDuringCalendarEvents)
         calendarFilterMode = try c.decodeIfPresent(CalendarFilterMode.self, forKey: .calendarFilterMode) ?? .all
         filteredCalendarIDs = try c.decodeIfPresent([String].self, forKey: .filteredCalendarIDs) ?? []
-        // migrate legacy hour fields to minutes
         if let mins = try c.decodeIfPresent(Int.self, forKey: .workdayStartMinutes) {
             workdayStartMinutes = mins
         } else if let hour = try c.decodeIfPresent(Int.self, forKey: .workdayStartHourLegacy) {
@@ -196,7 +304,7 @@ public struct AppSettings: Codable, Sendable {
         } else {
             workdayEndMinutes = nil
         }
-        profiles = try c.decode([AppProfile].self, forKey: .profiles)
+        profiles = try c.decodeIfPresent([AppProfile].self, forKey: .profiles) ?? []
         activeProfileId = try c.decodeIfPresent(UUID.self, forKey: .activeProfileId)
         notificationLeadMinutes = try c.decode(Int.self, forKey: .notificationLeadMinutes)
         weeklyNotificationEnabled = try c.decode(Bool.self, forKey: .weeklyNotificationEnabled)
@@ -219,13 +327,46 @@ public struct AppSettings: Codable, Sendable {
         case globalSnoozeHotkey, menuBarIconTheme, breakEnforcementMode, rolePolicies, activeRole, localOnlyMode
     }
 
-    // convenience accessors for UI display
     public var workdayStartHourDisplay: Int? { workdayStartMinutes.map { $0 / 60 } }
     public var workdayEndHourDisplay: Int? { workdayEndMinutes.map { $0 / 60 } }
     public var workdayStartMinuteOffset: Int { (workdayStartMinutes ?? 0) % 60 }
     public var workdayEndMinuteOffset: Int { (workdayEndMinutes ?? 0) % 60 }
 
-    // custom encode to write workdayStartMinutes/workdayEndMinutes (not legacy hour keys)
+    public func profileSnapshot(name: String, id: UUID = UUID()) -> AppProfile {
+        AppProfile(
+            id: id,
+            name: name,
+            customBreakTypes: customBreakTypes,
+            blockedBundleIDs: blockedBundleIDs,
+            idleThresholdMinutes: idleThresholdMinutes,
+            pauseDuringFocus: pauseDuringFocus,
+            pauseDuringCalendarEvents: pauseDuringCalendarEvents,
+            calendarFilterMode: calendarFilterMode,
+            filteredCalendarIDs: filteredCalendarIDs,
+            workdayStartMinutes: workdayStartMinutes,
+            workdayEndMinutes: workdayEndMinutes,
+            notificationLeadMinutes: notificationLeadMinutes,
+            breakEnforcementMode: breakEnforcementMode,
+            snoozeDurationMinutes: snoozeDurationMinutes
+        )
+    }
+
+    public mutating func apply(profile: AppProfile) {
+        activeProfileId = profile.id
+        customBreakTypes = profile.customBreakTypes
+        blockedBundleIDs = profile.blockedBundleIDs
+        idleThresholdMinutes = profile.idleThresholdMinutes
+        pauseDuringFocus = profile.pauseDuringFocus
+        pauseDuringCalendarEvents = profile.pauseDuringCalendarEvents
+        calendarFilterMode = profile.calendarFilterMode
+        filteredCalendarIDs = profile.filteredCalendarIDs
+        workdayStartMinutes = profile.workdayStartMinutes
+        workdayEndMinutes = profile.workdayEndMinutes
+        notificationLeadMinutes = profile.notificationLeadMinutes
+        breakEnforcementMode = profile.breakEnforcementMode
+        snoozeDurationMinutes = profile.snoozeDurationMinutes
+    }
+
     public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(eyeConfig, forKey: .eyeConfig)
@@ -255,11 +396,13 @@ public struct AppSettings: Codable, Sendable {
         try c.encode(localOnlyMode, forKey: .localOnlyMode)
     }
 
-    public static var defaultCustomBreakTypes: [CustomBreakType] {[
-        CustomBreakType(name: "Eye Break", intervalMinutes: 20, durationSeconds: 20, minDisplaySeconds: 5, tips: ["Look 20 feet away for 20 seconds"]),
-        CustomBreakType(name: "Micro Break", intervalMinutes: 45, durationSeconds: 30, minDisplaySeconds: 5, tips: ["Relax and breathe"]),
-        CustomBreakType(name: "Long Break", intervalMinutes: 90, durationSeconds: 900, minDisplaySeconds: 10, tips: ["Stand up and stretch"]),
-    ]}
+    public static var defaultCustomBreakTypes: [CustomBreakType] {
+        [
+            CustomBreakType(name: "Eye Break", intervalMinutes: 20, durationSeconds: 20, minDisplaySeconds: 5, tips: ["Look 20 feet away for 20 seconds"]),
+            CustomBreakType(name: "Micro Break", intervalMinutes: 45, durationSeconds: 30, minDisplaySeconds: 5, tips: ["Relax and breathe"]),
+            CustomBreakType(name: "Long Break", intervalMinutes: 90, durationSeconds: 900, minDisplaySeconds: 10, tips: ["Stand up and stretch"]),
+        ]
+    }
 
     public static var defaults: AppSettings {
         AppSettings(
@@ -288,9 +431,14 @@ public struct AppSettings: Codable, Sendable {
         try Self.validateBreakConfig(longConfig, fieldPrefix: "longConfig")
 
         for (index, profile) in profiles.enumerated() {
-            try Self.validateRange(profile.idleThresholdMinutes,
-                                   field: "profiles[\(index)].idleThresholdMinutes",
-                                   range: 1...60)
+            try Self.validateRange(profile.idleThresholdMinutes, field: "profiles[\(index)].idleThresholdMinutes", range: 1...60)
+            try Self.validateRange(profile.notificationLeadMinutes, field: "profiles[\(index)].notificationLeadMinutes", range: 0...5)
+            try Self.validateRange(profile.snoozeDurationMinutes, field: "profiles[\(index)].snoozeDurationMinutes", range: 1...30)
+            try Self.validateWorkdayMinutes(profile.workdayStartMinutes, field: "profiles[\(index)].workdayStartMinutes")
+            try Self.validateWorkdayMinutes(profile.workdayEndMinutes, field: "profiles[\(index)].workdayEndMinutes")
+            for (breakIndex, breakType) in profile.customBreakTypes.enumerated() {
+                try Self.validateCustomBreakType(breakType, index: breakIndex, prefix: "profiles[\(index)].customBreakTypes")
+            }
         }
 
         for (index, breakType) in customBreakTypes.enumerated() {
@@ -298,32 +446,21 @@ public struct AppSettings: Codable, Sendable {
         }
     }
 
-    // valid options: 30, 60, 90, 365, 0 (unlimited)
     public mutating func clampRetention() {
         let valid = [0, 30, 60, 90, 365]
         if !valid.contains(historyRetentionDays) { historyRetentionDays = 30 }
     }
 
     private static func validateBreakConfig(_ config: BreakConfig, fieldPrefix: String) throws {
-        try validateRange(config.intervalMinutes,
-                          field: "\(fieldPrefix).intervalMinutes",
-                          range: 1...480)
-        try validateRange(config.durationSeconds,
-                          field: "\(fieldPrefix).durationSeconds",
-                          range: 10...7200)
+        try validateRange(config.intervalMinutes, field: "\(fieldPrefix).intervalMinutes", range: 1...480)
+        try validateRange(config.durationSeconds, field: "\(fieldPrefix).durationSeconds", range: 10...7200)
     }
 
-    private static func validateCustomBreakType(_ breakType: CustomBreakType, index: Int) throws {
-        let fieldPrefix = "customBreakTypes[\(index)]"
-        try validateRange(breakType.intervalMinutes,
-                          field: "\(fieldPrefix).intervalMinutes",
-                          range: 1...480)
-        try validateRange(breakType.durationSeconds,
-                          field: "\(fieldPrefix).durationSeconds",
-                          range: 10...7200)
-        try validateRange(breakType.snoozeMinutes,
-                          field: "\(fieldPrefix).snoozeMinutes",
-                          range: 1...60)
+    private static func validateCustomBreakType(_ breakType: CustomBreakType, index: Int, prefix: String = "customBreakTypes") throws {
+        let fieldPrefix = "\(prefix)[\(index)]"
+        try validateRange(breakType.intervalMinutes, field: "\(fieldPrefix).intervalMinutes", range: 1...480)
+        try validateRange(breakType.durationSeconds, field: "\(fieldPrefix).durationSeconds", range: 10...7200)
+        try validateRange(breakType.snoozeMinutes, field: "\(fieldPrefix).snoozeMinutes", range: 1...60)
 
         if breakType.minDisplaySeconds < 1 || breakType.minDisplaySeconds > breakType.durationSeconds {
             throw AppSettingsImportValidationError.outOfRange(
@@ -365,6 +502,6 @@ public struct AppSettings: Codable, Sendable {
 
     private static func validateWorkdayMinutes(_ value: Int?, field: String) throws {
         guard let value else { return }
-        try validateRange(value, field: field, range: 0...1439) // 0 to 23:59
+        try validateRange(value, field: field, range: 0...1439)
     }
 }

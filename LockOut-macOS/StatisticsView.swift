@@ -24,6 +24,12 @@ struct StatisticsView: View {
                     BarMark(x: .value("Date", s.date, unit: .day),
                             y: .value("Skipped", s.skipped))
                     .foregroundStyle(.red)
+                    BarMark(x: .value("Date", s.date, unit: .day),
+                            y: .value("Snoozed", s.snoozed))
+                    .foregroundStyle(.orange)
+                    BarMark(x: .value("Date", s.date, unit: .day),
+                            y: .value("Deferred", s.deferred))
+                    .foregroundStyle(.blue)
                 }
             }
             .frame(height: 200)
@@ -31,9 +37,11 @@ struct StatisticsView: View {
             HStack(spacing: 12) {
                 legendDot(color: .green, label: "Completed")
                 legendDot(color: .red, label: "Skipped")
+                legendDot(color: .orange, label: "Snoozed")
+                legendDot(color: .blue, label: "Deferred")
             }
             // summary (#21: trend + near-miss)
-            let total = stats.reduce(0) { $0 + $1.completed + $1.skipped }
+            let total = stats.reduce(0) { $0 + $1.counts.allOutcomesTotal }
             let rate = ComplianceCalculator.overallRate(stats: stats)
             let streakInfo = ComplianceCalculator.streakWithNearMiss(stats: repository.dailyStats(for: 30))
             let previousStats = repository.dailyStats(for: range * 2).prefix(range).map { $0 }
@@ -102,12 +110,19 @@ struct StatisticsView: View {
         let fmt = ISO8601DateFormatter()
         let typeNames = allTypeNames
         let rows = stats.map { s -> [String: Any] in
-            var row: [String: Any] = ["date": fmt.string(from: s.date),
-                                       "completed": s.completed, "skipped": s.skipped]
+            var row: [String: Any] = [
+                "date": fmt.string(from: s.date),
+                "completed": s.completed,
+                "skipped": s.skipped,
+                "snoozed": s.snoozed,
+                "deferred": s.deferred,
+            ]
             for name in typeNames {
-                let (c, k) = s.perTypeCounts[name] ?? (0, 0)
-                row["\(name)_completed"] = c
-                row["\(name)_skipped"] = k
+                let counts = s.perTypeCounts[name] ?? BreakStatusCounts()
+                row["\(name)_completed"] = counts.completed
+                row["\(name)_skipped"] = counts.skipped
+                row["\(name)_snoozed"] = counts.snoozed
+                row["\(name)_deferred"] = counts.deferred
             }
             return row
         }
@@ -125,15 +140,15 @@ struct StatisticsView: View {
         panel.nameFieldStringValue = "lockout-stats.csv"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         let typeNames = allTypeNames
-        let typeHeaders = typeNames.flatMap { ["\($0)_completed", "\($0)_skipped"] }
-        let headers = (["date", "completed", "skipped"] + typeHeaders).map(CSVExport.escapedCell)
+        let typeHeaders = typeNames.flatMap { ["\($0)_completed", "\($0)_skipped", "\($0)_snoozed", "\($0)_deferred"] }
+        let headers = (["date", "completed", "skipped", "snoozed", "deferred"] + typeHeaders).map(CSVExport.escapedCell)
         var csv = headers.joined(separator: ",") + "\n"
         let fmt = ISO8601DateFormatter()
         for s in stats {
-            var row = [fmt.string(from: s.date), "\(s.completed)", "\(s.skipped)"]
+            var row = [fmt.string(from: s.date), "\(s.completed)", "\(s.skipped)", "\(s.snoozed)", "\(s.deferred)"]
             for name in typeNames {
-                let (c, k) = s.perTypeCounts[name] ?? (0, 0)
-                row += ["\(c)", "\(k)"]
+                let counts = s.perTypeCounts[name] ?? BreakStatusCounts()
+                row += ["\(counts.completed)", "\(counts.skipped)", "\(counts.snoozed)", "\(counts.deferred)"]
             }
             csv += row.map(CSVExport.escapedCell).joined(separator: ",") + "\n"
         }

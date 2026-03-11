@@ -5,6 +5,7 @@ struct BreakOverlayView: View {
     let breakType: BreakType
     let duration: Int
     let minDisplaySeconds: Int
+    let scheduledAt: Date
     let scheduler: BreakScheduler
     let repository: BreakHistoryRepository
     let cloudSync: CloudKitSyncService
@@ -24,13 +25,50 @@ struct BreakOverlayView: View {
             .first(where: { $0.role == scheduler.currentSettings.activeRole })?
             .canBypassBreak ?? true
     }
-    // #14: emergency escape always available after 30s regardless of enforcement/role
     private var emergencyEscapeAvailable: Bool { elapsed >= 30 }
+    private var enforcementMode: BreakEnforcementMode { scheduler.currentSettings.breakEnforcementMode }
+    private var showSkipSnoozeButtons: Bool {
+        switch enforcementMode {
+        case .reminder: return true
+        case .soft_lock: return canBypass
+        case .hard_lock: return canBypass && emergencyEscapeAvailable
+        }
+    }
+    private var controlsEnabled: Bool {
+        switch enforcementMode {
+        case .reminder: return canSkip && canBypass
+        case .soft_lock: return canSkip && canBypass
+        case .hard_lock: return emergencyEscapeAvailable && canBypass
+        }
+    }
+    private var showEmergencyExit: Bool {
+        switch enforcementMode {
+        case .reminder: return false
+        case .soft_lock, .hard_lock: return emergencyEscapeAvailable
+        }
+    }
+    private var primaryMessage: String {
+        scheduler.currentCustomBreakType?.message ?? defaultMessage
+    }
+    private var secondaryTip: String? {
+        let tips = scheduler.currentCustomBreakType?.tips ?? []
+        guard !tips.isEmpty else { return nil }
+        return tips[tipIndex % tips.count]
+    }
+    private var defaultMessage: String {
+        switch breakType {
+        case .eye:
+            return "Look at something 20 feet away for 20 seconds"
+        case .micro, .long:
+            return "Relax and breathe"
+        }
+    }
 
-    init(breakType: BreakType, duration: Int, minDisplaySeconds: Int = 5, scheduler: BreakScheduler, repository: BreakHistoryRepository, cloudSync: CloudKitSyncService, onDismiss: @escaping () -> Void) {
+    init(breakType: BreakType, duration: Int, minDisplaySeconds: Int = 5, scheduledAt: Date, scheduler: BreakScheduler, repository: BreakHistoryRepository, cloudSync: CloudKitSyncService, onDismiss: @escaping () -> Void) {
         self.breakType = breakType
         self.duration = duration
         self.minDisplaySeconds = minDisplaySeconds
+        self.scheduledAt = scheduledAt
         self.scheduler = scheduler
         self.repository = repository
         self.cloudSync = cloudSync
@@ -54,28 +92,30 @@ struct BreakOverlayView: View {
                 )
                 .frame(width: 140, height: 140)
                 Spacer()
-                HStack {
-                    Button("Snooze \(scheduler.currentCustomBreakType?.snoozeMinutes ?? scheduler.currentSettings.snoozeDurationMinutes) min") {
-                        scheduler.snooze(repository: repository, cloudSync: cloudSync)
-                        onDismiss()
+                if showSkipSnoozeButtons {
+                    HStack {
+                        Button("Snooze \(scheduler.currentCustomBreakType?.snoozeMinutes ?? scheduler.currentSettings.snoozeDurationMinutes) min") {
+                            scheduler.snooze(repository: repository, cloudSync: cloudSync)
+                            onDismiss()
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(!controlsEnabled)
+                        Spacer()
+                        Button("Skip") {
+                            scheduler.skip(repository: repository, cloudSync: cloudSync)
+                            onDismiss()
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(!controlsEnabled)
                     }
-                    .buttonStyle(.plain)
-                    .disabled(!canSkip || !canBypass)
-                    Spacer()
-                    Button("Skip") {
-                        scheduler.skip(repository: repository, cloudSync: cloudSync)
-                        onDismiss()
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(!canSkip || !canBypass)
                 }
-                if !canBypass && !emergencyEscapeAvailable {
-                    Text("Bypass disabled. Emergency exit available in \(max(0, 30 - Int(elapsed)))s.")
+                if enforcementMode != .reminder && !showEmergencyExit {
+                    Text(lockStatusText)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .padding(.top, 8)
                 }
-                if !canBypass && emergencyEscapeAvailable { // #14: emergency escape
+                if showEmergencyExit {
                     Button("Emergency Exit") {
                         scheduler.skip(repository: repository, cloudSync: cloudSync)
                         onDismiss()
@@ -113,15 +153,21 @@ struct BreakOverlayView: View {
     @ViewBuilder
     private var breakContent: some View {
         let ct = scheduler.currentCustomBreakType
-        let tips = ct?.tips ?? []
-        let currentTip = tips.isEmpty ? nil : tips[tipIndex % tips.count]
         switch breakType {
         case .eye:
             VStack(spacing: 12) {
                 Image(systemName: "eye").font(.system(size: 64))
                 Text(ct?.name ?? "Eye Break").font(.title).bold()
-                Text(currentTip ?? "Look at something 20 feet away for 20 seconds")
-                    .font(.body).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                Text(primaryMessage)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                if let secondaryTip {
+                    Text(secondaryTip)
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .multilineTextAlignment(.center)
+                }
             }
         case .micro, .long:
             VStack(spacing: 12) {
@@ -130,8 +176,31 @@ struct BreakOverlayView: View {
                     .frame(width: 80, height: 80)
                     .scaleEffect(breatheScale)
                 Text(ct?.name ?? (breakType == .micro ? "Micro Break" : "Long Break")).font(.title).bold()
-                Text(currentTip ?? "Relax and breathe").font(.body).foregroundStyle(.secondary)
+                Text(primaryMessage)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                if let secondaryTip {
+                    Text(secondaryTip)
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .multilineTextAlignment(.center)
+                }
             }
+        }
+    }
+
+    private var lockStatusText: String {
+        if !canBypass {
+            return "Bypass disabled. Emergency exit available in \(max(0, 30 - Int(elapsed)))s."
+        }
+        switch enforcementMode {
+        case .soft_lock:
+            return "Skip and snooze unlock in \(max(0, minDisplaySeconds - Int(elapsed)))s."
+        case .hard_lock:
+            return "Skip and snooze unlock after the emergency timeout."
+        case .reminder:
+            return ""
         }
     }
 }

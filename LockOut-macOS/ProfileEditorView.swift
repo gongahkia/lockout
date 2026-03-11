@@ -50,20 +50,14 @@ struct ProfileEditorView: View {
                 Button("Create") {
                     let name = newProfileName.trimmingCharacters(in: .whitespaces)
                     guard !name.isEmpty else { return }
-                    let profile = AppProfile(name: name,
-                        customBreakTypes: scheduler.currentSettings.customBreakTypes,
-                        blockedBundleIDs: scheduler.currentSettings.blockedBundleIDs,
-                        idleThresholdMinutes: scheduler.currentSettings.idleThresholdMinutes)
+                    let profile = scheduler.currentSettings.profileSnapshot(name: name)
                     profiles.wrappedValue.append(profile)
                     newProfileName = ""
                 }
             }
             Button("Save Current Settings as New Profile") {
                 let name = "Profile \(profiles.wrappedValue.count + 1)"
-                let profile = AppProfile(name: name,
-                    customBreakTypes: scheduler.currentSettings.customBreakTypes,
-                    blockedBundleIDs: scheduler.currentSettings.blockedBundleIDs,
-                    idleThresholdMinutes: scheduler.currentSettings.idleThresholdMinutes)
+                let profile = scheduler.currentSettings.profileSnapshot(name: name)
                 profiles.wrappedValue.append(profile)
                 scheduler.currentSettings.activeProfileId = profile.id
             }
@@ -80,10 +74,7 @@ struct ProfileEditorView: View {
     }
 
     private func activateProfile(_ profile: AppProfile) {
-        scheduler.currentSettings.activeProfileId = profile.id
-        scheduler.currentSettings.customBreakTypes = profile.customBreakTypes
-        scheduler.currentSettings.blockedBundleIDs = profile.blockedBundleIDs
-        scheduler.currentSettings.idleThresholdMinutes = profile.idleThresholdMinutes
+        scheduler.currentSettings.apply(profile: profile)
         scheduler.reschedule(with: scheduler.currentSettings)
     }
 
@@ -117,6 +108,22 @@ struct ProfileDetailEditor: View {
             }
             Stepper("Idle threshold: \(profile.idleThresholdMinutes) min",
                     value: $profile.idleThresholdMinutes, in: 1...60)
+            Toggle("Pause during Focus Mode", isOn: $profile.pauseDuringFocus)
+            Toggle("Pause during Calendar events", isOn: $profile.pauseDuringCalendarEvents)
+            Picker("Calendar Filter", selection: $profile.calendarFilterMode) {
+                Text("All events").tag(CalendarFilterMode.all)
+                Text("Busy only").tag(CalendarFilterMode.busyOnly)
+                Text("Selected calendars").tag(CalendarFilterMode.selected)
+            }
+            Stepper("Notification lead: \(profile.notificationLeadMinutes) min",
+                    value: $profile.notificationLeadMinutes, in: 0...5)
+            Stepper("Snooze duration: \(profile.snoozeDurationMinutes) min",
+                    value: $profile.snoozeDurationMinutes, in: 1...30)
+            Picker("Break enforcement", selection: $profile.breakEnforcementMode) {
+                Text("Reminder").tag(BreakEnforcementMode.reminder)
+                Text("Soft Lock").tag(BreakEnforcementMode.soft_lock)
+                Text("Hard Lock").tag(BreakEnforcementMode.hard_lock)
+            }
             Button("Done") { onDone() }
                 .buttonStyle(.borderedProminent)
         }

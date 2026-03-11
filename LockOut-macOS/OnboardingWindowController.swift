@@ -1,15 +1,15 @@
 import AppKit
-import SwiftUI
 import EventKit
-import UserNotifications
 import LockOutCore
+import SwiftUI
+import UserNotifications
 
 final class OnboardingWindowController: NSWindowController {
     private static var instance: OnboardingWindowController?
 
     static func present(scheduler: BreakScheduler) {
         let win = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 480, height: 560),
+            contentRect: NSRect(x: 0, y: 0, width: 560, height: 620),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -23,158 +23,290 @@ final class OnboardingWindowController: NSWindowController {
     }
 }
 
+private enum OnboardingPreset: String, CaseIterable, Identifiable {
+    case developerFocus
+    case strictRecovery
+    case managerCalendarFirst
+    case writerGentleRoutine
+    case consultantMultiMac
+    case managedTeam
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .developerFocus: return "Developer Focus"
+        case .strictRecovery: return "Strict Recovery"
+        case .managerCalendarFirst: return "Manager Calendar-First"
+        case .writerGentleRoutine: return "Writer Gentle Routine"
+        case .consultantMultiMac: return "Consultant Multi-Mac"
+        case .managedTeam: return "Managed Team"
+        }
+    }
+
+    var summary: String {
+        switch self {
+        case .developerFocus:
+            return "Focus-aware reminders, workday scheduling, and a faster pre-break warning."
+        case .strictRecovery:
+            return "Stricter cadence and enforcement for users actively protecting eyes, posture, or RSI recovery."
+        case .managerCalendarFirst:
+            return "Meeting-aware breaks that stay out of the way during busy calendar blocks."
+        case .writerGentleRoutine:
+            return "A lighter rhythm for long writing sessions with fewer hard interruptions."
+        case .consultantMultiMac:
+            return "A sync-friendly setup designed to feel consistent across more than one Mac."
+        case .managedTeam:
+            return "A policy-friendly baseline for managed environments and mandatory break routines."
+        }
+    }
+
+    func applying(to settings: AppSettings) -> AppSettings {
+        var updated = settings
+        switch self {
+        case .developerFocus:
+            updated.pauseDuringFocus = true
+            updated.pauseDuringCalendarEvents = false
+            updated.workdayStartMinutes = 9 * 60
+            updated.workdayEndMinutes = 18 * 60
+            updated.notificationLeadMinutes = 2
+            updated.breakEnforcementMode = .reminder
+            updated.snoozeDurationMinutes = 5
+        case .strictRecovery:
+            updated.customBreakTypes = [
+                CustomBreakType(name: "Eye Break", intervalMinutes: 20, durationSeconds: 30, minDisplaySeconds: 15, tips: ["Look 20 feet away and blink slowly"], overlayOpacity: 0.9, snoozeMinutes: 3),
+                CustomBreakType(name: "Micro Break", intervalMinutes: 35, durationSeconds: 60, minDisplaySeconds: 20, tips: ["Drop your shoulders and loosen your grip"], overlayOpacity: 0.9, snoozeMinutes: 3),
+                CustomBreakType(name: "Long Break", intervalMinutes: 75, durationSeconds: 600, minDisplaySeconds: 30, tips: ["Stand up, stretch, and step away"], overlayOpacity: 0.95, snoozeMinutes: 5),
+            ]
+            updated.breakEnforcementMode = .hard_lock
+            updated.notificationLeadMinutes = 1
+            updated.snoozeDurationMinutes = 3
+            updated.pauseDuringFocus = false
+            updated.pauseDuringCalendarEvents = false
+        case .managerCalendarFirst:
+            updated.pauseDuringCalendarEvents = true
+            updated.calendarFilterMode = .busyOnly
+            updated.pauseDuringFocus = false
+            updated.workdayStartMinutes = 9 * 60
+            updated.workdayEndMinutes = 18 * 60
+            updated.notificationLeadMinutes = 5
+            updated.breakEnforcementMode = .reminder
+        case .writerGentleRoutine:
+            updated.customBreakTypes = [
+                CustomBreakType(name: "Eye Break", intervalMinutes: 25, durationSeconds: 20, minDisplaySeconds: 5, tips: ["Look past the screen and relax your gaze"], snoozeMinutes: 5),
+                CustomBreakType(name: "Micro Break", intervalMinutes: 60, durationSeconds: 45, minDisplaySeconds: 10, tips: ["Unclench your jaw and drop your shoulders"], snoozeMinutes: 5),
+                CustomBreakType(name: "Long Break", intervalMinutes: 120, durationSeconds: 600, minDisplaySeconds: 15, tips: ["Leave the desk and reset"], snoozeMinutes: 10),
+            ]
+            updated.breakEnforcementMode = .reminder
+            updated.notificationLeadMinutes = 1
+            updated.pauseDuringFocus = false
+            updated.pauseDuringCalendarEvents = false
+        case .consultantMultiMac:
+            updated.pauseDuringCalendarEvents = true
+            updated.calendarFilterMode = .busyOnly
+            updated.pauseDuringFocus = true
+            updated.workdayStartMinutes = 8 * 60 + 30
+            updated.workdayEndMinutes = 18 * 60
+            updated.notificationLeadMinutes = 2
+            updated.breakEnforcementMode = .soft_lock
+            updated.localOnlyMode = false
+        case .managedTeam:
+            updated.activeRole = .it_managed
+            updated.pauseDuringCalendarEvents = true
+            updated.pauseDuringFocus = true
+            updated.workdayStartMinutes = 9 * 60
+            updated.workdayEndMinutes = 17 * 60
+            updated.notificationLeadMinutes = 2
+            updated.breakEnforcementMode = .soft_lock
+            updated.snoozeDurationMinutes = 5
+        }
+        return updated
+    }
+}
+
 struct OnboardingView: View {
     let scheduler: BreakScheduler
     let onFinish: () -> Void
+
     @State private var page = 0
-    @State private var breatheScale: CGFloat = 0.5
+    @State private var selectedPreset: OnboardingPreset = .developerFocus
     @State private var enableCalendar = false
     @State private var enableFocus = false
 
+    private var appDelegate: AppDelegate? { NSApp.delegate as? AppDelegate }
+    private var managedSnapshot: ManagedSettingsSnapshot? { appDelegate?.managedSettings }
+    private var presets: [OnboardingPreset] {
+        managedSnapshot == nil ? OnboardingPreset.allCases : [.managedTeam]
+    }
+
     var body: some View {
         TabView(selection: $page) {
-            pageWelcome.tag(0)
-            pageBreaks.tag(1)
-            pageNotifications.tag(2)
-            pageIntegrations.tag(3)
-            pageCustomization.tag(4) // #17: new page
-            pageEnforcement.tag(5) // #17: new page
-            pageLaunch.tag(6)
+            presetSelection.tag(0)
+            permissionsPage.tag(1)
+            integrationsPage.tag(2)
+            launchPage.tag(3)
         }
         .tabViewStyle(.automatic)
-        .frame(width: 480, height: 560)
-    }
-
-    private var pageWelcome: some View {
-        VStack(spacing: 16) {
-            Spacer()
-            Image(systemName: "eye").font(.system(size: 72))
-            Text("20-20-20 Rule").font(.title).bold()
-            Text("Every 20 minutes, look at something 20 feet away for at least 20 seconds to reduce digital eye strain.")
-                .multilineTextAlignment(.center).foregroundStyle(.secondary)
-            Spacer()
-            Button("Next") { page = 1 }.buttonStyle(.borderedProminent)
-        }.padding(40)
-    }
-
-    private var pageBreaks: some View {
-        VStack(spacing: 16) {
-            Spacer()
-            Circle().fill(Color.blue.opacity(0.3)).frame(width: 80, height: 80).scaleEffect(breatheScale)
-                .onAppear {
-                    withAnimation(.easeInOut(duration: 4).repeatForever(autoreverses: true)) { breatheScale = 1 }
-                }
-            Text("Rest Breaks").font(.title).bold()
-            Text("Micro breaks (45 min) and long breaks (90 min) help reduce fatigue and keep you focused throughout the day.")
-                .multilineTextAlignment(.center).foregroundStyle(.secondary)
-            Spacer()
-            Button("Next") { page = 2 }.buttonStyle(.borderedProminent)
-        }.padding(40)
-    }
-
-    private var pageNotifications: some View {
-        VStack(spacing: 16) {
-            Spacer()
-            Image(systemName: "bell.badge").font(.system(size: 64))
-            Text("Break Reminders").font(.title).bold()
-            Text("LockOut sends a reminder before each break so you can wrap up your current task.")
-                .multilineTextAlignment(.center).foregroundStyle(.secondary)
-            Spacer()
-            HStack(spacing: 12) {
-                Button("Skip") { page = 3 }.buttonStyle(.bordered)
-                Button("Allow Notifications") {
-                    UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
-                    DispatchQueue.main.async { page = 3 }
-                }.buttonStyle(.borderedProminent)
+        .frame(width: 560, height: 620)
+        .onAppear {
+            if managedSnapshot != nil {
+                selectedPreset = .managedTeam
+                enableCalendar = scheduler.currentSettings.pauseDuringCalendarEvents
+                enableFocus = scheduler.currentSettings.pauseDuringFocus
             }
-        }.padding(40)
+        }
     }
 
-    private var pageIntegrations: some View {
-        VStack(spacing: 16) {
-            Spacer()
-            Image(systemName: "arrow.triangle.2.circlepath").font(.system(size: 64))
-            Text("Optional Integrations").font(.title).bold()
-            Text("LockOut can pause during calendar events or Focus Mode.")
-                .multilineTextAlignment(.center).foregroundStyle(.secondary)
-            Toggle("Pause during Calendar events", isOn: $enableCalendar)
-            Toggle("Pause during Focus Mode", isOn: $enableFocus)
+    private var presetSelection: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text("Choose a working style")
+                .font(.largeTitle).bold()
+            Text("LockOut will start with a preset tuned for how you work. You can refine it later in Settings and Profiles.")
+                .foregroundStyle(.secondary)
+
+            if let managedSnapshot {
+                Text("Your organization manages these settings: \(managedSnapshot.forcedKeys.map(\.displayName).sorted().joined(separator: ", "))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            ForEach(presets) { preset in
+                Button {
+                    selectedPreset = preset
+                } label: {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text(preset.title).font(.headline)
+                            Spacer()
+                            if selectedPreset == preset {
+                                Image(systemName: "checkmark.circle.fill").foregroundStyle(.blue)
+                            }
+                        }
+                        Text(preset.summary)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(selectedPreset == preset ? Color.accentColor.opacity(0.12) : Color.gray.opacity(0.08))
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(managedSnapshot != nil && preset != .managedTeam)
+            }
+
             Spacer()
             Button("Continue") {
-                scheduler.currentSettings.pauseDuringCalendarEvents = enableCalendar
-                scheduler.currentSettings.pauseDuringFocus = enableFocus
-                if enableCalendar {
+                applyPreset()
+                page = 1
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .padding(32)
+    }
+
+    private var permissionsPage: some View {
+        VStack(spacing: 18) {
+            Spacer()
+            Image(systemName: "bell.badge")
+                .font(.system(size: 64))
+            Text("Enable essential permissions")
+                .font(.title).bold()
+            Text("Notifications let LockOut warn you before a break. Calendar access powers selected-calendar and busy-time pauses.")
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.secondary)
+            HStack(spacing: 12) {
+                Button("Allow Notifications") {
+                    UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+                }
+                .buttonStyle(.borderedProminent)
+                Button("Allow Calendar Access") {
                     EKEventStore().requestFullAccessToEvents { _, _ in }
                 }
-                page = 4
-            }.buttonStyle(.borderedProminent)
-        }.padding(40)
-    }
-
-    // #17: custom break types explanation
-    private var pageCustomization: some View {
-        VStack(spacing: 16) {
-            Spacer()
-            Image(systemName: "slider.horizontal.3").font(.system(size: 64))
-            Text("Custom Break Types").font(.title).bold()
-            Text("Create your own break types with custom intervals, durations, overlay colors, and tips. Find them in Schedule from the sidebar.")
-                .multilineTextAlignment(.center).foregroundStyle(.secondary)
-            VStack(alignment: .leading, spacing: 8) {
-                Label("Profiles let you switch break configs for different contexts", systemImage: "person.2")
-                Label("Track your compliance in Statistics with charts and streaks", systemImage: "chart.bar")
-                Label("Use the global snooze hotkey for quick snooze from any app", systemImage: "keyboard")
+                .buttonStyle(.bordered)
             }
-            .font(.callout).foregroundStyle(.secondary)
             Spacer()
-            Button("Next") { page = 5 }.buttonStyle(.borderedProminent)
-        }.padding(40)
+            Button("Next") { page = 2 }
+                .buttonStyle(.borderedProminent)
+        }
+        .padding(40)
     }
 
-    // #17: enforcement modes explanation
-    private var pageEnforcement: some View {
-        VStack(spacing: 16) {
+    private var integrationsPage: some View {
+        VStack(spacing: 18) {
             Spacer()
-            Image(systemName: "lock.shield").font(.system(size: 64))
-            Text("Break Enforcement").font(.title).bold()
-            Text("Choose how strictly breaks are enforced:")
-                .multilineTextAlignment(.center).foregroundStyle(.secondary)
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .top) {
-                    Text("Reminder").bold().frame(width: 80, alignment: .leading)
-                    Text("Gentle overlay you can dismiss anytime")
-                }
-                HStack(alignment: .top) {
-                    Text("Soft Lock").bold().frame(width: 80, alignment: .leading)
-                    Text("Must wait before skipping (emergency exit after 30s)")
-                }
-                HStack(alignment: .top) {
-                    Text("Hard Lock").bold().frame(width: 80, alignment: .leading)
-                    Text("Can't skip easily (emergency exit always available after 30s)")
-                }
+            Image(systemName: "slider.horizontal.3")
+                .font(.system(size: 64))
+            Text("Confirm live integrations")
+                .font(.title).bold()
+            Text("Use these only where they help. Managed settings are shown but cannot be changed here.")
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.secondary)
+
+            Toggle("Pause during Calendar events", isOn: $enableCalendar)
+                .disabled(isManaged(.pauseDuringCalendarEvents))
+            Toggle("Pause during Focus Mode", isOn: $enableFocus)
+                .disabled(isManaged(.pauseDuringFocus))
+
+            if let managedSnapshot {
+                Text("Managed setup active from \(managedSnapshot.metadata.source).")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-            .font(.callout).foregroundStyle(.secondary)
-            Text("You can always change this in Settings.")
-                .font(.caption).foregroundStyle(.tertiary)
+
             Spacer()
-            Button("Next") { page = 6 }.buttonStyle(.borderedProminent)
-        }.padding(40)
+            Button("Next") {
+                scheduler.currentSettings.pauseDuringCalendarEvents = enableCalendar
+                scheduler.currentSettings.pauseDuringFocus = enableFocus
+                if let appDelegate {
+                    scheduler.reschedule(with: appDelegate.applyManagedSettings(to: scheduler.currentSettings))
+                } else {
+                    scheduler.reschedule(with: scheduler.currentSettings)
+                }
+                page = 3
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .padding(40)
     }
 
-    private var pageLaunch: some View {
-        VStack(spacing: 16) {
+    private var launchPage: some View {
+        VStack(spacing: 18) {
             Spacer()
-            Toggle("Launch at Login", isOn: Binding(
-                get: { LaunchAtLoginService.isEnabled },
-                set: { $0 ? LaunchAtLoginService.enable() : LaunchAtLoginService.disable() }
-            ))
-            Text("Tip: LockOut lives in your menu bar. Click the eye icon to access all features.")
-                .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
+            Toggle(
+                "Launch at Login",
+                isOn: Binding(
+                    get: { LaunchAtLoginService.isEnabled },
+                    set: { $0 ? LaunchAtLoginService.enable() : LaunchAtLoginService.disable() }
+                )
+            )
+            Text("Preset: \(selectedPreset.title)")
+                .font(.headline)
+            Text("LockOut lives in your menu bar. You can change your preset later by saving a full profile in the app.")
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.secondary)
             Spacer()
             Button("Get Started") {
                 UserDefaults.standard.set(true, forKey: "hasOnboarded")
-                UserDefaults.standard.set(true, forKey: "hasSeenMainWindow") // #18
+                UserDefaults.standard.set(true, forKey: "hasSeenMainWindow")
                 onFinish()
-            }.buttonStyle(.borderedProminent)
-        }.padding(40)
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .padding(40)
+    }
+
+    private func applyPreset() {
+        let presetSettings = selectedPreset.applying(to: scheduler.currentSettings)
+        let resolved = appDelegate?.applyManagedSettings(to: presetSettings) ?? presetSettings
+        scheduler.reschedule(with: resolved)
+        enableCalendar = resolved.pauseDuringCalendarEvents
+        enableFocus = resolved.pauseDuringFocus
+    }
+
+    private func isManaged(_ key: ManagedSettingsKey) -> Bool {
+        managedSnapshot?.isForced(key) ?? false
     }
 }

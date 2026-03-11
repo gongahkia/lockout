@@ -1,16 +1,33 @@
-import Foundation
 import Combine
+import Foundation
+
+public struct ScheduledBreakContext: Equatable, Sendable {
+    public let customTypeID: UUID
+    public let scheduledAt: Date
+
+    public init(customTypeID: UUID, scheduledAt: Date) {
+        self.customTypeID = customTypeID
+        self.scheduledAt = scheduledAt
+    }
+}
 
 @MainActor
 public final class BreakScheduler: ObservableObject {
     @Published public var nextBreak: (customTypeID: UUID, fireDate: Date)?
     @Published public var currentSettings: AppSettings
+    @Published public private(set) var activePauseReasons: Set<PauseReason>
+    @Published public private(set) var pendingDeferredBreak: ScheduledBreakContext?
 
-    var timers: [UUID: Timer] = [:] // internal for testability
-    private static let persistedFireDatesKey = "lockout_persisted_fire_dates" // #5
+    public var onBreakTriggered: ((CustomBreakType, ScheduledBreakContext) -> Void)?
+
+    var timers: [UUID: Timer] = [:]
+
+    private var activeBreakContext: ScheduledBreakContext?
+    private static let persistedFireDatesKey = "lockout_persisted_fire_dates"
 
     public init(settings: AppSettings = .defaults) {
         self.currentSettings = settings
+        self.activePauseReasons = settings.isPaused ? [.manual] : []
     }
 
     deinit {
@@ -18,21 +35,68 @@ public final class BreakScheduler: ObservableObject {
         timers.removeAll()
     }
 
+    public var isPaused: Bool {
+        !activePauseReasons.isEmpty
+    }
+
+    public var primaryPauseReason: PauseReason? {
+        let ordered = PauseReason.allCases.filter { activePauseReasons.contains($0) }
+        return ordered.first
+    }
+
+    public var pauseStatusLabel: String? {
+        primaryPauseReason.map { "Paused: \($0.displayName)" }
+    }
+
+    public var pendingDeferredSummary: String? {
+        guard let pendingDeferredBreak,
+              let customType = currentSettings.customBreakTypes.first(where: { $0.id == pendingDeferredBreak.customTypeID }) else { return nil }
+        return "Pending deferred: \(customType.name)"
+    }
+
+    public var currentCustomBreakType: CustomBreakType? {
+        if let context = activeBreakContext {
+            return currentSettings.customBreakTypes.first { $0.id == context.customTypeID }
+        }
+        if let pendingDeferredBreak {
+            return currentSettings.customBreakTypes.first { $0.id == pendingDeferredBreak.customTypeID }
+        }
+        guard let customTypeID = nextBreak?.customTypeID else { return nil }
+        return currentSettings.customBreakTypes.first { $0.id == customTypeID }
+    }
+
+    public var allUpcomingBreaks: [(customTypeID: UUID, name: String, fireDate: Date)] {
+        timers.compactMap { (id, timer) in
+            guard let ct = currentSettings.customBreakTypes.first(where: { $0.id == id }) else { return nil }
+            return (customTypeID: id, name: ct.name, fireDate: timer.fireDate)
+        }.sorted { $0.fireDate < $1.fireDate }
+    }
+
+    public func breakContextForPresentation() -> ScheduledBreakContext? {
+        activeBreakContext ?? pendingDeferredBreak ?? nextBreak.map { ScheduledBreakContext(customTypeID: $0.customTypeID, scheduledAt: $0.fireDate) }
+    }
+
     public func start(settings: AppSettings, offsetSeconds: TimeInterval = 0) {
         stop()
         currentSettings = settings
-        guard !settings.isPaused else {
+        if settings.isPaused && activePauseReasons.isEmpty {
+            activePauseReasons = [.manual]
+        }
+        currentSettings.isPaused = isPaused || settings.isPaused
+        guard !currentSettings.isPaused else {
+            nextBreak = nil
             Observability.emit(category: "BreakScheduler", message: "start skipped: paused")
             return
         }
         Observability.emit(category: "BreakScheduler", message: "starting with offset=\(offsetSeconds)s, \(settings.customBreakTypes.filter(\.enabled).count) types")
         let now = Date()
-        let persisted = Self.loadPersistedFireDates() // #5
+        let persisted = Self.loadPersistedFireDates()
         var soonest: (customTypeID: UUID, fireDate: Date)?
         for customType in settings.customBreakTypes.filter(\.enabled) {
             let id = customType.id
+            if pendingDeferredBreak?.customTypeID == id { continue }
             let fireDate: Date
-            if let saved = persisted[id.uuidString], saved > now { // #5: reuse persisted date if still in future
+            if let saved = persisted[id.uuidString], saved > now {
                 fireDate = saved
             } else {
                 let requested = now.addingTimeInterval(Double(customType.intervalMinutes) * 60 - offsetSeconds)
@@ -41,24 +105,19 @@ public final class BreakScheduler: ObservableObject {
             scheduleTimer(for: id, fireDate: fireDate)
             if soonest == nil || fireDate < soonest!.fireDate { soonest = (customTypeID: id, fireDate: fireDate) }
         }
-        if let soonest {
-            nextBreak = (customTypeID: soonest.customTypeID, fireDate: soonest.fireDate)
-        } else {
-            nextBreak = nil
-        }
-        persistFireDates() // #5
+        nextBreak = soonest
+        persistFireDates()
     }
 
-    private func legacyBreakType(forCustomTypeID id: UUID) -> BreakType {
-        guard let idx = currentSettings.customBreakTypes.firstIndex(where: { $0.id == id }) else {
-            return .eye
-        }
-        switch idx {
-        case 0: return .eye
-        case 1: return .micro
-        case 2: return .long
-        default: return .eye
-        }
+    public func stop() {
+        timers.values.forEach { $0.invalidate() }
+        timers.removeAll()
+        nextBreak = nil
+    }
+
+    public func triggerBreak(_ customType: CustomBreakType) {
+        let context = ScheduledBreakContext(customTypeID: customType.id, scheduledAt: Date())
+        onBreakTriggered?(customType, context)
     }
 
     public func breakType(for customType: CustomBreakType) -> BreakType {
@@ -68,100 +127,143 @@ public final class BreakScheduler: ObservableObject {
         return legacyBreakType(forCustomTypeID: customType.id)
     }
 
-    public func stop() {
-        timers.values.forEach { $0.invalidate() }
-        timers.removeAll()
+    public func beginBreakPresentation(_ context: ScheduledBreakContext) {
+        activeBreakContext = context
+        if pendingDeferredBreak == context {
+            pendingDeferredBreak = nil
+        }
+        if timers[context.customTypeID] == nil,
+           let customType = currentSettings.customBreakTypes.first(where: { $0.id == context.customTypeID }),
+           customType.enabled,
+           !isPaused {
+            let nextFireDate = Date().addingTimeInterval(Double(customType.intervalMinutes) * 60)
+            scheduleTimer(for: context.customTypeID, fireDate: nextFireDate)
+        }
+        refreshNextBreak()
+        persistFireDates()
     }
 
-    public var onBreakTriggered: ((CustomBreakType) -> Void)?
-
-    public func triggerBreak(_ customType: CustomBreakType) {
-        onBreakTriggered?(customType)
-    }
-
-    public var currentCustomBreakType: CustomBreakType? {
-        guard let customTypeID = nextBreak?.customTypeID else { return nil }
-        return currentSettings.customBreakTypes.first { $0.id == customTypeID }
-    }
-
-    // #22: all upcoming fire dates for display
-    public var allUpcomingBreaks: [(customTypeID: UUID, name: String, fireDate: Date)] {
-        timers.compactMap { (id, timer) in
-            guard let ct = currentSettings.customBreakTypes.first(where: { $0.id == id }) else { return nil }
-            return (customTypeID: id, name: ct.name, fireDate: timer.fireDate)
-        }.sorted { $0.fireDate < $1.fireDate }
-    }
-
-    public func snooze(minutes: Int? = nil, repository: BreakHistoryRepository? = nil, cloudSync: CloudKitSyncService? = nil) {
-        let savedNextBreak = nextBreak // #23: capture before stop()
-        let breakTypeName = currentCustomBreakType?.name
-        let mins = minutes ?? currentCustomBreakType?.snoozeMinutes ?? currentSettings.snoozeDurationMinutes
-        guard mins > 0 else { return }
-        let clamped = min(mins, 60)
-        Observability.emit(category: "BreakScheduler", message: "snoozed \(clamped)min break=\(breakTypeName ?? "unknown")")
-        if let repository, let nb = savedNextBreak { // #23: use saved value
-            let session = BreakSession(type: legacyBreakType(forCustomTypeID: nb.customTypeID), scheduledAt: nb.fireDate, status: .snoozed, breakTypeName: breakTypeName)
+    public func registerDeferredBreak(_ context: ScheduledBreakContext, repository: BreakHistoryRepository, cloudSync: CloudKitSyncService? = nil) {
+        Observability.emit(category: "BreakScheduler", message: "deferred break=\(customTypeName(for: context.customTypeID) ?? "unknown")")
+        if pendingDeferredBreak != context {
+            let session = BreakSession(
+                type: legacyBreakType(forCustomTypeID: context.customTypeID),
+                scheduledAt: context.scheduledAt,
+                status: .deferred,
+                breakTypeName: customTypeName(for: context.customTypeID)
+            )
             repository.save(session)
             if !currentSettings.localOnlyMode, let cloudSync {
                 Task { await cloudSync.uploadSession(session) }
             }
         }
+        activeBreakContext = nil
+        pendingDeferredBreak = context
+        refreshNextBreak()
+        persistFireDates()
+    }
+
+    public func clearPendingDeferredBreak() {
+        pendingDeferredBreak = nil
+    }
+
+    public func snooze(minutes: Int? = nil, repository: BreakHistoryRepository? = nil, cloudSync: CloudKitSyncService? = nil) {
+        let context = breakContextForPresentation()
+        let breakTypeName = currentCustomBreakType?.name
+        let mins = minutes ?? currentCustomBreakType?.snoozeMinutes ?? currentSettings.snoozeDurationMinutes
+        guard mins > 0 else { return }
+        let clamped = min(mins, 60)
+        Observability.emit(category: "BreakScheduler", message: "snoozed \(clamped)min break=\(breakTypeName ?? "unknown")")
+        if let repository, let context {
+            let session = BreakSession(
+                type: legacyBreakType(forCustomTypeID: context.customTypeID),
+                scheduledAt: context.scheduledAt,
+                status: .snoozed,
+                breakTypeName: breakTypeName
+            )
+            repository.save(session)
+            if !currentSettings.localOnlyMode, let cloudSync {
+                Task { await cloudSync.uploadSession(session) }
+            }
+        }
+        activeBreakContext = nil
+        pendingDeferredBreak = nil
         stop()
-        guard var nb = savedNextBreak else { return } // #23: use saved value
-        nb.fireDate = Date().addingTimeInterval(Double(clamped) * 60)
-        nextBreak = nb
-        let customTypeID = nb.customTypeID
-        scheduleTimer(for: customTypeID, fireDate: nb.fireDate)
-        persistFireDates() // #5
+        guard let context else { return }
+        nextBreak = (customTypeID: context.customTypeID, fireDate: Date().addingTimeInterval(Double(clamped) * 60))
+        scheduleTimer(for: context.customTypeID, fireDate: nextBreak!.fireDate)
+        persistFireDates()
     }
 
     public func skip(repository: BreakHistoryRepository, cloudSync: CloudKitSyncService? = nil) {
+        let context = breakContextForPresentation()
         Observability.emit(category: "BreakScheduler", message: "skipped break=\(currentCustomBreakType?.name ?? "unknown")")
-        guard let nb = nextBreak else { return }
-        let session = BreakSession(type: legacyBreakType(forCustomTypeID: nb.customTypeID), scheduledAt: nb.fireDate, status: .skipped, breakTypeName: currentCustomBreakType?.name)
+        guard let context else { return }
+        let session = BreakSession(
+            type: legacyBreakType(forCustomTypeID: context.customTypeID),
+            scheduledAt: context.scheduledAt,
+            status: .skipped,
+            breakTypeName: currentCustomBreakType?.name
+        )
         repository.save(session)
         if !currentSettings.localOnlyMode, let cloudSync {
             Task { await cloudSync.uploadSession(session) }
         }
+        activeBreakContext = nil
+        pendingDeferredBreak = nil
         reschedule(with: currentSettings)
     }
 
     public func markCompleted(repository: BreakHistoryRepository, cloudSync: CloudKitSyncService? = nil) {
+        let context = breakContextForPresentation()
         Observability.emit(category: "BreakScheduler", message: "completed break=\(currentCustomBreakType?.name ?? "unknown")")
-        guard let nb = nextBreak else { return }
-        let session = BreakSession(type: legacyBreakType(forCustomTypeID: nb.customTypeID), scheduledAt: nb.fireDate, endedAt: Date(), status: .completed, breakTypeName: currentCustomBreakType?.name)
+        guard let context else { return }
+        let session = BreakSession(
+            type: legacyBreakType(forCustomTypeID: context.customTypeID),
+            scheduledAt: context.scheduledAt,
+            endedAt: Date(),
+            status: .completed,
+            breakTypeName: currentCustomBreakType?.name
+        )
         repository.save(session)
         if !currentSettings.localOnlyMode, let cloudSync {
             Task { await cloudSync.uploadSession(session) }
         }
+        activeBreakContext = nil
+        pendingDeferredBreak = nil
         reschedule(with: currentSettings)
     }
 
-    public func markDeferred(repository: BreakHistoryRepository, cloudSync: CloudKitSyncService? = nil) {
-        Observability.emit(category: "BreakScheduler", message: "deferred break=\(currentCustomBreakType?.name ?? "unknown")")
-        guard let nb = nextBreak else { return }
-        let session = BreakSession(type: legacyBreakType(forCustomTypeID: nb.customTypeID), scheduledAt: nb.fireDate, status: .deferred, breakTypeName: currentCustomBreakType?.name)
-        repository.save(session)
-        if !currentSettings.localOnlyMode, let cloudSync {
-            Task { await cloudSync.uploadSession(session) }
+    public func pause(reason: PauseReason = .manual) {
+        let inserted = activePauseReasons.insert(reason).inserted
+        currentSettings.isPaused = true
+        AppSettingsStore.save(currentSettings)
+        guard inserted else { return }
+        Observability.emit(category: "BreakScheduler", message: "paused reason=\(reason.rawValue)")
+        stop()
+        Self.clearPersistedFireDates()
+    }
+
+    public func resume(reason: PauseReason = .manual) {
+        guard activePauseReasons.contains(reason) else { return }
+        activePauseReasons.remove(reason)
+        currentSettings.isPaused = !activePauseReasons.isEmpty
+        AppSettingsStore.save(currentSettings)
+        guard activePauseReasons.isEmpty else {
+            let reasons = activePauseReasons.map { $0.rawValue }.sorted()
+            Observability.emit(category: "BreakScheduler", message: "resume blocked by remaining reasons=\(reasons)")
+            return
         }
-        reschedule(with: currentSettings)
+        Observability.emit(category: "BreakScheduler", message: "resumed")
+        start(settings: currentSettings)
     }
 
     public func pause() {
-        Observability.emit(category: "BreakScheduler", message: "paused")
-        stop()
-        currentSettings.isPaused = true
-        nextBreak = nil
-        AppSettingsStore.save(currentSettings)
-        Self.clearPersistedFireDates() // #5
+        pause(reason: .manual)
     }
 
     public func resume() {
-        Observability.emit(category: "BreakScheduler", message: "resumed")
-        currentSettings.isPaused = false
-        AppSettingsStore.save(currentSettings)
-        start(settings: currentSettings)
+        resume(reason: .manual)
     }
 
     public func reschedule(with settings: AppSettings) {
@@ -179,6 +281,54 @@ public final class BreakScheduler: ObservableObject {
             Task { @MainActor [weak self] in self?.timerFired(customTypeID: customTypeID) }
         }
         timers[customTypeID] = timer
+        refreshNextBreak()
+    }
+
+    private func timerFired(customTypeID: UUID) {
+        let scheduledAt = timers[customTypeID]?.fireDate ?? Date()
+        timers[customTypeID]?.invalidate()
+        timers.removeValue(forKey: customTypeID)
+        guard let customType = currentSettings.customBreakTypes.first(where: { $0.id == customTypeID }) else {
+            refreshNextBreak()
+            persistFireDates()
+            return
+        }
+        let context = ScheduledBreakContext(customTypeID: customTypeID, scheduledAt: scheduledAt)
+        Observability.emit(category: "BreakScheduler", message: "timer fired: \(customType.name) (interval=\(customType.intervalMinutes)min)")
+        if let onBreakTriggered {
+            onBreakTriggered(customType, context)
+        } else {
+            beginBreakPresentation(context)
+        }
+        refreshNextBreak()
+        persistFireDates()
+    }
+
+    private func refreshNextBreak() {
+        let pending = timers.compactMap { (id, timer) -> (UUID, Date)? in
+            (id, timer.fireDate)
+        }.min(by: { $0.1 < $1.1 })
+        if let (id, date) = pending {
+            nextBreak = (customTypeID: id, fireDate: date)
+        } else {
+            nextBreak = nil
+        }
+    }
+
+    private func customTypeName(for customTypeID: UUID) -> String? {
+        currentSettings.customBreakTypes.first(where: { $0.id == customTypeID })?.name
+    }
+
+    private func legacyBreakType(forCustomTypeID id: UUID) -> BreakType {
+        guard let idx = currentSettings.customBreakTypes.firstIndex(where: { $0.id == id }) else {
+            return .eye
+        }
+        switch idx {
+        case 0: return .eye
+        case 1: return .micro
+        case 2: return .long
+        default: return .eye
+        }
     }
 
     private func clampedFireDate(for customTypeID: UUID, requestedFireDate: Date) -> Date {
@@ -196,27 +346,6 @@ public final class BreakScheduler: ObservableObject {
         return now.addingTimeInterval(delay)
     }
 
-    private func timerFired(customTypeID: UUID) {
-        if let customType = currentSettings.customBreakTypes.first(where: { $0.id == customTypeID }) {
-            Observability.emit(category: "BreakScheduler", message: "timer fired: \(customType.name) (interval=\(customType.intervalMinutes)min)")
-            onBreakTriggered?(customType)
-            if customType.enabled && !currentSettings.isPaused {
-                let nextFireDate = Date().addingTimeInterval(Double(customType.intervalMinutes) * 60)
-                scheduleTimer(for: customTypeID, fireDate: nextFireDate)
-            }
-        }
-        let pending = timers.compactMap { (id, timer) -> (UUID, Date)? in
-            (id, timer.fireDate)
-        }.min(by: { $0.1 < $1.1 })
-        if let (id, d) = pending {
-            nextBreak = (customTypeID: id, fireDate: d)
-        } else {
-            nextBreak = (customTypeID: customTypeID, fireDate: Date())
-        }
-        persistFireDates() // #5
-    }
-
-    // MARK: - #5 Persist absolute fire dates
     private func persistFireDates() {
         var dict: [String: Date] = [:]
         for (id, timer) in timers {

@@ -11,32 +11,32 @@ final class BreakOverlayWindowController {
     private let cloudSync: CloudKitSyncService
     private var audioPlayer: AVAudioPlayer?
 
+    var isShowingOverlay: Bool { !windows.isEmpty }
+
     init(scheduler: BreakScheduler, repository: BreakHistoryRepository, cloudSync: CloudKitSyncService) {
         self.scheduler = scheduler
         self.repo = repository
         self.cloudSync = cloudSync
     }
 
-    func show(breakType: BreakType, duration: Int, minDisplaySeconds: Int = 5) {
+    @discardableResult
+    func show(breakType: BreakType, duration: Int, minDisplaySeconds: Int = 5, scheduledAt: Date) -> Bool {
         guard windows.isEmpty else {
             FileLogger.shared.log(.debug, category: "Overlay", "show skipped: overlay already visible")
-            return
+            return false
         }
         guard !SystemStateService.isScreenLocked() else {
             FileLogger.shared.log(.info, category: "Overlay", "deferred: screen locked")
-            scheduler.markDeferred(repository: repo, cloudSync: cloudSync)
-            return
+            return false
         }
         guard !SystemStateService.frontmostAppIsFullscreen() else {
             FileLogger.shared.log(.info, category: "Overlay", "deferred: fullscreen app active")
-            scheduler.markDeferred(repository: repo, cloudSync: cloudSync)
-            return
+            return false
         }
         let frontmostID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? ""
         if scheduler.currentSettings.blockedBundleIDs.contains(frontmostID) {
             FileLogger.shared.log(.info, category: "Overlay", "deferred: blocked app \(frontmostID)")
-            scheduler.markDeferred(repository: repo, cloudSync: cloudSync)
-            return
+            return false
         }
         FileLogger.shared.log(.info, category: "Overlay", "showing break=\(breakType.rawValue) duration=\(duration)s screens=\(NSScreen.screens.count)")
         let customType = scheduler.currentCustomBreakType
@@ -64,6 +64,7 @@ final class BreakOverlayWindowController {
                 breakType: breakType,
                 duration: duration,
                 minDisplaySeconds: minDisplaySeconds,
+                scheduledAt: scheduledAt,
                 scheduler: scheduler,
                 repository: repo,
                 cloudSync: cloudSync
@@ -86,6 +87,7 @@ final class BreakOverlayWindowController {
             }
             windows.append(win)
         }
+        return true
     }
 
     private func playBreakSound(_ soundName: String?) {

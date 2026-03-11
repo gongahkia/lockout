@@ -20,6 +20,9 @@ struct ScheduleView: View {
     @State private var editingIndex: Int? = nil
     @State private var showEditor = false
 
+    private var appDelegate: AppDelegate? { NSApp.delegate as? AppDelegate }
+    private var breakTypesLocked: Bool { appDelegate?.managedSettings?.isForced(.customBreakTypes) ?? false }
+
     private var customTypes: Binding<[CustomBreakType]> {
         Binding(
             get: { scheduler.currentSettings.customBreakTypes },
@@ -35,29 +38,33 @@ struct ScheduleView: View {
                         HStack {
                             Toggle("", isOn: customTypes[i].enabled)
                                 .labelsHidden()
+                                .disabled(breakTypesLocked)
                             Text(customTypes.wrappedValue[i].name)
                             Spacer()
                             Text("\(customTypes.wrappedValue[i].intervalMinutes)m / \(customTypes.wrappedValue[i].durationSeconds)s")
                                 .foregroundStyle(.secondary).font(.caption)
                             Button("Edit") { editingIndex = i; showEditor = true }
                                 .buttonStyle(.plain)
+                                .disabled(breakTypesLocked)
                         }
                     }
-                    .onDelete { customTypes.wrappedValue.remove(atOffsets: $0); reschedule() }
-                    .onMove { customTypes.wrappedValue.move(fromOffsets: $0, toOffset: $1); reschedule() }
+                    .onDelete { if !breakTypesLocked { customTypes.wrappedValue.remove(atOffsets: $0); reschedule() } }
+                    .onMove { if !breakTypesLocked { customTypes.wrappedValue.move(fromOffsets: $0, toOffset: $1); reschedule() } }
                 }
                 Button("Add Break Type") {
-                    var newType = CustomBreakType(name: "New Break", intervalMinutes: 30, durationSeconds: 60)
+                    let newType = CustomBreakType(name: "New Break", intervalMinutes: 30, durationSeconds: 60)
                     scheduler.currentSettings.customBreakTypes.append(newType)
                     editingIndex = scheduler.currentSettings.customBreakTypes.count - 1
                     showEditor = true
                     reschedule()
                 }
+                .disabled(breakTypesLocked)
             }
             Button("Restore Defaults") {
                 scheduler.currentSettings.customBreakTypes = AppSettings.defaultCustomBreakTypes
                 scheduler.reschedule(with: scheduler.currentSettings)
             }
+            .disabled(breakTypesLocked)
         }
         .padding(24)
         .navigationTitle("Schedule")

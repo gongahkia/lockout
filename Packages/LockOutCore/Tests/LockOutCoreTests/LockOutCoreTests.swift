@@ -74,7 +74,7 @@ final class BreakSchedulerTests: XCTestCase {
         scheduler = BreakScheduler(settings: settings)
 
         let exp = expectation(description: "onBreakTriggered called")
-        scheduler.onBreakTriggered = { fired in
+        scheduler.onBreakTriggered = { fired, _ in
             if fired.id == custom.id { exp.fulfill() }
         }
 
@@ -716,5 +716,132 @@ final class SettingsSyncSizeTests: XCTestCase {
         svc.push(settings)
         let loaded = AppSettingsStore.load()
         XCTAssertNotNil(loaded)
+    }
+}
+
+final class ManagedSettingsResolverTests: XCTestCase {
+    func testApplyOverridesOnlyForcedKeys() {
+        var local = AppSettings.defaults
+        local.pauseDuringFocus = false
+        local.breakEnforcementMode = .reminder
+
+        var managed = AppSettings.defaults
+        managed.pauseDuringFocus = true
+        managed.breakEnforcementMode = .hard_lock
+
+        let snapshot = ManagedSettingsSnapshot(
+            settings: managed,
+            forcedKeys: [.pauseDuringFocus, .breakEnforcementMode]
+        )
+
+        let resolved = ManagedSettingsResolver.apply(snapshot, to: local)
+        XCTAssertTrue(resolved.pauseDuringFocus)
+        XCTAssertEqual(resolved.breakEnforcementMode, .hard_lock)
+        XCTAssertEqual(resolved.snoozeDurationMinutes, local.snoozeDurationMinutes)
+    }
+
+    func testResolveUsesManagedOverridesAfterMerge() {
+        var local = AppSettings.defaults
+        local.pauseDuringFocus = false
+
+        var remote = AppSettings.defaults
+        remote.pauseDuringFocus = true
+        remote.notificationLeadMinutes = 5
+
+        var managed = AppSettings.defaults
+        managed.notificationLeadMinutes = 0
+        let snapshot = ManagedSettingsSnapshot(settings: managed, forcedKeys: [.notificationLeadMinutes])
+
+        let resolved = ManagedSettingsResolver.resolve(local: local, remote: remote, managed: snapshot)
+        XCTAssertTrue(resolved.pauseDuringFocus)
+        XCTAssertEqual(resolved.notificationLeadMinutes, 0)
+    }
+}
+
+final class ProfileSnapshotTests: XCTestCase {
+    func testProfileSnapshotRoundTripRestoresRoutineFields() {
+        var settings = AppSettings.defaults
+        settings.pauseDuringFocus = true
+        settings.pauseDuringCalendarEvents = true
+        settings.calendarFilterMode = .selected
+        settings.filteredCalendarIDs = ["work"]
+        settings.workdayStartMinutes = 540
+        settings.workdayEndMinutes = 1020
+        settings.notificationLeadMinutes = 3
+        settings.breakEnforcementMode = .soft_lock
+        settings.snoozeDurationMinutes = 7
+
+        let profile = settings.profileSnapshot(name: "Workday")
+
+        var restored = AppSettings.defaults
+        restored.apply(profile: profile)
+
+        XCTAssertEqual(restored.pauseDuringFocus, settings.pauseDuringFocus)
+        XCTAssertEqual(restored.pauseDuringCalendarEvents, settings.pauseDuringCalendarEvents)
+        XCTAssertEqual(restored.calendarFilterMode, settings.calendarFilterMode)
+        XCTAssertEqual(restored.filteredCalendarIDs, settings.filteredCalendarIDs)
+        XCTAssertEqual(restored.workdayStartMinutes, settings.workdayStartMinutes)
+        XCTAssertEqual(restored.workdayEndMinutes, settings.workdayEndMinutes)
+        XCTAssertEqual(restored.notificationLeadMinutes, settings.notificationLeadMinutes)
+        XCTAssertEqual(restored.breakEnforcementMode, settings.breakEnforcementMode)
+        XCTAssertEqual(restored.snoozeDurationMinutes, settings.snoozeDurationMinutes)
+    }
+}
+
+@MainActor
+final class DeferredBreakTests: XCTestCase {
+    func testRegisterDeferredBreakCreatesPendingContext() throws {
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: BreakSessionRecord.self, configurations: config)
+        let repo = BreakHistoryRepository(modelContext: ModelContext(container))
+        let scheduler = BreakScheduler(settings: .defaults)
+        scheduler.start(settings: .defaults)
+
+        let customType = try XCTUnwrap(scheduler.currentSettings.customBreakTypes.first)
+        let context = ScheduledBreakContext(customTypeID: customType.id, scheduledAt: Date())
+
+        scheduler.registerDeferredBreak(context, repository: repo)
+
+        XCTAssertEqual(scheduler.pendingDeferredBreak, context)
+        XCTAssertEqual(repo.fetchSessions(from: .distantPast, to: .distantFuture).first?.status, .deferred)
+    }
+
+    func testPauseReasonsStackAndClearIndependently() {
+        let scheduler = BreakScheduler(settings: .defaults)
+        scheduler.start(settings: .defaults)
+
+        scheduler.pause(reason: .manual)
+        scheduler.pause(reason: .calendar)
+        XCTAssertTrue(scheduler.isPaused)
+        XCTAssertEqual(scheduler.primaryPauseReason, .manual)
+
+        scheduler.resume(reason: .manual)
+        XCTAssertTrue(scheduler.isPaused)
+        XCTAssertEqual(scheduler.primaryPauseReason, .calendar)
+
+        scheduler.resume(reason: .calendar)
+        XCTAssertFalse(scheduler.isPaused)
+    }
+}
+
+@MainActor
+final class DailyStatsAggregationTests: XCTestCase {
+    func testDailyStatsTrackAllStatusesAndComplianceIgnoresDeferred() throws {
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: BreakSessionRecord.self, configurations: config)
+        let repo = BreakHistoryRepository(modelContext: ModelContext(container))
+        let now = Date()
+
+        repo.save(BreakSession(type: .eye, scheduledAt: now.addingTimeInterval(-4), status: .completed))
+        repo.save(BreakSession(type: .eye, scheduledAt: now.addingTimeInterval(-3), status: .skipped))
+        repo.save(BreakSession(type: .eye, scheduledAt: now.addingTimeInterval(-2), status: .snoozed))
+        repo.save(BreakSession(type: .eye, scheduledAt: now.addingTimeInterval(-1), status: .deferred))
+
+        let stats = try XCTUnwrap(repo.dailyStats(for: 1).first)
+        XCTAssertEqual(stats.completed, 1)
+        XCTAssertEqual(stats.skipped, 1)
+        XCTAssertEqual(stats.snoozed, 1)
+        XCTAssertEqual(stats.deferred, 1)
+        XCTAssertEqual(stats.complianceRate, 1.0 / 3.0, accuracy: 0.001)
     }
 }

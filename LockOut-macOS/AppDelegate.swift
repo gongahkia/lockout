@@ -1,47 +1,43 @@
 import AppKit
+import ApplicationServices
 import Combine
-import SwiftData
-import LockOutCore
 import EventKit
+import LockOutCore
+import SwiftData
 import UserNotifications
 import os
-import ApplicationServices // #7: AXIsProcessTrusted
 
-// MARK: - Schema migration (#12)
 enum LockOutSchemaV1: VersionedSchema {
     static var versionIdentifier = Schema.Version(1, 0, 0)
     static var models: [any PersistentModel.Type] { [BreakSessionRecord.self] }
 }
 
-// future schema versions: copy V1, change model, add to schemas + stages
-// enum LockOutSchemaV2: VersionedSchema {
-//     static var versionIdentifier = Schema.Version(2, 0, 0)
-//     static var models: [any PersistentModel.Type] { [BreakSessionRecord.self] }
-// }
-
 enum LockOutSchemaMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] { [LockOutSchemaV1.self] }
-    static var stages: [MigrationStage] {
-        // add .lightweight(fromVersion:toVersion:) or .custom(fromVersion:toVersion:willMigrate:didMigrate:) here
-        // example: .lightweight(fromVersion: LockOutSchemaV1.self, toVersion: LockOutSchemaV2.self)
-        []
-    }
+    static var stages: [MigrationStage] { [] }
 }
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
-    private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.lockout", category: "AppDelegate") // #27
+    private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.lockout", category: "AppDelegate")
+    private static let lastFireKey = "last_break_fire_date"
+
     private(set) var scheduler: BreakScheduler!
     private(set) var repository: BreakHistoryRepository!
     private(set) var settingsSync: SettingsSyncService!
     private(set) var cloudSync: CloudKitSyncService!
     private(set) var updaterController: UpdaterController!
+
     @Published var syncError: String?
+    @Published private(set) var managedSettings: ManagedSettingsSnapshot?
+
     private var modelContainer: ModelContainer!
     var menuBarController: MenuBarController?
     var overlayController: BreakOverlayWindowController?
+
     private var cancellables = Set<AnyCancellable>()
     private var idleCheckTimer: Timer?
+    private var deferredRetryTimer: Timer?
     private var idlePaused = false
     private var activityMonitor: Any?
     private var calendarTimer: Timer?
@@ -53,151 +49,103 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private var eventTap: CFMachPort?
     private var previousSettings: AppSettings?
     private var lastKnownFocusModeEnabled: Bool?
-
-    private static let lastFireKey = "last_break_fire_date"
+    private var isNormalizingSettings = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        CrashReporter.install() // #29
-        let log = FileLogger.shared
-        Observability.levelSink = { level, category, message in
-            let mapped: FileLogger.Level
-            switch level {
-            case .debug: mapped = .debug
-            case .info: mapped = .info
-            case .warn: mapped = .warn
-            case .error: mapped = .error
-            }
-            log.log(mapped, category: category, message)
-        }
-        log.log(.info, category: "AppDelegate", "applicationDidFinishLaunching started")
-        log.log(.info, category: "AppDelegate", "bundle=\(Bundle.main.bundleIdentifier ?? "nil") version=\(AppVersion.current)")
-        log.log(.info, category: "AppDelegate", "logFile=\(log.logURL.path)")
+        CrashReporter.install()
+        configureLogging()
+
         let bundleID = Bundle.main.bundleIdentifier ?? ""
         if bundleID == "com.yourapp.lockout.macos" {
-            let alert = NSAlert()
-            alert.messageText = "Configuration Required"
-            alert.informativeText = "Configure Config.xcconfig before distributing LockOut."
-            alert.alertStyle = .warning
-            alert.addButton(withTitle: "Quit")
-            alert.runModal()
-            log.log(.error, category: "AppDelegate", "terminated: placeholder bundle ID")
-            NSApp.terminate(nil)
+            terminateForConfigurationIssue(message: "Configure Config.xcconfig before distributing LockOut.")
             return
         }
         if NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).count > 1 {
-            log.log(.warn, category: "AppDelegate", "terminated: another instance already running")
+            FileLogger.shared.log(.warn, category: "AppDelegate", "terminated: another instance already running")
             NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
                 .first(where: { $0 != NSRunningApplication.current })?
                 .activate(options: .activateIgnoringOtherApps)
             NSApp.terminate(nil)
             return
         }
-        let isUITesting = CommandLine.arguments.contains("--uitesting")
-        do {
-            let config = isUITesting
-                ? ModelConfiguration(isStoredInMemoryOnly: true)
-                : ModelConfiguration()
-            modelContainer = try ModelContainer(for: BreakSessionRecord.self,
-                                                migrationPlan: LockOutSchemaMigrationPlan.self,
-                                                configurations: config)
-        } catch {
-            log.log(.error, category: "AppDelegate", "SwiftData init failed: \(error)")
-            let alert = NSAlert()
-            alert.messageText = "Database Error"
-            alert.informativeText = error.localizedDescription
-            alert.alertStyle = .critical
-            alert.addButton(withTitle: "Quit")
-            alert.runModal()
-            NSApp.terminate(nil)
-            return
-        }
+
+        guard initializePersistence() else { return }
+
         repository = BreakHistoryRepository(modelContext: ModelContext(modelContainer))
         settingsSync = SettingsSyncService()
         cloudSync = CloudKitSyncService()
         updaterController = UpdaterController()
-        log.log(.info, category: "AppDelegate", "core services initialized")
+        settingsSync.onError = { [weak self] msg in DispatchQueue.main.async { self?.syncError = msg } }
         cloudSync.onError = { [weak self] msg in DispatchQueue.main.async { self?.syncError = msg } }
+
+        refreshManagedSettings()
         let localSettings = AppSettingsStore.load()
-        let settings = (localSettings?.localOnlyMode == true
-            ? localSettings
-            : (settingsSync.pull() ?? localSettings)) ?? .defaults
-        scheduler = BreakScheduler(settings: settings)
-        previousSettings = settings
-        log.log(.info, category: "AppDelegate", "scheduler started, \(settings.customBreakTypes.filter(\.enabled).count) break types enabled, localOnly=\(settings.localOnlyMode)")
-        let retentionDays = settings.historyRetentionDays
+        let remoteSettings = localSettings?.localOnlyMode == true ? nil : settingsSync.pull()
+        let resolvedSettings = ManagedSettingsResolver.resolve(local: localSettings, remote: remoteSettings, managed: managedSettings)
+
+        scheduler = BreakScheduler(settings: resolvedSettings)
+        previousSettings = resolvedSettings
+        overlayController = BreakOverlayWindowController(scheduler: scheduler, repository: repository, cloudSync: cloudSync)
+
+        let retentionDays = resolvedSettings.historyRetentionDays
         let repo = repository!
         Task { @MainActor in repo.pruneOldRecords(retentionDays: retentionDays) }
-        applyLaunchOffset(settings: settings)
-        if !settings.localOnlyMode {
-            settingsSync.observeChanges { [weak self] remote in
-                guard let self else { return }
-                let merged = SettingsSyncService.merge(local: self.scheduler.currentSettings, remote: remote)
-                let shouldRefreshWeeklyTimer = SettingsChangeDetector.weeklyNotificationPreferenceChanged(
-                    previous: self.scheduler.currentSettings,
-                    current: merged
-                )
-                self.scheduler.reschedule(with: merged)
-                if shouldRefreshWeeklyTimer {
-                    self.scheduleWeeklyComplianceNotification()
-                }
-            }
-        }
-        scheduler.$currentSettings.dropFirst().sink { [weak self] settings in
-            guard let self else { return }
-            self.settingsSync.push(settings)
-            if Self.didWorkdaySettingsChange(previous: self.previousSettings, current: settings) {
-                self.scheduleWorkdayTimers()
-            }
-            if Self.didCalendarPollingPreferenceChange(previous: self.previousSettings, current: settings) {
-                if settings.pauseDuringCalendarEvents { self.startCalendarPolling() }
-                else { self.stopCalendarPolling() }
-            }
-            self.previousSettings = settings
-            self.registerGlobalSnoozeHotkey(settings.globalSnoozeHotkey)
-        }.store(in: &cancellables)
-        scheduler.$nextBreak.dropFirst().compactMap { $0 }.sink { [weak self] nb in
-            guard let self else { return }
-            let lead = Double(self.scheduler.currentSettings.notificationLeadMinutes) * 60
-            let interval = nb.fireDate.timeIntervalSinceNow - lead
-            UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["break_reminder"])
-            if interval > 0 { self.scheduleBreakReminderNotification(leadSeconds: interval) }
-        }.store(in: &cancellables)
+
+        applyLaunchOffset(settings: resolvedSettings)
+        configureSettingsObservation(for: resolvedSettings)
+        registerSchedulerBindings()
+        registerWorkspaceObservers()
+        registerGlobalSnoozeHotkey(resolvedSettings.globalSnoozeHotkey)
+
         menuBarController = MenuBarController(
             scheduler: scheduler,
             repository: repository,
             cloudSync: cloudSync,
             settingsSync: settingsSync,
             updater: updaterController.updater,
-            showBreak: { [weak self] type, duration in self?.overlayController?.show(breakType: type, duration: duration) }
+            showBreak: { [weak self] type, duration in
+                self?.presentAdHocBreak(type: type, duration: duration)
+            }
         )
-        overlayController = BreakOverlayWindowController(scheduler: scheduler, repository: repository, cloudSync: cloudSync)
-        scheduler.onBreakTriggered = { [weak self] ct in
-            guard let self else { return }
-            overlayController?.show(breakType: legacyBreakType(ct), duration: ct.durationSeconds, minDisplaySeconds: ct.minDisplaySeconds)
+
+        scheduler.onBreakTriggered = { [weak self] customType, context in
+            self?.attemptBreakPresentation(customType: customType, context: context)
         }
-        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [weak self] _ in self?.scheduler.pause() }
-        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in self?.scheduler.resume() }
-        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.screensDidSleepNotification, object: nil, queue: .main) { [weak self] _ in self?.overlayController?.dismiss() }
-        NotificationCenter.default.addObserver(forName: .streakDidChange, object: nil, queue: .main) { [weak self] _ in
-            self?.menuBarController?.updateStreak()
-        }
+
         if !UserDefaults.standard.bool(forKey: "hasOnboarded") {
             OnboardingWindowController.present(scheduler: scheduler)
-        } else if !UserDefaults.standard.bool(forKey: "hasSeenMainWindow") { // #18: show main window once
+        } else if !UserDefaults.standard.bool(forKey: "hasSeenMainWindow") {
             UserDefaults.standard.set(true, forKey: "hasSeenMainWindow")
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 NSApp.setActivationPolicy(.regular)
                 NSApp.activate(ignoringOtherApps: true)
             }
         }
+
         requestNotificationPermission()
         startIdleDetection()
         observeFocusMode()
-        startCalendarPolling()
+        if resolvedSettings.pauseDuringCalendarEvents { startCalendarPolling() }
         scheduleWorkdayTimers()
         scheduleWeeklyComplianceNotification()
-        log.log(.info, category: "AppDelegate", "applicationDidFinishLaunching completed")
+        refreshDeferredRetryTimer()
         NotificationCenter.default.post(name: .appDidFinishSetup, object: nil)
+        FileLogger.shared.log(.info, category: "AppDelegate", "applicationDidFinishLaunching completed")
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        FileLogger.shared.log(.info, category: "AppDelegate", "applicationWillTerminate")
+        UserDefaults.standard.set(Date(), forKey: Self.lastFireKey)
+        settingsSync.stopObserving()
+        deferredRetryTimer?.invalidate()
+    }
+
+    func refreshManagedSettings() {
+        managedSettings = ManagedSettingsResolver.load()
+    }
+
+    func applyManagedSettings(to settings: AppSettings) -> AppSettings {
+        ManagedSettingsResolver.apply(managedSettings, to: settings)
     }
 
     func registerGlobalSnoozeHotkey(_ hotkey: HotkeyDescriptor?) {
@@ -206,7 +154,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             eventTap = nil
         }
         guard let hotkey else { return }
-        // #7: check Accessibility permission before creating event tap
         if !AXIsProcessTrusted() {
             let opts = [kAXTrustedCheckOptionPrompt.takeRetainedValue(): true] as CFDictionary
             AXIsProcessTrustedWithOptions(opts)
@@ -226,10 +173,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                     return Unmanaged.passUnretained(event)
                 }
                 let keyCode = Int(event.getIntegerValueField(.keyboardEventKeycode))
-                let flags = Int(event.flags.rawValue) & 0x00FF0000 // modifier bits
+                let flags = Int(event.flags.rawValue) & 0x00FF0000
                 if keyCode == hotkey.keyCode && flags == (hotkey.modifierFlags & 0x00FF0000) {
-                    Task { @MainActor in delegate.scheduler.snooze(repository: delegate.repository, cloudSync: delegate.cloudSync) }
-                    return nil // consume event
+                    Task { @MainActor in
+                        delegate.scheduler.snooze(repository: delegate.repository, cloudSync: delegate.cloudSync)
+                    }
+                    return nil
                 }
                 return Unmanaged.passUnretained(event)
             },
@@ -243,17 +192,208 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
     }
 
-    private func legacyBreakType(_ ct: LockOutCore.CustomBreakType) -> LockOutCore.BreakType {
-        let l = ct.name.lowercased()
-        if l.contains("micro") { return .micro }
-        if l.contains("long") { return .long }
-        return .eye
+    func scheduleWeeklyComplianceNotification() {
+        weeklyNotifTimer?.invalidate()
+        weeklyNotifTimer = nil
+        guard scheduler.currentSettings.weeklyNotificationEnabled else { return }
+        let cal = Calendar.current
+        var comps = DateComponents()
+        comps.weekday = 2
+        comps.hour = 9
+        comps.minute = 0
+        comps.second = 0
+        guard let nextMonday = cal.nextDate(after: Date(), matching: comps, matchingPolicy: .nextTime) else { return }
+        let interval = nextMonday.timeIntervalSinceNow
+        weeklyNotifTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { [weak self] _ in
+            self?.fireWeeklyComplianceNotification()
+            _ = Timer.scheduledTimer(withTimeInterval: 7 * 86400, repeats: true) { [weak self] _ in
+                self?.fireWeeklyComplianceNotification()
+            }
+        }
     }
 
-    func applicationWillTerminate(_ notification: Notification) {
-        FileLogger.shared.log(.info, category: "AppDelegate", "applicationWillTerminate")
-        UserDefaults.standard.set(Date(), forKey: Self.lastFireKey)
+    func scheduleBreakReminderNotification(leadSeconds: Double) {
+        guard leadSeconds > 0 else { return }
+        let content = UNMutableNotificationContent()
+        content.title = "Break coming up"
+        content.body = "Your next break starts in \(Int(leadSeconds / 60)) min"
+        content.sound = .default
+        content.categoryIdentifier = "BREAK_REMINDER"
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: leadSeconds, repeats: false)
+        let request = UNNotificationRequest(identifier: "break_reminder", content: content, trigger: trigger)
+        Self.scheduleNotification(request)
+    }
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completion: @escaping () -> Void) {
+        DispatchQueue.main.async {
+            switch response.actionIdentifier {
+            case "START_BREAK":
+                if let customType = self.scheduler.currentCustomBreakType {
+                    self.scheduler.triggerBreak(customType)
+                }
+            case "SNOOZE_BREAK":
+                let mins = self.scheduler.currentCustomBreakType?.snoozeMinutes ?? self.scheduler.currentSettings.snoozeDurationMinutes
+                self.scheduler.snooze(minutes: mins, repository: self.repository, cloudSync: self.cloudSync)
+            default:
+                break
+            }
+        }
+        completion()
+    }
+
+    static func scheduleNotification(_ request: UNNotificationRequest) {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            guard settings.authorizationStatus == .authorized else { return }
+            UNUserNotificationCenter.current().add(request) { err in
+                if let err {
+                    logger.error("notification scheduling failed: \(String(describing: err), privacy: .public)")
+                }
+            }
+        }
+    }
+
+    static func didWorkdaySettingsChange(previous: AppSettings?, current: AppSettings) -> Bool {
+        SettingsChangeDetector.workdayTimersNeedRefresh(previous: previous, current: current)
+    }
+
+    static func didCalendarPollingPreferenceChange(previous: AppSettings?, current: AppSettings) -> Bool {
+        SettingsChangeDetector.calendarPollingPreferenceChanged(previous: previous, current: current)
+    }
+
+    private func configureLogging() {
+        let log = FileLogger.shared
+        Observability.levelSink = { level, category, message in
+            let mapped: FileLogger.Level
+            switch level {
+            case .debug: mapped = .debug
+            case .info: mapped = .info
+            case .warn: mapped = .warn
+            case .error: mapped = .error
+            }
+            log.log(mapped, category: category, message)
+        }
+        log.log(.info, category: "AppDelegate", "applicationDidFinishLaunching started")
+        log.log(.info, category: "AppDelegate", "bundle=\(Bundle.main.bundleIdentifier ?? "nil") version=\(AppVersion.current)")
+        log.log(.info, category: "AppDelegate", "logFile=\(log.logURL.path)")
+    }
+
+    private func terminateForConfigurationIssue(message: String) {
+        let alert = NSAlert()
+        alert.messageText = "Configuration Required"
+        alert.informativeText = message
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Quit")
+        alert.runModal()
+        FileLogger.shared.log(.error, category: "AppDelegate", "terminated: \(message)")
+        NSApp.terminate(nil)
+    }
+
+    private func initializePersistence() -> Bool {
+        let isUITesting = CommandLine.arguments.contains("--uitesting")
+        do {
+            let config = isUITesting ? ModelConfiguration(isStoredInMemoryOnly: true) : ModelConfiguration()
+            modelContainer = try ModelContainer(
+                for: BreakSessionRecord.self,
+                migrationPlan: LockOutSchemaMigrationPlan.self,
+                configurations: config
+            )
+            return true
+        } catch {
+            FileLogger.shared.log(.error, category: "AppDelegate", "SwiftData init failed: \(error)")
+            let alert = NSAlert()
+            alert.messageText = "Database Error"
+            alert.informativeText = error.localizedDescription
+            alert.alertStyle = .critical
+            alert.addButton(withTitle: "Quit")
+            alert.runModal()
+            NSApp.terminate(nil)
+            return false
+        }
+    }
+
+    private func configureSettingsObservation(for settings: AppSettings) {
         settingsSync.stopObserving()
+        guard !settings.localOnlyMode else { return }
+        settingsSync.observeChanges { [weak self] remote in
+            guard let self else { return }
+            self.refreshManagedSettings()
+            let merged = ManagedSettingsResolver.resolve(local: self.scheduler.currentSettings, remote: remote, managed: self.managedSettings)
+            let shouldRefreshWeeklyTimer = SettingsChangeDetector.weeklyNotificationPreferenceChanged(previous: self.scheduler.currentSettings, current: merged)
+            self.scheduler.reschedule(with: merged)
+            if shouldRefreshWeeklyTimer {
+                self.scheduleWeeklyComplianceNotification()
+            }
+            self.syncError = self.settingsSync.lastErrorMessage
+        }
+    }
+
+    private func registerSchedulerBindings() {
+        scheduler.$currentSettings.dropFirst().sink { [weak self] settings in
+            guard let self else { return }
+            self.refreshManagedSettings()
+            if self.isNormalizingSettings {
+                self.isNormalizingSettings = false
+            }
+            let effective = self.applyManagedSettings(to: settings)
+            if effective != settings {
+                self.isNormalizingSettings = true
+                self.scheduler.currentSettings = effective
+                return
+            }
+
+            self.settingsSync.push(effective)
+            if Self.didWorkdaySettingsChange(previous: self.previousSettings, current: effective) {
+                self.scheduleWorkdayTimers()
+            }
+            if Self.didCalendarPollingPreferenceChange(previous: self.previousSettings, current: effective) {
+                if effective.pauseDuringCalendarEvents {
+                    self.startCalendarPolling()
+                } else {
+                    self.stopCalendarPolling()
+                }
+            }
+            if self.previousSettings?.localOnlyMode != effective.localOnlyMode {
+                self.configureSettingsObservation(for: effective)
+            }
+            self.previousSettings = effective
+            self.registerGlobalSnoozeHotkey(effective.globalSnoozeHotkey)
+            self.refreshDeferredRetryTimer()
+            self.syncError = self.settingsSync.lastErrorMessage ?? self.syncError
+        }.store(in: &cancellables)
+
+        scheduler.$nextBreak.dropFirst().sink { [weak self] nextBreak in
+            guard let self else { return }
+            UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["break_reminder"])
+            guard let nextBreak else { return }
+            let lead = Double(self.scheduler.currentSettings.notificationLeadMinutes) * 60
+            let interval = nextBreak.fireDate.timeIntervalSinceNow - lead
+            if interval > 0 {
+                self.scheduleBreakReminderNotification(leadSeconds: interval)
+            }
+        }.store(in: &cancellables)
+
+        scheduler.$pendingDeferredBreak.dropFirst().sink { [weak self] _ in
+            self?.refreshDeferredRetryTimer()
+        }.store(in: &cancellables)
+    }
+
+    private func registerWorkspaceObservers() {
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.scheduler.pause(reason: .manual)
+        }
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.scheduler.resume(reason: .manual)
+            self?.retryPendingDeferredBreak()
+        }
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.screensDidSleepNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.overlayController?.dismiss()
+        }
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.retryPendingDeferredBreak()
+        }
+        NotificationCenter.default.addObserver(forName: .streakDidChange, object: nil, queue: .main) { [weak self] _ in
+            self?.menuBarController?.updateStreak()
+        }
     }
 
     private func applyLaunchOffset(settings: AppSettings) {
@@ -265,7 +405,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         scheduler.start(settings: settings, offsetSeconds: elapsed)
     }
 
-    private func scheduleDailyTimer(minutesFromMidnight: Int, action: @escaping () -> Void) -> Timer { // #20
+    private func scheduleDailyTimer(minutesFromMidnight: Int, action: @escaping () -> Void) -> Timer {
         let cal = Calendar.current
         var comps = cal.dateComponents([.year, .month, .day], from: Date())
         comps.hour = minutesFromMidnight / 60
@@ -279,24 +419,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
     }
 
-    func scheduleWeeklyComplianceNotification() {
-        weeklyNotifTimer?.invalidate()
-        weeklyNotifTimer = nil
-        guard scheduler.currentSettings.weeklyNotificationEnabled else { return }
-        let cal = Calendar.current
-        var comps = DateComponents()
-        comps.weekday = 2 // Monday
-        comps.hour = 9; comps.minute = 0; comps.second = 0
-        guard let nextMonday = cal.nextDate(after: Date(), matching: comps, matchingPolicy: .nextTime) else { return }
-        let interval = nextMonday.timeIntervalSinceNow
-        weeklyNotifTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { [weak self] _ in
-            self?.fireWeeklyComplianceNotification()
-            _ = Timer.scheduledTimer(withTimeInterval: 7 * 86400, repeats: true) { [weak self] _ in
-                self?.fireWeeklyComplianceNotification()
-            }
-        }
-    }
-
     private func fireWeeklyComplianceNotification() {
         let stats = repository.dailyStats(for: 7)
         let rate = Int(ComplianceCalculator.overallRate(stats: stats) * 100)
@@ -306,17 +428,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         content.sound = .default
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
         let request = UNNotificationRequest(identifier: "weekly_compliance", content: content, trigger: trigger)
-        AppDelegate.scheduleNotification(request)
+        Self.scheduleNotification(request)
     }
 
-    private func scheduleWorkdayTimers() { // #20: uses minutes from midnight
+    private func scheduleWorkdayTimers() {
         workdayStartTimer?.invalidate()
         workdayEndTimer?.invalidate()
         if let startMins = scheduler.currentSettings.workdayStartMinutes {
-            workdayStartTimer = scheduleDailyTimer(minutesFromMidnight: startMins) { [weak self] in self?.scheduler.resume() }
+            workdayStartTimer = scheduleDailyTimer(minutesFromMidnight: startMins) { [weak self] in
+                self?.scheduler.resume(reason: .workday)
+            }
         }
         if let endMins = scheduler.currentSettings.workdayEndMinutes {
-            workdayEndTimer = scheduleDailyTimer(minutesFromMidnight: endMins) { [weak self] in self?.scheduler.pause() }
+            workdayEndTimer = scheduleDailyTimer(minutesFromMidnight: endMins) { [weak self] in
+                self?.scheduler.pause(reason: .workday)
+            }
         }
     }
 
@@ -337,7 +463,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         calendarTimer = nil
         if calendarPaused {
             calendarPaused = false
-            scheduler.resume()
+            scheduler.resume(reason: .calendar)
         }
     }
 
@@ -346,31 +472,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         let now = Date()
         let filterMode = scheduler.currentSettings.calendarFilterMode
         let filteredIDs = Set(scheduler.currentSettings.filteredCalendarIDs)
-        var cals = ekStore.calendars(for: .event)
-        if filterMode == .selected && !filteredIDs.isEmpty { // #19: filter to selected calendars
-            cals = cals.filter { filteredIDs.contains($0.calendarIdentifier) }
+        var calendars = ekStore.calendars(for: .event)
+        if filterMode == .selected && !filteredIDs.isEmpty {
+            calendars = calendars.filter { filteredIDs.contains($0.calendarIdentifier) }
         }
-        let pred = ekStore.predicateForEvents(withStart: now.addingTimeInterval(-1), end: now.addingTimeInterval(1), calendars: cals)
-        let events = ekStore.events(matching: pred).filter { $0.startDate <= now && $0.endDate >= now }
+        let predicate = ekStore.predicateForEvents(withStart: now.addingTimeInterval(-1), end: now.addingTimeInterval(1), calendars: calendars)
+        let events = ekStore.events(matching: predicate).filter { $0.startDate <= now && $0.endDate >= now }
         let active: Bool
         switch filterMode {
-        case .busyOnly: // #19: only pause for busy events
+        case .busyOnly:
             active = events.contains { $0.availability == .busy || $0.availability == .unavailable }
         case .all, .selected:
             active = !events.isEmpty
         }
         if active && !calendarPaused {
             calendarPaused = true
-            scheduler.pause()
+            scheduler.pause(reason: .calendar)
         } else if !active && calendarPaused {
             calendarPaused = false
-            scheduler.resume()
+            scheduler.resume(reason: .calendar)
         }
     }
 
     private func observeFocusMode() {
         let nc = CFNotificationCenterGetDarwinNotifyCenter()
-        CFNotificationCenterAddObserver(nc, Unmanaged.passUnretained(self).toOpaque(),
+        CFNotificationCenterAddObserver(
+            nc,
+            Unmanaged.passUnretained(self).toOpaque(),
             { _, observer, _, _, _ in
                 guard let ptr = observer else { return }
                 let delegate = Unmanaged<AppDelegate>.fromOpaque(ptr).takeUnretainedValue()
@@ -379,20 +507,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 let action = SettingsChangeDetector.focusPauseAction(
                     previousFocusEnabled: delegate.lastKnownFocusModeEnabled,
                     currentFocusEnabled: isEnabled,
-                    isPaused: delegate.scheduler.currentSettings.isPaused
+                    isPaused: delegate.scheduler.isPaused
                 )
                 delegate.lastKnownFocusModeEnabled = isEnabled
                 switch action {
-                case .pause: delegate.scheduler.pause()
-                case .resume: delegate.scheduler.resume()
-                case .none: break
+                case .pause:
+                    delegate.scheduler.pause(reason: .focus)
+                case .resume:
+                    delegate.scheduler.resume(reason: .focus)
+                case .none:
+                    break
                 }
             },
-            "com.apple.donotdisturb.state.changed" as CFString, nil, .deliverImmediately)
+            "com.apple.donotdisturb.state.changed" as CFString,
+            nil,
+            .deliverImmediately
+        )
     }
 
     private func readFocusModeEnabled() -> Bool? {
-        // #6: private API; may break across macOS versions. Fail gracefully.
         do {
             guard let defaults = UserDefaults(suiteName: "com.apple.ncprefs"),
                   let data = defaults.data(forKey: "dnd_prefs") else {
@@ -405,7 +538,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             }
             return enabled
         } catch {
-            FileLogger.shared.log(.warn, category: "AppDelegate", "Focus Mode detection failed (private API may have changed): \(error)")
+            FileLogger.shared.log(.warn, category: "AppDelegate", "Focus Mode detection failed: \(error)")
             return nil
         }
     }
@@ -414,16 +547,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         idleCheckTimer?.invalidate()
         idleCheckTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
             guard let self else { return }
-            let threshold = Double(scheduler.currentSettings.idleThresholdMinutes) * 60
+            let threshold = Double(self.scheduler.currentSettings.idleThresholdMinutes) * 60
             let idle = CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: CGEventType(rawValue: ~0)!)
-            if idle >= threshold && !idlePaused {
-                idlePaused = true
-                scheduler.pause()
-                activityMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .keyDown]) { [weak self] _ in
-                    guard let self, idlePaused else { return }
-                    idlePaused = false
-                    scheduler.resume()
-                    if let m = activityMonitor { NSEvent.removeMonitor(m); activityMonitor = nil }
+            if idle >= threshold && !self.idlePaused {
+                self.idlePaused = true
+                self.scheduler.pause(reason: .idle)
+                self.activityMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .keyDown]) { [weak self] _ in
+                    guard let self, self.idlePaused else { return }
+                    self.idlePaused = false
+                    self.scheduler.resume(reason: .idle)
+                    if let monitor = self.activityMonitor {
+                        NSEvent.removeMonitor(monitor)
+                        self.activityMonitor = nil
+                    }
                 }
             }
         }
@@ -432,63 +568,64 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private func requestNotificationPermission() {
         let startAction = UNNotificationAction(identifier: "START_BREAK", title: "Start Break Now", options: .foreground)
         let snoozeAction = UNNotificationAction(identifier: "SNOOZE_BREAK", title: "Snooze", options: [])
-        let category = UNNotificationCategory(identifier: "BREAK_REMINDER",
-                                               actions: [startAction, snoozeAction],
-                                               intentIdentifiers: [], options: [])
+        let category = UNNotificationCategory(identifier: "BREAK_REMINDER", actions: [startAction, snoozeAction], intentIdentifiers: [], options: [])
         UNUserNotificationCenter.current().setNotificationCategories([category])
         UNUserNotificationCenter.current().delegate = self
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
 
-    func userNotificationCenter(_ center: UNUserNotificationCenter,
-                                 didReceive response: UNNotificationResponse,
-                                 withCompletionHandler completion: @escaping () -> Void) {
-        DispatchQueue.main.async {
-            switch response.actionIdentifier {
-            case "START_BREAK":
-                if let ct = self.scheduler.currentCustomBreakType {
-                    self.overlayController?.show(breakType: self.legacyBreakType(ct),
-                                                 duration: ct.durationSeconds,
-                                                 minDisplaySeconds: ct.minDisplaySeconds)
-                }
-            case "SNOOZE_BREAK":
-                let mins = self.scheduler.currentCustomBreakType?.snoozeMinutes
-                    ?? self.scheduler.currentSettings.snoozeDurationMinutes
-                self.scheduler.snooze(minutes: mins, repository: self.repository, cloudSync: self.cloudSync)
-            default: break
-            }
+    private func presentAdHocBreak(type: BreakType, duration: Int) {
+        let context: ScheduledBreakContext
+        if let customType = scheduler.currentCustomBreakType {
+            context = ScheduledBreakContext(customTypeID: customType.id, scheduledAt: Date())
+            attemptBreakPresentation(customType: customType, context: context)
+            return
         }
-        completion()
+        let fallback = scheduler.currentSettings.customBreakTypes.first(where: \.enabled)
+            ?? scheduler.currentSettings.customBreakTypes.first
+            ?? AppSettings.defaultCustomBreakTypes[0]
+        context = ScheduledBreakContext(customTypeID: fallback.id, scheduledAt: Date())
+        attemptBreakPresentation(customType: fallback, context: context)
+        _ = type
+        _ = duration
     }
 
-    func scheduleBreakReminderNotification(leadSeconds: Double) {
-        guard leadSeconds > 0 else { return }
-        let content = UNMutableNotificationContent()
-        content.title = "Break coming up"
-        content.body = "Your next break starts in \(Int(leadSeconds / 60)) min"
-        content.sound = .default
-        content.categoryIdentifier = "BREAK_REMINDER"
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: leadSeconds, repeats: false)
-        let request = UNNotificationRequest(identifier: "break_reminder", content: content, trigger: trigger)
-        AppDelegate.scheduleNotification(request)
+    private func attemptBreakPresentation(customType: CustomBreakType, context: ScheduledBreakContext) {
+        guard let overlayController else { return }
+        let shown = overlayController.show(
+            breakType: legacyBreakType(customType),
+            duration: customType.durationSeconds,
+            minDisplaySeconds: customType.minDisplaySeconds,
+            scheduledAt: context.scheduledAt
+        )
+        if shown {
+            scheduler.beginBreakPresentation(context)
+        } else {
+            scheduler.registerDeferredBreak(context, repository: repository, cloudSync: cloudSync)
+        }
+        refreshDeferredRetryTimer()
     }
 
-    static func scheduleNotification(_ request: UNNotificationRequest) {
-        UNUserNotificationCenter.current().getNotificationSettings { settings in
-            guard settings.authorizationStatus == .authorized else { return }
-            UNUserNotificationCenter.current().add(request) { err in
-                if let err {
-                    logger.error("notification scheduling failed: \(String(describing: err), privacy: .public)")
-                }
-            }
+    private func refreshDeferredRetryTimer() {
+        deferredRetryTimer?.invalidate()
+        deferredRetryTimer = nil
+        guard scheduler.pendingDeferredBreak != nil else { return }
+        deferredRetryTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+            self?.retryPendingDeferredBreak()
         }
     }
 
-    static func didWorkdaySettingsChange(previous: AppSettings?, current: AppSettings) -> Bool {
-        SettingsChangeDetector.workdayTimersNeedRefresh(previous: previous, current: current)
+    @objc private func retryPendingDeferredBreak() {
+        guard let context = scheduler.pendingDeferredBreak,
+              let customType = scheduler.currentSettings.customBreakTypes.first(where: { $0.id == context.customTypeID }),
+              overlayController?.isShowingOverlay == false else { return }
+        attemptBreakPresentation(customType: customType, context: context)
     }
 
-    static func didCalendarPollingPreferenceChange(previous: AppSettings?, current: AppSettings) -> Bool {
-        SettingsChangeDetector.calendarPollingPreferenceChanged(previous: previous, current: current)
+    private func legacyBreakType(_ customType: CustomBreakType) -> BreakType {
+        let lower = customType.name.lowercased()
+        if lower.contains("micro") { return .micro }
+        if lower.contains("long") { return .long }
+        return .eye
     }
 }

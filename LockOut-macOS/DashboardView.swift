@@ -35,6 +35,15 @@ struct DashboardView: View {
                 label: scheduler.currentCustomBreakType?.name ?? "—",
                 timeString: timeString
             )
+            if let pauseStatus = scheduler.pauseStatusLabel {
+                Text(pauseStatus)
+                    .font(.headline)
+                    .foregroundStyle(.secondary)
+            } else if let pending = scheduler.pendingDeferredSummary {
+                Text(pending)
+                    .font(.headline)
+                    .foregroundStyle(.orange)
+            }
             VStack {
                 Text("\(Int(todayCompliance * 100))%")
                     .font(.largeTitle).bold()
