@@ -4,7 +4,7 @@ import Combine
 import EventKit
 import LockOutCore
 import SwiftData
-import UserNotifications
+@preconcurrency import UserNotifications
 import os
 
 enum LockOutSchemaV1: VersionedSchema {
@@ -19,7 +19,7 @@ enum LockOutSchemaMigrationPlan: SchemaMigrationPlan {
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
-    private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.lockout", category: "AppDelegate")
+    nonisolated private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.lockout", category: "AppDelegate")
     private static let lastFireKey = "last_break_fire_date"
 
     private(set) var scheduler: BreakScheduler!
@@ -50,10 +50,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private var previousSettings: AppSettings?
     private var lastKnownFocusModeEnabled: Bool?
     private var isNormalizingSettings = false
+    private var isUITesting: Bool { CommandLine.arguments.contains("--uitesting") }
+    private var shouldResetOnboardingForUITests: Bool { CommandLine.arguments.contains("--reset-onboarding") }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         CrashReporter.install()
         configureLogging()
+        configureUITestingDefaultsIfNeeded()
 
         let bundleID = Bundle.main.bundleIdentifier ?? ""
         if bundleID == "com.yourapp.lockout.macos" {
@@ -64,7 +67,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             FileLogger.shared.log(.warn, category: "AppDelegate", "terminated: another instance already running")
             NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
                 .first(where: { $0 != NSRunningApplication.current })?
-                .activate(options: .activateIgnoringOtherApps)
+                .activate(options: [])
             NSApp.terminate(nil)
             return
         }
@@ -122,7 +125,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             }
         }
 
-        requestNotificationPermission()
+        if !isUITesting {
+            requestNotificationPermission()
+        }
         startIdleDetection()
         observeFocusMode()
         if resolvedSettings.pauseDuringCalendarEvents { startCalendarPolling() }
@@ -153,7 +158,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             CGEvent.tapEnable(tap: tap, enable: false)
             eventTap = nil
         }
-        guard let hotkey else { return }
+        guard hotkey != nil else { return }
         if !AXIsProcessTrusted() {
             let opts = [kAXTrustedCheckOptionPrompt.takeRetainedValue(): true] as CFDictionary
             AXIsProcessTrustedWithOptions(opts)
@@ -205,9 +210,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         guard let nextMonday = cal.nextDate(after: Date(), matching: comps, matchingPolicy: .nextTime) else { return }
         let interval = nextMonday.timeIntervalSinceNow
         weeklyNotifTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { [weak self] _ in
-            self?.fireWeeklyComplianceNotification()
-            _ = Timer.scheduledTimer(withTimeInterval: 7 * 86400, repeats: true) { [weak self] _ in
-                self?.fireWeeklyComplianceNotification()
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.fireWeeklyComplianceNotification()
+                _ = Timer.scheduledTimer(withTimeInterval: 7 * 86400, repeats: true) { [weak self] _ in
+                    Task { @MainActor [weak self] in
+                        self?.fireWeeklyComplianceNotification()
+                    }
+                }
             }
         }
     }
@@ -224,8 +234,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         Self.scheduleNotification(request)
     }
 
-    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completion: @escaping () -> Void) {
-        DispatchQueue.main.async {
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completion: @escaping () -> Void) {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
             switch response.actionIdentifier {
             case "START_BREAK":
                 if let customType = self.scheduler.currentCustomBreakType {
@@ -241,7 +252,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         completion()
     }
 
-    static func scheduleNotification(_ request: UNNotificationRequest) {
+    nonisolated static func scheduleNotification(_ request: UNNotificationRequest) {
+        let logger = Self.logger
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             guard settings.authorizationStatus == .authorized else { return }
             UNUserNotificationCenter.current().add(request) { err in
@@ -274,7 +286,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
         log.log(.info, category: "AppDelegate", "applicationDidFinishLaunching started")
         log.log(.info, category: "AppDelegate", "bundle=\(Bundle.main.bundleIdentifier ?? "nil") version=\(AppVersion.current)")
-        log.log(.info, category: "AppDelegate", "logFile=\(log.logURL.path)")
+            log.log(.info, category: "AppDelegate", "logFile=\(log.logURL.path)")
+    }
+
+    private func configureUITestingDefaultsIfNeeded() {
+        guard isUITesting else { return }
+        var settings = AppSettings.defaults
+        settings.localOnlyMode = true
+        AppSettingsStore.save(settings)
+        UserDefaults.standard.removeObject(forKey: Self.lastFireKey)
+        UserDefaults.standard.set(!shouldResetOnboardingForUITests, forKey: "hasOnboarded")
+        UserDefaults.standard.set(false, forKey: "hasSeenMainWindow")
     }
 
     private func terminateForConfigurationIssue(message: String) {
@@ -379,20 +401,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     private func registerWorkspaceObservers() {
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [weak self] _ in
-            self?.scheduler.pause(reason: .manual)
+            Task { @MainActor [weak self] in
+                self?.scheduler.pause(reason: .manual)
+            }
         }
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
-            self?.scheduler.resume(reason: .manual)
-            self?.retryPendingDeferredBreak()
+            Task { @MainActor [weak self] in
+                self?.scheduler.resume(reason: .manual)
+                self?.retryPendingDeferredBreak()
+            }
         }
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.screensDidSleepNotification, object: nil, queue: .main) { [weak self] _ in
-            self?.overlayController?.dismiss()
+            Task { @MainActor [weak self] in
+                self?.overlayController?.dismiss()
+            }
         }
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] _ in
-            self?.retryPendingDeferredBreak()
+            Task { @MainActor [weak self] in
+                self?.retryPendingDeferredBreak()
+            }
+        }
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.retryPendingDeferredBreak()
+            }
+        }
+        NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.retryPendingDeferredBreak()
+            }
+        }
+        NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.retryPendingDeferredBreak()
+            }
         }
         NotificationCenter.default.addObserver(forName: .streakDidChange, object: nil, queue: .main) { [weak self] _ in
-            self?.menuBarController?.updateStreak()
+            Task { @MainActor [weak self] in
+                self?.menuBarController?.updateStreak()
+            }
         }
     }
 
@@ -405,7 +452,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         scheduler.start(settings: settings, offsetSeconds: elapsed)
     }
 
-    private func scheduleDailyTimer(minutesFromMidnight: Int, action: @escaping () -> Void) -> Timer {
+    private func scheduleDailyTimer(minutesFromMidnight: Int, action: @escaping @MainActor () -> Void) -> Timer {
         let cal = Calendar.current
         var comps = cal.dateComponents([.year, .month, .day], from: Date())
         comps.hour = minutesFromMidnight / 60
@@ -414,8 +461,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         var fire = cal.date(from: comps) ?? Date()
         if fire <= Date() { fire = cal.date(byAdding: .day, value: 1, to: fire) ?? fire }
         return Timer.scheduledTimer(withTimeInterval: fire.timeIntervalSinceNow, repeats: false) { _ in
-            action()
-            _ = Timer.scheduledTimer(withTimeInterval: 86400, repeats: true) { _ in action() }
+            Task { @MainActor in
+                action()
+                _ = Timer.scheduledTimer(withTimeInterval: 86400, repeats: true) { _ in
+                    Task { @MainActor in action() }
+                }
+            }
         }
     }
 
@@ -451,9 +502,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         calendarTimer = nil
         guard scheduler.currentSettings.pauseDuringCalendarEvents else { return }
         ekStore.requestFullAccessToEvents { [weak self] granted, _ in
-            guard granted, let self else { return }
-            self.calendarTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
-                self?.checkCalendarEvents()
+            guard granted else { return }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.calendarTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+                    Task { @MainActor [weak self] in
+                        self?.checkCalendarEvents()
+                    }
+                }
             }
         }
     }
@@ -502,21 +558,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             { _, observer, _, _, _ in
                 guard let ptr = observer else { return }
                 let delegate = Unmanaged<AppDelegate>.fromOpaque(ptr).takeUnretainedValue()
-                guard delegate.scheduler.currentSettings.pauseDuringFocus else { return }
-                guard let isEnabled = delegate.readFocusModeEnabled() else { return }
-                let action = SettingsChangeDetector.focusPauseAction(
-                    previousFocusEnabled: delegate.lastKnownFocusModeEnabled,
-                    currentFocusEnabled: isEnabled,
-                    isPaused: delegate.scheduler.isPaused
-                )
-                delegate.lastKnownFocusModeEnabled = isEnabled
-                switch action {
-                case .pause:
-                    delegate.scheduler.pause(reason: .focus)
-                case .resume:
-                    delegate.scheduler.resume(reason: .focus)
-                case .none:
-                    break
+                Task { @MainActor in
+                    guard delegate.scheduler.currentSettings.pauseDuringFocus else { return }
+                    guard let isEnabled = delegate.readFocusModeEnabled() else { return }
+                    let action = SettingsChangeDetector.focusPauseAction(
+                        previousFocusEnabled: delegate.lastKnownFocusModeEnabled,
+                        currentFocusEnabled: isEnabled,
+                        isPaused: delegate.scheduler.isPaused
+                    )
+                    delegate.lastKnownFocusModeEnabled = isEnabled
+                    switch action {
+                    case .pause:
+                        delegate.scheduler.pause(reason: .focus)
+                    case .resume:
+                        delegate.scheduler.resume(reason: .focus)
+                    case .none:
+                        break
+                    }
                 }
             },
             "com.apple.donotdisturb.state.changed" as CFString,
@@ -546,22 +604,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private func startIdleDetection() {
         idleCheckTimer?.invalidate()
         idleCheckTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
-            guard let self else { return }
-            let threshold = Double(self.scheduler.currentSettings.idleThresholdMinutes) * 60
-            let idle = CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: CGEventType(rawValue: ~0)!)
-            if idle >= threshold && !self.idlePaused {
-                self.idlePaused = true
-                self.scheduler.pause(reason: .idle)
-                self.activityMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .keyDown]) { [weak self] _ in
-                    guard let self, self.idlePaused else { return }
-                    self.idlePaused = false
-                    self.scheduler.resume(reason: .idle)
-                    if let monitor = self.activityMonitor {
-                        NSEvent.removeMonitor(monitor)
-                        self.activityMonitor = nil
-                    }
+            Task { @MainActor [weak self] in
+                self?.handleIdleDetectionTick()
+            }
+        }
+    }
+
+    private func handleIdleDetectionTick() {
+        let threshold = Double(scheduler.currentSettings.idleThresholdMinutes) * 60
+        let idle = CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: CGEventType(rawValue: ~0)!)
+        if idle >= threshold && !idlePaused {
+            idlePaused = true
+            scheduler.pause(reason: .idle)
+            activityMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .keyDown]) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.handleIdleActivity()
                 }
             }
+        }
+    }
+
+    private func handleIdleActivity() {
+        guard idlePaused else { return }
+        idlePaused = false
+        scheduler.resume(reason: .idle)
+        if let monitor = activityMonitor {
+            NSEvent.removeMonitor(monitor)
+            activityMonitor = nil
         }
     }
 
@@ -611,7 +680,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         deferredRetryTimer = nil
         guard scheduler.pendingDeferredBreak != nil else { return }
         deferredRetryTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
-            self?.retryPendingDeferredBreak()
+            Task { @MainActor [weak self] in
+                self?.retryPendingDeferredBreak()
+            }
         }
     }
 

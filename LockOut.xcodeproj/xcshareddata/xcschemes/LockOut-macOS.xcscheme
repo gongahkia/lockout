@@ -21,6 +21,20 @@
                ReferencedContainer = "container:LockOut.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "2C74FAB986A400CDD06D527D"
+               BuildableName = "LockOut-macOSUITests.xctest"
+               BlueprintName = "LockOut-macOSUITests"
+               ReferencedContainer = "container:LockOut.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction
@@ -39,6 +53,16 @@
          </BuildableReference>
       </MacroExpansion>
       <Testables>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "2C74FAB986A400CDD06D527D"
+               BuildableName = "LockOut-macOSUITests.xctest"
+               BlueprintName = "LockOut-macOSUITests"
+               ReferencedContainer = "container:LockOut.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction

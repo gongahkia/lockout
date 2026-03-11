@@ -9,7 +9,6 @@ struct SettingsView: View {
 
     @EnvironmentObject var scheduler: BreakScheduler
 
-    @State private var manualBundleID = ""
     @State private var isRecordingHotkey = false
     @State private var syncRefresh = false
 
@@ -116,8 +115,8 @@ struct SettingsView: View {
                         )
                     ) {
                         Text("Off").tag(-1)
-                        ForEach(workdayTimeSlots, id: \.self) { mins in
-                            Text(formatMinutes(mins)).tag(mins)
+                        ForEach(SettingsUIHelpers.workdayTimeSlots, id: \.self) { mins in
+                            Text(SettingsUIHelpers.formatMinutes(mins)).tag(mins)
                         }
                     }
                     .disabled(isLocked(.workdayStartMinutes))
@@ -130,8 +129,8 @@ struct SettingsView: View {
                         )
                     ) {
                         Text("Off").tag(-1)
-                        ForEach(workdayTimeSlots, id: \.self) { mins in
-                            Text(formatMinutes(mins)).tag(mins)
+                        ForEach(SettingsUIHelpers.workdayTimeSlots, id: \.self) { mins in
+                            Text(SettingsUIHelpers.formatMinutes(mins)).tag(mins)
                         }
                     }
                     .disabled(isLocked(.workdayEndMinutes))
@@ -279,6 +278,7 @@ struct SettingsView: View {
         .padding(24)
         .navigationTitle("Settings")
         .id(syncRefresh)
+        .accessibilityIdentifier("settings.view")
     }
 
     @ViewBuilder private func managedBanner(snapshot: ManagedSettingsSnapshot) -> some View {
@@ -295,56 +295,14 @@ struct SettingsView: View {
     }
 
     @ViewBuilder private var blocklistSection: some View {
-        let running = NSWorkspace.shared.runningApplications
-            .filter { $0.activationPolicy == .regular && $0.bundleIdentifier != nil && $0.bundleIdentifier != Bundle.main.bundleIdentifier }
-            .sorted { ($0.localizedName ?? "") < ($1.localizedName ?? "") }
-        let blocklist = Binding(
+        BundleIDSelectionSection(
+            selectedBundleIDs: Binding(
             get: { scheduler.currentSettings.blockedBundleIDs },
             set: { scheduler.currentSettings.blockedBundleIDs = $0 }
+            ),
+            isDisabled: isLocked(.blockedBundleIDs),
+            caption: "Block break overlay for these apps:"
         )
-
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Block break overlay for these apps:")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            ForEach(running, id: \.processIdentifier) { app in
-                let bid = app.bundleIdentifier ?? ""
-                Toggle(
-                    app.localizedName ?? bid,
-                    isOn: Binding(
-                        get: { blocklist.wrappedValue.contains(bid) },
-                        set: { on in
-                            if on {
-                                if !blocklist.wrappedValue.contains(bid) { blocklist.wrappedValue.append(bid) }
-                            } else {
-                                blocklist.wrappedValue.removeAll { $0 == bid }
-                            }
-                        }
-                    )
-                )
-                .disabled(isLocked(.blockedBundleIDs))
-            }
-            HStack {
-                TextField("Manual bundle ID", text: $manualBundleID)
-                Button("Add") {
-                    let id = manualBundleID.trimmingCharacters(in: .whitespaces)
-                    guard !id.isEmpty, !blocklist.wrappedValue.contains(id), isValidBundleID(id) else { return }
-                    blocklist.wrappedValue.append(id)
-                    manualBundleID = ""
-                }
-                .disabled(isLocked(.blockedBundleIDs))
-            }
-            ForEach(blocklist.wrappedValue, id: \.self) { id in
-                HStack {
-                    Text(id).font(.caption).foregroundStyle(.secondary)
-                    Spacer()
-                    Button("Remove") { blocklist.wrappedValue.removeAll { $0 == id } }
-                        .buttonStyle(.plain)
-                        .foregroundStyle(.red)
-                        .disabled(isLocked(.blockedBundleIDs))
-                }
-            }
-        }
     }
 
     private var versionFooter: some View {
@@ -373,10 +331,6 @@ struct SettingsView: View {
         return parts.joined()
     }
 
-    private var workdayTimeSlots: [Int] {
-        stride(from: 0, to: 1440, by: 30).map { $0 }
-    }
-
     private func isLocked(_ key: ManagedSettingsKey) -> Bool {
         managedSnapshot?.isForced(key) ?? false
     }
@@ -393,14 +347,6 @@ struct SettingsView: View {
         return map[code] ?? "?\(code)"
     }
 
-    private func formatMinutes(_ mins: Int) -> String {
-        String(format: "%02d:%02d", mins / 60, mins % 60)
-    }
-
-    private func isValidBundleID(_ id: String) -> Bool {
-        id.range(of: #"^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$"#, options: .regularExpression) != nil
-    }
-
     private func importSettings() {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.json]
@@ -411,16 +357,9 @@ struct SettingsView: View {
             let data = try Data(contentsOf: url)
             let imported = try AppSettings.decodeValidatedImportJSON(data)
             let resolvedImport = appDelegate?.applyManagedSettings(to: imported) ?? imported
-            let changes = diffSettingsKeys(old: scheduler.currentSettings, new: resolvedImport)
-            let lockedKeys = managedSnapshot?.forcedKeys.map(\.displayName).sorted() ?? []
             let alert = NSAlert()
             alert.messageText = "Import Settings?"
-            var pieces: [String] = []
-            pieces.append(changes.isEmpty ? "No changes detected." : "Changed: \(changes.joined(separator: ", "))")
-            if !lockedKeys.isEmpty {
-                pieces.append("Managed keys will stay locked: \(lockedKeys.joined(separator: ", "))")
-            }
-            alert.informativeText = pieces.joined(separator: "\n")
+            alert.informativeText = importPreviewMessage(imported: imported, resolvedImport: resolvedImport)
             alert.addButton(withTitle: "Apply")
             alert.addButton(withTitle: "Cancel")
             guard alert.runModal() == .alertFirstButtonReturn else { return }
@@ -468,18 +407,6 @@ struct SettingsView: View {
         return path.isEmpty ? "<root>" : path
     }
 
-    private func diffSettingsKeys(old: AppSettings, new: AppSettings) -> [String] {
-        guard let oldData = try? JSONEncoder().encode(old),
-              let newData = try? JSONEncoder().encode(new),
-              let oldDict = (try? JSONSerialization.jsonObject(with: oldData)) as? [String: Any],
-              let newDict = (try? JSONSerialization.jsonObject(with: newData)) as? [String: Any] else { return [] }
-        return oldDict.keys.filter { key in
-            let oldJSON = oldDict[key].flatMap(stringifyJSONObject) ?? ""
-            let newJSON = newDict[key].flatMap(stringifyJSONObject) ?? ""
-            return oldJSON != newJSON
-        }.sorted()
-    }
-
     private func stringifyJSONObject(_ object: Any) -> String? {
         if JSONSerialization.isValidJSONObject(object),
            let data = try? JSONSerialization.data(withJSONObject: object) {
@@ -491,11 +418,10 @@ struct SettingsView: View {
     }
 
     private func exportSettings() {
-        let lockedKeys = managedSnapshot?.forcedKeys.map(\.displayName).sorted() ?? []
-        if !lockedKeys.isEmpty {
+        if let preview = exportPreviewMessage() {
             let alert = NSAlert()
             alert.messageText = "Export Managed Settings?"
-            alert.informativeText = "This export will include managed values. Locked keys: \(lockedKeys.joined(separator: ", "))"
+            alert.informativeText = preview
             alert.addButton(withTitle: "Continue")
             alert.addButton(withTitle: "Cancel")
             guard alert.runModal() == .alertFirstButtonReturn else { return }
@@ -531,9 +457,260 @@ struct SettingsView: View {
         case .hard_lock: return "Hard Lock"
         }
     }
+
+    private func importPreviewMessage(imported: AppSettings, resolvedImport: AppSettings) -> String {
+        let editableChanges = previewDiffs(from: scheduler.currentSettings, to: resolvedImport)
+        let lockedChanges = lockedImportDiffs(imported: imported, resolvedImport: resolvedImport)
+        var sections: [String] = []
+
+        if editableChanges.isEmpty {
+            sections.append("No editable changes detected.")
+        } else {
+            sections.append("Will change:")
+            sections.append(contentsOf: previewLines(for: editableChanges))
+        }
+
+        if !lockedChanges.isEmpty {
+            sections.append("")
+            sections.append("Managed, ignored from file:")
+            sections.append(contentsOf: previewLines(for: lockedChanges, prefix: "Requested"))
+        }
+
+        return sections.joined(separator: "\n")
+    }
+
+    private func exportPreviewMessage() -> String? {
+        guard let managedSnapshot, !managedSnapshot.forcedKeys.isEmpty else { return nil }
+        let entries = managedSnapshot.forcedKeys.sorted { $0.displayName < $1.displayName }.map {
+            "• \($0.displayName) = \(settingsValueSummary(for: $0.rawValue, in: scheduler.currentSettings))"
+        }
+        return (["This export includes values enforced by managed preferences.", "", "Locked fields:"]
+            + limitPreviewLines(entries))
+            .joined(separator: "\n")
+    }
+
+    private func previewDiffs(from current: AppSettings, to updated: AppSettings) -> [SettingsPreviewDiff] {
+        previewableKeys.compactMap { key in
+            guard settingsRawValueString(for: key, in: current) != settingsRawValueString(for: key, in: updated) else { return nil }
+            return SettingsPreviewDiff(
+                label: settingsLabel(for: key),
+                fromValue: settingsValueSummary(for: key, in: current),
+                toValue: settingsValueSummary(for: key, in: updated)
+            )
+        }
+    }
+
+    private func lockedImportDiffs(imported: AppSettings, resolvedImport: AppSettings) -> [SettingsPreviewDiff] {
+        guard let managedSnapshot else { return [] }
+        return managedSnapshot.forcedKeys.sorted { $0.displayName < $1.displayName }.compactMap { key in
+            guard settingsRawValueString(for: key.rawValue, in: imported) != settingsRawValueString(for: key.rawValue, in: resolvedImport) else { return nil }
+            return SettingsPreviewDiff(
+                label: key.displayName,
+                fromValue: settingsValueSummary(for: key.rawValue, in: imported),
+                toValue: settingsValueSummary(for: key.rawValue, in: resolvedImport)
+            )
+        }
+    }
+
+    private func previewLines(for diffs: [SettingsPreviewDiff], prefix: String? = nil) -> [String] {
+        let lines = diffs.map { diff in
+            if let prefix {
+                return "• \(diff.label): \(prefix) \(diff.fromValue), effective \(diff.toValue)"
+            }
+            return "• \(diff.label): \(diff.fromValue) -> \(diff.toValue)"
+        }
+        return limitPreviewLines(lines)
+    }
+
+    private func limitPreviewLines(_ lines: [String], maxCount: Int = 10) -> [String] {
+        guard lines.count > maxCount else { return lines }
+        return Array(lines.prefix(maxCount)) + ["• +\(lines.count - maxCount) more"]
+    }
+
+    private var previewableKeys: [String] {
+        [
+            "eyeConfig",
+            "microConfig",
+            "longConfig",
+            "snoozeDurationMinutes",
+            "historyRetentionDays",
+            "isPaused",
+            "customBreakTypes",
+            "blockedBundleIDs",
+            "idleThresholdMinutes",
+            "pauseDuringFocus",
+            "pauseDuringCalendarEvents",
+            "calendarFilterMode",
+            "filteredCalendarIDs",
+            "workdayStartMinutes",
+            "workdayEndMinutes",
+            "profiles",
+            "activeProfileId",
+            "notificationLeadMinutes",
+            "weeklyNotificationEnabled",
+            "globalSnoozeHotkey",
+            "menuBarIconTheme",
+            "breakEnforcementMode",
+            "rolePolicies",
+            "activeRole",
+            "localOnlyMode",
+        ]
+    }
+
+    private func settingsLabel(for key: String) -> String {
+        if let managedKey = ManagedSettingsKey(rawValue: key) {
+            return managedKey.displayName
+        }
+        switch key {
+        case "eyeConfig": return "Eye Break"
+        case "microConfig": return "Micro Break"
+        case "longConfig": return "Long Break"
+        case "historyRetentionDays": return "Retention Period"
+        case "isPaused": return "Pause State"
+        case "profiles": return "Profiles"
+        case "activeProfileId": return "Active Profile"
+        case "weeklyNotificationEnabled": return "Weekly Summary"
+        case "globalSnoozeHotkey": return "Snooze Hotkey"
+        case "menuBarIconTheme": return "Menu Bar Icon"
+        default: return key
+        }
+    }
+
+    private func settingsValueSummary(for key: String, in settings: AppSettings) -> String {
+        switch key {
+        case "eyeConfig":
+            return breakConfigSummary(settings.eyeConfig)
+        case "microConfig":
+            return breakConfigSummary(settings.microConfig)
+        case "longConfig":
+            return breakConfigSummary(settings.longConfig)
+        case "snoozeDurationMinutes":
+            return "\(settings.snoozeDurationMinutes) min"
+        case "historyRetentionDays":
+            return settings.historyRetentionDays == 0 ? "Unlimited" : "\(settings.historyRetentionDays) days"
+        case "isPaused":
+            return settings.isPaused ? "Paused" : "Running"
+        case "customBreakTypes":
+            return "\(settings.customBreakTypes.count) type(s)"
+        case "blockedBundleIDs":
+            return listSummary(settings.blockedBundleIDs, empty: "None")
+        case "idleThresholdMinutes":
+            return "\(settings.idleThresholdMinutes) min"
+        case "pauseDuringFocus":
+            return toggleSummary(settings.pauseDuringFocus)
+        case "pauseDuringCalendarEvents":
+            return toggleSummary(settings.pauseDuringCalendarEvents)
+        case "calendarFilterMode":
+            return calendarFilterSummary(settings.calendarFilterMode)
+        case "filteredCalendarIDs":
+            return settings.filteredCalendarIDs.isEmpty ? "None" : "\(settings.filteredCalendarIDs.count) calendar(s)"
+        case "workdayStartMinutes":
+            return settings.workdayStartMinutes.map(SettingsUIHelpers.formatMinutes) ?? "Off"
+        case "workdayEndMinutes":
+            return settings.workdayEndMinutes.map(SettingsUIHelpers.formatMinutes) ?? "Off"
+        case "profiles":
+            return "\(settings.profiles.count) profile(s)"
+        case "activeProfileId":
+            return activeProfileSummary(for: settings)
+        case "notificationLeadMinutes":
+            return "\(settings.notificationLeadMinutes) min"
+        case "weeklyNotificationEnabled":
+            return toggleSummary(settings.weeklyNotificationEnabled)
+        case "globalSnoozeHotkey":
+            return hotkeyLabel(for: settings.globalSnoozeHotkey)
+        case "menuBarIconTheme":
+            return menuBarThemeSummary(settings.menuBarIconTheme)
+        case "breakEnforcementMode":
+            return enforcementLabel(settings.breakEnforcementMode)
+        case "rolePolicies":
+            return "\(settings.rolePolicies.count) role policy(s)"
+        case "activeRole":
+            return roleLabel(settings.activeRole)
+        case "localOnlyMode":
+            return settings.localOnlyMode ? "Local only" : "Syncing"
+        default:
+            guard let object = rawSettingsValue(for: key, in: settings) else { return "Unknown" }
+            return stringifyJSONObject(object) ?? "Unknown"
+        }
+    }
+
+    private func settingsRawValueString(for key: String, in settings: AppSettings) -> String {
+        guard let object = rawSettingsValue(for: key, in: settings) else { return "" }
+        return stringifyJSONObject(object) ?? ""
+    }
+
+    private func rawSettingsValue(for key: String, in settings: AppSettings) -> Any? {
+        guard let data = try? JSONEncoder().encode(settings),
+              let dict = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return nil }
+        return dict[key]
+    }
+
+    private func breakConfigSummary(_ config: BreakConfig) -> String {
+        "\(config.intervalMinutes)m / \(config.durationSeconds)s / \(config.isEnabled ? "On" : "Off")"
+    }
+
+    private func listSummary(_ values: [String], empty: String) -> String {
+        guard !values.isEmpty else { return empty }
+        let sorted = values.sorted()
+        if sorted.count <= 3 {
+            return sorted.joined(separator: ", ")
+        }
+        return sorted.prefix(3).joined(separator: ", ") + " +\(sorted.count - 3) more"
+    }
+
+    private func toggleSummary(_ value: Bool) -> String {
+        value ? "On" : "Off"
+    }
+
+    private func calendarFilterSummary(_ mode: CalendarFilterMode) -> String {
+        switch mode {
+        case .all: return "All events"
+        case .busyOnly: return "Busy only"
+        case .selected: return "Selected calendars"
+        }
+    }
+
+    private func activeProfileSummary(for settings: AppSettings) -> String {
+        guard let activeID = settings.activeProfileId else { return "None" }
+        return settings.profiles.first(where: { $0.id == activeID })?.name ?? activeID.uuidString
+    }
+
+    private func hotkeyLabel(for hotkey: HotkeyDescriptor?) -> String {
+        guard let hotkey else { return "None" }
+        var parts: [String] = []
+        let mods = NSEvent.ModifierFlags(rawValue: UInt(hotkey.modifierFlags))
+        if mods.contains(.control) { parts.append("⌃") }
+        if mods.contains(.option) { parts.append("⌥") }
+        if mods.contains(.shift) { parts.append("⇧") }
+        if mods.contains(.command) { parts.append("⌘") }
+        parts.append(keyCodeToString(hotkey.keyCode))
+        return parts.joined()
+    }
+
+    private func menuBarThemeSummary(_ theme: MenuBarIconTheme) -> String {
+        switch theme {
+        case .monochrome: return "Monochrome"
+        case .color: return "Color"
+        case .minimal: return "Minimal"
+        }
+    }
 }
 
-private struct CalendarSelectionSection: View {
+private struct SettingsPreviewDiff {
+    let label: String
+    let fromValue: String
+    let toValue: String
+}
+
+enum SettingsUIHelpers {
+    static let workdayTimeSlots = stride(from: 0, to: 1440, by: 30).map { $0 }
+
+    static func formatMinutes(_ mins: Int) -> String {
+        String(format: "%02d:%02d", mins / 60, mins % 60)
+    }
+}
+
+struct CalendarSelectionSection: View {
     @Binding var selectedIDs: [String]
     let isDisabled: Bool
 
@@ -602,6 +779,81 @@ private struct CalendarSelectionSection: View {
         }
         calendars = available
         accessMessage = available.isEmpty ? "No calendars are available on this Mac." : ""
+    }
+}
+
+struct BundleIDSelectionSection: View {
+    @Binding var selectedBundleIDs: [String]
+    let isDisabled: Bool
+    let caption: String
+
+    @State private var manualBundleID = ""
+
+    private var runningApplications: [NSRunningApplication] {
+        NSWorkspace.shared.runningApplications
+            .filter { $0.activationPolicy == .regular && $0.bundleIdentifier != nil && $0.bundleIdentifier != Bundle.main.bundleIdentifier }
+            .sorted { ($0.localizedName ?? "") < ($1.localizedName ?? "") }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(caption)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            ForEach(runningApplications, id: \.processIdentifier) { app in
+                let bundleID = app.bundleIdentifier ?? ""
+                Toggle(app.localizedName ?? bundleID, isOn: toggleBinding(for: bundleID))
+                    .disabled(isDisabled)
+            }
+
+            HStack {
+                TextField("Manual bundle ID", text: $manualBundleID)
+                Button("Add", action: addManualBundleID)
+                    .disabled(isDisabled)
+            }
+
+            ForEach(Array(Set(selectedBundleIDs)).sorted(), id: \.self) { bundleID in
+                HStack {
+                    Text(bundleID)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Remove") {
+                        selectedBundleIDs.removeAll { $0 == bundleID }
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.red)
+                    .disabled(isDisabled)
+                }
+            }
+        }
+    }
+
+    private func toggleBinding(for bundleID: String) -> Binding<Bool> {
+        Binding(
+            get: { selectedBundleIDs.contains(bundleID) },
+            set: { selected in
+                if selected {
+                    if !selectedBundleIDs.contains(bundleID) {
+                        selectedBundleIDs.append(bundleID)
+                    }
+                } else {
+                    selectedBundleIDs.removeAll { $0 == bundleID }
+                }
+            }
+        )
+    }
+
+    private func addManualBundleID() {
+        let bundleID = manualBundleID.trimmingCharacters(in: .whitespaces)
+        guard !bundleID.isEmpty, !selectedBundleIDs.contains(bundleID), isValidBundleID(bundleID) else { return }
+        selectedBundleIDs.append(bundleID)
+        manualBundleID = ""
+    }
+
+    private func isValidBundleID(_ id: String) -> Bool {
+        id.range(of: #"^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$"#, options: .regularExpression) != nil
     }
 }
 

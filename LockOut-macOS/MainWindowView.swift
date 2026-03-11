@@ -8,6 +8,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
     case statistics = "Statistics"
     case settings = "Settings"
     var id: String { rawValue }
+    var accessibilityID: String { "sidebar." + rawValue.lowercased() }
     var icon: String {
         switch self {
         case .dashboard: "house"
@@ -30,15 +31,17 @@ struct MainWindowView: View {
             List(SidebarItem.allCases, selection: $selected) { item in
                 Label(item.rawValue, systemImage: item.icon)
                     .tag(item)
+                    .accessibilityIdentifier(item.accessibilityID)
             }
+            .accessibilityIdentifier("sidebar.list")
             .navigationTitle("LockOut")
         } detail: {
             switch selected {
-            case .dashboard: DashboardView(repository: repository)
-            case .schedule: ScheduleView()
-            case .profiles: ProfileEditorView() // #16
-            case .statistics: StatisticsView(repository: repository, cloudSync: cloudSync)
-            case .settings: SettingsView(repository: repository, cloudSync: cloudSync)
+            case .dashboard: DashboardView(repository: repository).accessibilityIdentifier("detail.dashboard")
+            case .schedule: ScheduleView().accessibilityIdentifier("detail.schedule")
+            case .profiles: ProfileEditorView().accessibilityIdentifier("detail.profiles") // #16
+            case .statistics: StatisticsView(repository: repository, cloudSync: cloudSync).accessibilityIdentifier("detail.statistics")
+            case .settings: SettingsView(repository: repository, cloudSync: cloudSync).accessibilityIdentifier("detail.settings")
             case nil: EmptyView()
             }
         }

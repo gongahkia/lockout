@@ -148,6 +148,7 @@ struct OnboardingView: View {
         }
         .tabViewStyle(.automatic)
         .frame(width: 560, height: 620)
+        .accessibilityIdentifier("onboarding.root")
         .onAppear {
             if managedSnapshot != nil {
                 selectedPreset = .managedTeam
@@ -203,6 +204,7 @@ struct OnboardingView: View {
                 page = 1
             }
             .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier("onboarding.continue")
         }
         .padding(32)
     }
@@ -230,6 +232,7 @@ struct OnboardingView: View {
             Spacer()
             Button("Next") { page = 2 }
                 .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier("onboarding.permissions.next")
         }
         .padding(40)
     }
@@ -268,6 +271,7 @@ struct OnboardingView: View {
                 page = 3
             }
             .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier("onboarding.integrations.next")
         }
         .padding(40)
     }
@@ -294,6 +298,7 @@ struct OnboardingView: View {
                 onFinish()
             }
             .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier("onboarding.getStarted")
         }
         .padding(40)
     }

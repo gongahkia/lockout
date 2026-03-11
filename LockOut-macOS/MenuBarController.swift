@@ -126,14 +126,23 @@ final class MenuBarController {
 
     private func startTick() { // #13: adaptive tick rate
         tickTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            guard let self else { return }
-            self.tickCount += 1
-            let menuVisible = self.statusItem.menu?.highlightedItem != nil
-            if menuVisible || self.tickCount % 5 == 0 { // update countdown every 5s unless menu is open
-                self.updateCountdown()
+            Task { @MainActor [weak self] in
+                self?.handleTick()
             }
-            if self.tickCount % 10 == 0 { self.updateOverdue() } // overdue check every 10s
-            if self.tickCount % 60 == 0 { self.updateStreak() }
+        }
+    }
+
+    private func handleTick() {
+        tickCount += 1
+        let menuVisible = statusItem.menu?.highlightedItem != nil
+        if menuVisible || tickCount % 5 == 0 { // update countdown every 5s unless menu is open
+            updateCountdown()
+        }
+        if tickCount % 10 == 0 {
+            updateOverdue()
+        }
+        if tickCount % 60 == 0 {
+            updateStreak()
         }
     }
 
@@ -225,7 +234,9 @@ final class MenuBarController {
         scheduler.pause(reason: .manual)
         manualResumeTimer?.invalidate()
         manualResumeTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { [weak self] _ in
-            self?.scheduler.resume(reason: .manual)
+            Task { @MainActor [weak self] in
+                self?.scheduler.resume(reason: .manual)
+            }
         }
         updateIcon()
     }
@@ -235,7 +246,9 @@ final class MenuBarController {
         scheduler.pause(reason: .manual)
         manualResumeTimer?.invalidate()
         manualResumeTimer = Timer.scheduledTimer(withTimeInterval: max(date.timeIntervalSinceNow, 1), repeats: false) { [weak self] _ in
-            self?.scheduler.resume(reason: .manual)
+            Task { @MainActor [weak self] in
+                self?.scheduler.resume(reason: .manual)
+            }
         }
         updateIcon()
     }
@@ -309,10 +322,7 @@ final class MenuBarController {
         guard let idStr = sender.representedObject as? String,
               let id = UUID(uuidString: idStr),
               let profile = scheduler.currentSettings.profiles.first(where: { $0.id == id }) else { return }
-        scheduler.currentSettings.activeProfileId = id
-        scheduler.currentSettings.customBreakTypes = profile.customBreakTypes
-        scheduler.currentSettings.blockedBundleIDs = profile.blockedBundleIDs
-        scheduler.currentSettings.idleThresholdMinutes = profile.idleThresholdMinutes
+        scheduler.currentSettings.apply(profile: profile)
         scheduler.reschedule(with: scheduler.currentSettings)
     }
 

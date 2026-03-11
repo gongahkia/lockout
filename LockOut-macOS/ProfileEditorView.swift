@@ -1,5 +1,6 @@
-import SwiftUI
+import AppKit
 import LockOutCore
+import SwiftUI
 
 struct ProfileEditorView: View {
     @EnvironmentObject var scheduler: BreakScheduler
@@ -54,6 +55,7 @@ struct ProfileEditorView: View {
                     profiles.wrappedValue.append(profile)
                     newProfileName = ""
                 }
+                .accessibilityIdentifier("profiles.create")
             }
             Button("Save Current Settings as New Profile") {
                 let name = "Profile \(profiles.wrappedValue.count + 1)"
@@ -62,13 +64,22 @@ struct ProfileEditorView: View {
                 scheduler.currentSettings.activeProfileId = profile.id
             }
             .buttonStyle(.bordered)
+            .accessibilityIdentifier("profiles.saveCurrent")
         }
         .padding()
         .frame(minWidth: 500, minHeight: 300)
+        .accessibilityIdentifier("profiles.view")
         .sheet(isPresented: $showEditor) {
             if let editing = editingProfile,
                let idx = profiles.wrappedValue.firstIndex(where: { $0.id == editing.id }) {
-                ProfileDetailEditor(profile: profiles[idx]) { showEditor = false }
+                ProfileDetailEditor(profile: profiles[idx]) {
+                    let updatedProfile = profiles.wrappedValue[idx]
+                    if scheduler.currentSettings.activeProfileId == updatedProfile.id {
+                        scheduler.currentSettings.apply(profile: updatedProfile)
+                        scheduler.reschedule(with: scheduler.currentSettings)
+                    }
+                    showEditor = false
+                }
             }
         }
     }
@@ -91,43 +102,166 @@ struct ProfileDetailEditor: View {
     @Binding var profile: AppProfile
     let onDone: () -> Void
 
+    private var managedSnapshot: ManagedSettingsSnapshot? {
+        (NSApp.delegate as? AppDelegate)?.managedSettings
+    }
+
+    private var lockedProfileKeys: [ManagedSettingsKey] {
+        let supportedKeys: [ManagedSettingsKey] = [
+            .customBreakTypes,
+            .blockedBundleIDs,
+            .idleThresholdMinutes,
+            .pauseDuringFocus,
+            .pauseDuringCalendarEvents,
+            .calendarFilterMode,
+            .filteredCalendarIDs,
+            .workdayStartMinutes,
+            .workdayEndMinutes,
+            .notificationLeadMinutes,
+            .breakEnforcementMode,
+            .snoozeDurationMinutes,
+        ]
+        return supportedKeys.filter(isLocked).sorted { $0.displayName < $1.displayName }
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Edit: \(profile.name)").font(.headline)
-            List {
-                ForEach(profile.customBreakTypes.indices, id: \.self) { i in
-                    HStack {
-                        Toggle("", isOn: $profile.customBreakTypes[i].enabled).labelsHidden()
-                        Text(profile.customBreakTypes[i].name)
-                        Spacer()
-                        Text("\(profile.customBreakTypes[i].intervalMinutes)m / \(profile.customBreakTypes[i].durationSeconds)s")
-                            .font(.caption).foregroundStyle(.secondary)
+        ScrollView {
+            Form {
+                if !lockedProfileKeys.isEmpty {
+                    Section {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Label("Some profile fields are managed", systemImage: "lock.shield")
+                                .font(.headline)
+                            Text(lockedProfileKeys.map(\.displayName).joined(separator: ", "))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 4)
                     }
                 }
-                .onDelete { profile.customBreakTypes.remove(atOffsets: $0) }
+
+                Section("Break Types") {
+                    ForEach(Array(profile.customBreakTypes.enumerated()), id: \.element.id) { i, breakType in
+                        HStack {
+                            Toggle("", isOn: $profile.customBreakTypes[i].enabled).labelsHidden()
+                            Text(breakType.name)
+                            Spacer()
+                            Text("\(breakType.intervalMinutes)m / \(breakType.durationSeconds)s")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Button("Remove") {
+                                profile.customBreakTypes.remove(at: i)
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.red)
+                            .disabled(isLocked(.customBreakTypes))
+                        }
+                    }
+                    .disabled(isLocked(.customBreakTypes))
+                }
+
+                Section("Auto-Pause") {
+                    Stepper(
+                        "Idle threshold: \(profile.idleThresholdMinutes) min",
+                        value: $profile.idleThresholdMinutes,
+                        in: 1...60
+                    )
+                    .disabled(isLocked(.idleThresholdMinutes))
+
+                    Toggle("Pause during Focus Mode", isOn: $profile.pauseDuringFocus)
+                        .disabled(isLocked(.pauseDuringFocus))
+
+                    Toggle("Pause during Calendar events", isOn: $profile.pauseDuringCalendarEvents)
+                        .disabled(isLocked(.pauseDuringCalendarEvents))
+
+                    if profile.pauseDuringCalendarEvents {
+                        Picker("Calendar Filter", selection: $profile.calendarFilterMode) {
+                            Text("All events").tag(CalendarFilterMode.all)
+                            Text("Busy only").tag(CalendarFilterMode.busyOnly)
+                            Text("Selected calendars").tag(CalendarFilterMode.selected)
+                        }
+                        .disabled(isLocked(.calendarFilterMode))
+
+                        if profile.calendarFilterMode == .selected {
+                            CalendarSelectionSection(
+                                selectedIDs: $profile.filteredCalendarIDs,
+                                isDisabled: isLocked(.filteredCalendarIDs) || isLocked(.pauseDuringCalendarEvents)
+                            )
+                        }
+                    }
+                }
+
+                Section("Workday") {
+                    Picker("Start time", selection: Binding(
+                        get: { profile.workdayStartMinutes ?? -1 },
+                        set: { profile.workdayStartMinutes = $0 >= 0 ? $0 : nil }
+                    )) {
+                        Text("Off").tag(-1)
+                        ForEach(SettingsUIHelpers.workdayTimeSlots, id: \.self) { mins in
+                            Text(SettingsUIHelpers.formatMinutes(mins)).tag(mins)
+                        }
+                    }
+                    .disabled(isLocked(.workdayStartMinutes))
+
+                    Picker("End time", selection: Binding(
+                        get: { profile.workdayEndMinutes ?? -1 },
+                        set: { profile.workdayEndMinutes = $0 >= 0 ? $0 : nil }
+                    )) {
+                        Text("Off").tag(-1)
+                        ForEach(SettingsUIHelpers.workdayTimeSlots, id: \.self) { mins in
+                            Text(SettingsUIHelpers.formatMinutes(mins)).tag(mins)
+                        }
+                    }
+                    .disabled(isLocked(.workdayEndMinutes))
+                }
+
+                Section("Notifications & Enforcement") {
+                    Stepper(
+                        "Notification lead: \(profile.notificationLeadMinutes) min",
+                        value: $profile.notificationLeadMinutes,
+                        in: 0...5
+                    )
+                    .disabled(isLocked(.notificationLeadMinutes))
+
+                    Stepper(
+                        "Snooze duration: \(profile.snoozeDurationMinutes) min",
+                        value: $profile.snoozeDurationMinutes,
+                        in: 1...30
+                    )
+                    .disabled(isLocked(.snoozeDurationMinutes))
+
+                    Picker("Break enforcement", selection: $profile.breakEnforcementMode) {
+                        Text("Reminder").tag(BreakEnforcementMode.reminder)
+                        Text("Soft Lock").tag(BreakEnforcementMode.soft_lock)
+                        Text("Hard Lock").tag(BreakEnforcementMode.hard_lock)
+                    }
+                    .disabled(isLocked(.breakEnforcementMode))
+                }
+
+                Section("Blocklist") {
+                    BundleIDSelectionSection(
+                        selectedBundleIDs: $profile.blockedBundleIDs,
+                        isDisabled: isLocked(.blockedBundleIDs),
+                        caption: "Block break overlay for these apps while this profile is active:"
+                    )
+                }
+
+                Section {
+                    HStack {
+                        Spacer()
+                        Button("Done") { onDone() }
+                            .buttonStyle(.borderedProminent)
+                    }
+                }
             }
-            Stepper("Idle threshold: \(profile.idleThresholdMinutes) min",
-                    value: $profile.idleThresholdMinutes, in: 1...60)
-            Toggle("Pause during Focus Mode", isOn: $profile.pauseDuringFocus)
-            Toggle("Pause during Calendar events", isOn: $profile.pauseDuringCalendarEvents)
-            Picker("Calendar Filter", selection: $profile.calendarFilterMode) {
-                Text("All events").tag(CalendarFilterMode.all)
-                Text("Busy only").tag(CalendarFilterMode.busyOnly)
-                Text("Selected calendars").tag(CalendarFilterMode.selected)
-            }
-            Stepper("Notification lead: \(profile.notificationLeadMinutes) min",
-                    value: $profile.notificationLeadMinutes, in: 0...5)
-            Stepper("Snooze duration: \(profile.snoozeDurationMinutes) min",
-                    value: $profile.snoozeDurationMinutes, in: 1...30)
-            Picker("Break enforcement", selection: $profile.breakEnforcementMode) {
-                Text("Reminder").tag(BreakEnforcementMode.reminder)
-                Text("Soft Lock").tag(BreakEnforcementMode.soft_lock)
-                Text("Hard Lock").tag(BreakEnforcementMode.hard_lock)
-            }
-            Button("Done") { onDone() }
-                .buttonStyle(.borderedProminent)
         }
         .padding()
-        .frame(minWidth: 400, minHeight: 300)
+        .frame(minWidth: 540, minHeight: 560)
+        .navigationTitle(profile.name)
+        .accessibilityIdentifier("profile.detail")
+    }
+
+    private func isLocked(_ key: ManagedSettingsKey) -> Bool {
+        managedSnapshot?.isForced(key) ?? false
     }
 }
