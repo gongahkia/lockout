@@ -21,8 +21,17 @@
 
 The below instructions are for locally running `LockOut`.
 
-```console
+1. First run the below to install `LockOut` and its dependancies on your machine.
 
+```console
+$ git clone https://github.com/gongahkia/lockout && cd lockout
+$ 
+```
+
+2. Then optionally run the below to run `LockOut`'s build tooling.
+
+```console
+$ 
 ```
 
 ## Architecture
