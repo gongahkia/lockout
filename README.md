@@ -15,7 +15,10 @@
 
 ## Screenshot
 
-...
+<div align="center">
+    <img src="./asset/reference/1.png" width="29%">
+    <img src="./asset/reference/2.png" width="59%">
+</div>
 
 ## Usage
 
