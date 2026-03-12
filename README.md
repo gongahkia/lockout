@@ -21,17 +21,29 @@
 
 The below instructions are for locally running `LockOut`.
 
-1. First run the below to install `LockOut` and its dependancies on your machine.
+1. Clone the repository and enter the project directory.
 
 ```console
 $ git clone https://github.com/gongahkia/lockout && cd lockout
-$ 
 ```
 
-2. Then optionally run the below to run `LockOut`'s build tooling.
+2. Create a local `Config.xcconfig` file and fill with the required values before building.
 
 ```console
-$ 
+$ make setup-config
+$ open Config.xcconfig
+```
+
+3. Finally run the below command to build `LockOut` in [Xcode](https://developer.apple.com/xcode/).
+
+```console
+$ open LockOut.xcodeproj # for running and building in Xcode directly
+
+$ xcodebuild -project LockOut.xcodeproj -scheme LockOut-macOS -destination 'platform=macOS' -derivedDataPath .derivedData CODE_SIGNING_ALLOWED=NO build
+$ open .derivedData/Build/Products/Debug/LockOut.app # for building straight from the CLI
+
+$ make test # make commands for convenient build
+$ make build
 ```
 
 ## Architecture
