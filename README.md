@@ -7,7 +7,11 @@
 
 ## Stack
 
-...
+* *Script*: [Swift](https://www.swift.org/), [Swift Package Manager](https://www.swift.org/package-manager/), [SwiftUI](https://developer.apple.com/xcode/swiftui/), [Apple AppKit](https://developer.apple.com/documentation/appkit), 
+* *Local persistence*: [SwiftData](https://developer.apple.com/documentation/swiftdata)
+* *Cloud*: [CloudKit](https://developer.apple.com/icloud/cloudkit/)
+* *Package* [Sparkle](https://www.thesparkleproject.org/), [XcodeGen](https://xcodegen.com/)
+* *CI/CD*: [Github Actions](https://github.com/features/actions)
 
 ## Screenshot
 
@@ -21,12 +25,6 @@ The below instructions are for locally running `LockOut`.
 
 ```
 
-...
-
 ## Architecture
 
-...
-
-## Reference
-
-The name `LockOut` is in reference to...
+![](./asset/reference/architecture.png)
