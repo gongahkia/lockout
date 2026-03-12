@@ -50,20 +50,22 @@ public struct SyncedSettingsEnvelope: Codable, Equatable, Sendable {
     }
 }
 
+@MainActor
 public final class SettingsSyncService {
     private let store = NSUbiquitousKeyValueStore.default
-    private static let key = "app_settings"
-    private static let pushDebounceSeconds: TimeInterval = 0.4
-    private static let lastPushKey = "settings_last_push_date"
-    private static let lastPullKey = "settings_last_pull_date"
-    private static let lastMetadataKey = "settings_last_sync_metadata"
-    private static let lastErrorKey = "settings_last_error"
-    private static let deviceRegistryKey = "settings_sync_device_registry"
-    private static let deviceIDKey = "settings_sync_current_device_id"
-    private static let kvStoreWarnThreshold = 900_000
+    nonisolated private static let key = "app_settings"
+    nonisolated private static let pushDebounceSeconds: TimeInterval = 0.4
+    nonisolated private static let lastPushKey = "settings_last_push_date"
+    nonisolated private static let lastPullKey = "settings_last_pull_date"
+    nonisolated private static let lastMetadataKey = "settings_last_sync_metadata"
+    nonisolated private static let lastErrorKey = "settings_last_error"
+    nonisolated private static let deviceRegistryKey = "settings_sync_device_registry"
+    nonisolated private static let deviceIDKey = "settings_sync_current_device_id"
+    nonisolated private static let kvStoreWarnThreshold = 900_000
 
     private var observer: NSObjectProtocol?
     private var pendingPushWorkItem: DispatchWorkItem?
+    private var externalChangeHandler: ((AppSettings) -> Void)?
 
     public var onCloudPush: ((AppSettings) -> Void)?
     public var onError: ((String) -> Void)?
@@ -74,7 +76,7 @@ public final class SettingsSyncService {
 
     public init() {}
 
-    public static func currentDeviceID() -> String {
+    nonisolated public static func currentDeviceID() -> String {
         if let existing = UserDefaults.standard.string(forKey: Self.deviceIDKey) {
             return existing
         }
@@ -176,17 +178,15 @@ public final class SettingsSyncService {
 
     public func observeChanges(handler: @escaping (AppSettings) -> Void) {
         guard !isLocalOnlyEnabled else { return }
+        externalChangeHandler = handler
         observer = NotificationCenter.default.addObserver(
             forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
             object: store,
             queue: .main
         ) { [weak self] _ in
-            guard let self else { return }
-            guard let envelope = self.pullEnvelope() else { return }
-            self.lastPullDate = Date()
-            self.lastSyncMetadata = envelope.metadata
-            self.updateDeviceRegistry(from: envelope.metadata, wroteSettings: true)
-            handler(envelope.settings)
+            Task { @MainActor [weak self] in
+                self?.handleExternalStoreChange()
+            }
         }
     }
 
@@ -195,9 +195,10 @@ public final class SettingsSyncService {
             NotificationCenter.default.removeObserver(obs)
             observer = nil
         }
+        externalChangeHandler = nil
     }
 
-    public static func merge(local: AppSettings, remote: AppSettings) -> AppSettings {
+    nonisolated public static func merge(local: AppSettings, remote: AppSettings) -> AppSettings {
         var merged = remote
         merged.localOnlyMode = local.localOnlyMode
         merged.isPaused = local.isPaused
@@ -276,6 +277,14 @@ public final class SettingsSyncService {
         )
     }
 
+    private func handleExternalStoreChange() {
+        guard let envelope = pullEnvelope() else { return }
+        lastPullDate = Date()
+        lastSyncMetadata = envelope.metadata
+        updateDeviceRegistry(from: envelope.metadata, wroteSettings: true)
+        externalChangeHandler?(envelope.settings)
+    }
+
     private func updateDeviceRegistry(from metadata: SettingsSyncMetadata, wroteSettings: Bool) {
         let now = Date()
         if metadata.deviceID == Self.currentDeviceID() {
@@ -329,7 +338,7 @@ public final class SettingsSyncService {
         deviceRegistry = registry
     }
 
-    private static func stricterEnforcementMode(_ lhs: BreakEnforcementMode, _ rhs: BreakEnforcementMode) -> BreakEnforcementMode {
+    nonisolated private static func stricterEnforcementMode(_ lhs: BreakEnforcementMode, _ rhs: BreakEnforcementMode) -> BreakEnforcementMode {
         func rank(_ mode: BreakEnforcementMode) -> Int {
             switch mode {
             case .reminder: return 0

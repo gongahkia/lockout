@@ -5,6 +5,7 @@ import os
 
 private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.lockout", category: "CloudKitSyncService") // #27
 
+@MainActor
 public final class CloudKitSyncService {
     private lazy var db: CKDatabase = {
         let id = Bundle.main.object(forInfoDictionaryKey: "CLOUDKIT_CONTAINER_ID") as? String
@@ -38,7 +39,10 @@ public final class CloudKitSyncService {
         // flush pending queue when network becomes available
         NetworkMonitor.shared.$isConnected
             .filter { $0 }
-            .sink { [weak self] _ in Task { await self?.flushPending() } }
+            .sink { [weak self] _ in
+                guard let self else { return }
+                Task { await self.flushPending() }
+            }
             .store(in: &cancellables)
     }
 
@@ -132,17 +136,14 @@ public final class CloudKitSyncService {
         }
         isSyncing = true
         defer { isSyncing = false }
-        let remote = await fetchSessions(since: lastSyncDate)
+        let syncStart = lastSyncDate
+        let remote = await fetchSessions(since: syncStart)
         for session in remote {
-            await MainActor.run {
-                let local = repository.fetchSession(id: session.id)
-                repository.save(resolveConflict(local: local, remote: session))
-            }
+            let local = repository.fetchSession(id: session.id)
+            repository.save(resolveConflict(local: local, remote: session))
         }
         let end = Date()
-        let local = await MainActor.run {
-            repository.fetchSessions(from: lastSyncDate, to: end)
-        }
+        let local = repository.fetchSessions(from: syncStart, to: end)
         for session in local { await uploadSession(session) }
         lastSyncDate = end
     }

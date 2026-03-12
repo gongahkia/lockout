@@ -2,6 +2,7 @@ import Foundation
 import Network
 import Combine
 
+@MainActor
 public final class NetworkMonitor: ObservableObject {
     public static let shared = NetworkMonitor()
     @Published public private(set) var isConnected: Bool = true
@@ -12,7 +13,7 @@ public final class NetworkMonitor: ObservableObject {
 
     private init() {
         monitor.pathUpdateHandler = { [weak self] path in
-            DispatchQueue.main.async {
+            Task { @MainActor [weak self] in
                 guard let self else { return }
                 if !self._forcedOffline { self.isConnected = path.status == .satisfied }
             }
@@ -23,7 +24,6 @@ public final class NetworkMonitor: ObservableObject {
     /// test-only: override connection state (synchronous, call on main thread)
     public func forceOffline(_ offline: Bool) {
         _forcedOffline = offline
-        if Thread.isMainThread { isConnected = !offline }
-        else { DispatchQueue.main.sync { self.isConnected = !offline } }
+        isConnected = !offline
     }
 }

@@ -73,8 +73,10 @@ public final class BreakScheduler: ObservableObject {
     }
 
     deinit {
-        timers.values.forEach { $0.invalidate() }
-        timers.removeAll()
+        MainActor.assumeIsolated {
+            timers.values.forEach { $0.invalidate() }
+            timers.removeAll()
+        }
     }
 
     public var isPaused: Bool {

@@ -13,12 +13,13 @@ public final class BreakHistoryRepository {
     }
 
     public func fetchSession(id: UUID) -> BreakSession? {
-        let descriptor = FetchDescriptor<BreakSessionRecord>(predicate: #Predicate { $0.id == id })
-        return (try? context.fetch(descriptor))?.first?.toBreakSession()
+        fetchAllRecords()
+            .first(where: { $0.id == id })?
+            .toBreakSession()
     }
 
     public func save(_ session: BreakSession) {
-        if let existing = (try? context.fetch(FetchDescriptor<BreakSessionRecord>(predicate: #Predicate { $0.id == session.id })))?.first {
+        if let existing = fetchAllRecords().first(where: { $0.id == session.id }) {
             existing.status = session.status.rawValue
             existing.endedAt = session.endedAt
             if let name = session.breakTypeName { existing.breakTypeName = name }
@@ -35,18 +36,16 @@ public final class BreakHistoryRepository {
     }
 
     public func fetchSessions(from startDate: Date, to endDate: Date) -> [BreakSession] {
-        let descriptor = FetchDescriptor<BreakSessionRecord>(
-            predicate: #Predicate { $0.scheduledAt >= startDate && $0.scheduledAt <= endDate }
-        )
-        return (try? context.fetch(descriptor))?.compactMap { $0.toBreakSession() } ?? []
+        fetchAllRecords()
+            .filter { $0.scheduledAt >= startDate && $0.scheduledAt <= endDate }
+            .compactMap { $0.toBreakSession() }
     }
 
     public func pruneOldRecords(retentionDays: Int) {
         guard retentionDays > 0 else { return } // 0 = unlimited, keep all
         let cutoff = Calendar.current.date(byAdding: .day, value: -retentionDays, to: Date()) ?? Date()
-        let descriptor = FetchDescriptor<BreakSessionRecord>(predicate: #Predicate { $0.scheduledAt < cutoff })
         do {
-            let old = try context.fetch(descriptor)
+            let old = fetchAllRecords().filter { $0.scheduledAt < cutoff }
             old.forEach { context.delete($0) }
             try context.save()
         } catch {
@@ -89,5 +88,9 @@ public final class BreakHistoryRepository {
 
     public func analyticsSnapshot(for days: Int, insightsStore: BreakInsightsStore) -> BreakAnalyticsSnapshot {
         insightsStore.snapshot(for: recentSessions(for: days))
+    }
+
+    private func fetchAllRecords() -> [BreakSessionRecord] {
+        (try? context.fetch(FetchDescriptor<BreakSessionRecord>())) ?? []
     }
 }

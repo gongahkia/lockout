@@ -157,6 +157,7 @@ final class BlocklistTests: XCTestCase {
 }
 
 // MARK: - CloudKitSyncService conflict resolution
+@MainActor
 final class CloudKitConflictTests: XCTestCase {
     func testResolveConflictPrefersCompleted() {
         let svc = CloudKitSyncService()
@@ -234,6 +235,7 @@ final class CustomBreakTypeSchedulingTests: XCTestCase {
 }
 
 // MARK: - CloudKitSyncService offline upload queue
+@MainActor
 final class CloudKitOfflineQueueTests: XCTestCase {
     override func tearDown() {
         UserDefaults.standard.removeObject(forKey: "ckPendingUploads")
@@ -377,6 +379,7 @@ final class AppSettingsStoreTests: XCTestCase {
     }
 }
 
+@MainActor
 final class SettingsSyncServiceTests: XCTestCase {
     func testPushPersistsMutatedSettingsLocally() {
         let svc = SettingsSyncService()
@@ -439,6 +442,7 @@ final class SettingsSyncServiceTests: XCTestCase {
     }
 }
 
+@MainActor
 final class ObservabilityTests: XCTestCase {
     override func tearDown() {
         Observability.sink = nil
@@ -682,6 +686,7 @@ final class BreakSchedulerUpcomingTests: XCTestCase {
 }
 
 // #26: CloudKit sync lock — skips actual network calls, tests the guard
+@MainActor
 final class CloudKitSyncLockTests: XCTestCase {
     func testSyncServiceInitDoesNotCrash() {
         // verify service creation doesn't eagerly init CKDatabase
@@ -701,6 +706,7 @@ final class AppSettingsStoreErrorTests: XCTestCase {
 }
 
 // #26: iCloud KVStore size warning
+@MainActor
 final class SettingsSyncSizeTests: XCTestCase {
     func testPushDoesNotCrashWithLargeSettings() {
         let svc = SettingsSyncService()
@@ -866,6 +872,7 @@ final class OnboardingReviewStateTests: XCTestCase {
     }
 }
 
+@MainActor
 final class SyncDeviceRegistryTests: XCTestCase {
     func testPushRecordsCurrentDeviceInRegistry() async {
         let service = SettingsSyncService()
