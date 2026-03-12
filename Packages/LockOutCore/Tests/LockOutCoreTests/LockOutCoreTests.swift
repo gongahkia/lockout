@@ -3,6 +3,36 @@ import SwiftData
 import CloudKit
 @testable import LockOutCore
 
+private enum TestDefaultsKeys {
+    static let localSettings = "local_app_settings"
+    static let activeRole = "local_active_user_role"
+    static let pendingUploads = "ckPendingUploads"
+    static let lastSyncDate = "ck_last_sync_date"
+}
+
+@MainActor
+private func resetPersistentTestState() {
+    let defaults = UserDefaults.standard
+    defaults.removeObject(forKey: TestDefaultsKeys.localSettings)
+    defaults.removeObject(forKey: TestDefaultsKeys.activeRole)
+    defaults.removeObject(forKey: TestDefaultsKeys.pendingUploads)
+    defaults.removeObject(forKey: TestDefaultsKeys.lastSyncDate)
+    NetworkMonitor.shared.forceOffline(false)
+}
+
+@MainActor
+class PersistentStateTestCase: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        resetPersistentTestState()
+    }
+
+    override func tearDown() {
+        resetPersistentTestState()
+        super.tearDown()
+    }
+}
+
 // MARK: - ComplianceCalculator tests
 final class ComplianceCalculatorTests: XCTestCase {
     func testStreakEmpty() {
@@ -236,15 +266,9 @@ final class CustomBreakTypeSchedulingTests: XCTestCase {
 
 // MARK: - CloudKitSyncService offline upload queue
 @MainActor
-final class CloudKitOfflineQueueTests: XCTestCase {
-    override func tearDown() {
-        UserDefaults.standard.removeObject(forKey: "ckPendingUploads")
-        NetworkMonitor.shared.forceOffline(false)
-        super.tearDown()
-    }
-
+final class CloudKitOfflineQueueTests: PersistentStateTestCase {
     private func pendingQueue() -> [BreakSession] {
-        guard let data = UserDefaults.standard.data(forKey: "ckPendingUploads"),
+        guard let data = UserDefaults.standard.data(forKey: TestDefaultsKeys.pendingUploads),
               let queue = try? JSONDecoder().decode([BreakSession].self, from: data) else { return [] }
         return queue
     }
@@ -368,7 +392,7 @@ final class SettingsJSONRoundTripTests: XCTestCase {
 }
 
 // MARK: - AppSettingsStore round-trip
-final class AppSettingsStoreTests: XCTestCase {
+final class AppSettingsStoreTests: PersistentStateTestCase {
     func testRoundTrip() {
         AppSettingsStore.save(.defaults)
         let loaded = AppSettingsStore.load()
@@ -380,7 +404,7 @@ final class AppSettingsStoreTests: XCTestCase {
 }
 
 @MainActor
-final class SettingsSyncServiceTests: XCTestCase {
+final class SettingsSyncServiceTests: PersistentStateTestCase {
     func testPushPersistsMutatedSettingsLocally() {
         let svc = SettingsSyncService()
         var settings = AppSettings.defaults
@@ -443,7 +467,7 @@ final class SettingsSyncServiceTests: XCTestCase {
 }
 
 @MainActor
-final class ObservabilityTests: XCTestCase {
+final class ObservabilityTests: PersistentStateTestCase {
     override func tearDown() {
         Observability.sink = nil
         super.tearDown()
@@ -687,7 +711,7 @@ final class BreakSchedulerUpcomingTests: XCTestCase {
 
 // #26: CloudKit sync lock — skips actual network calls, tests the guard
 @MainActor
-final class CloudKitSyncLockTests: XCTestCase {
+final class CloudKitSyncLockTests: PersistentStateTestCase {
     func testSyncServiceInitDoesNotCrash() {
         // verify service creation doesn't eagerly init CKDatabase
         let svc = CloudKitSyncService()
@@ -696,18 +720,18 @@ final class CloudKitSyncLockTests: XCTestCase {
 }
 
 // #26: AppSettingsStore error logging
-final class AppSettingsStoreErrorTests: XCTestCase {
+final class AppSettingsStoreErrorTests: PersistentStateTestCase {
     func testLoadReturnsNilForCorruptData() {
-        UserDefaults.standard.set(Data([0xFF, 0xFE]), forKey: "local_app_settings")
+        UserDefaults.standard.set(Data([0xFF, 0xFE]), forKey: TestDefaultsKeys.localSettings)
         let result = AppSettingsStore.load()
         XCTAssertNil(result)
-        UserDefaults.standard.removeObject(forKey: "local_app_settings")
+        UserDefaults.standard.removeObject(forKey: TestDefaultsKeys.localSettings)
     }
 }
 
 // #26: iCloud KVStore size warning
 @MainActor
-final class SettingsSyncSizeTests: XCTestCase {
+final class SettingsSyncSizeTests: PersistentStateTestCase {
     func testPushDoesNotCrashWithLargeSettings() {
         let svc = SettingsSyncService()
         var settings = AppSettings.defaults
@@ -873,7 +897,7 @@ final class OnboardingReviewStateTests: XCTestCase {
 }
 
 @MainActor
-final class SyncDeviceRegistryTests: XCTestCase {
+final class SyncDeviceRegistryTests: PersistentStateTestCase {
     func testPushRecordsCurrentDeviceInRegistry() async {
         let service = SettingsSyncService()
         var settings = AppSettings.defaults
