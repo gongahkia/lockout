@@ -208,10 +208,13 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var pauseDuringCalendarEvents: Bool
     public var calendarFilterMode: CalendarFilterMode
     public var filteredCalendarIDs: [String]
+    public var calendarMatchOptions: CalendarMatchOptions
     public var workdayStartMinutes: Int?
     public var workdayEndMinutes: Int?
     public var profiles: [AppProfile]
+    public var autoProfileRules: [AutoProfileRule]
     public var activeProfileId: UUID?
+    public var profileActivationMode: ProfileActivationMode
     public var notificationLeadMinutes: Int
     public var weeklyNotificationEnabled: Bool
     public var globalSnoozeHotkey: HotkeyDescriptor?
@@ -220,6 +223,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var rolePolicies: [RolePolicy]
     public var activeRole: UserRole
     public var localOnlyMode: Bool
+    public var onboardingReviewState: OnboardingReviewState
+    public var recoveryModeConfig: RecoveryModeConfig
 
     public init(
         eyeConfig: BreakConfig,
@@ -235,10 +240,13 @@ public struct AppSettings: Codable, Equatable, Sendable {
         pauseDuringCalendarEvents: Bool = false,
         calendarFilterMode: CalendarFilterMode = .all,
         filteredCalendarIDs: [String] = [],
+        calendarMatchOptions: CalendarMatchOptions = CalendarMatchOptions(),
         workdayStartMinutes: Int? = nil,
         workdayEndMinutes: Int? = nil,
         profiles: [AppProfile] = [],
+        autoProfileRules: [AutoProfileRule] = [],
         activeProfileId: UUID? = nil,
+        profileActivationMode: ProfileActivationMode = .automatic,
         notificationLeadMinutes: Int = 1,
         weeklyNotificationEnabled: Bool = false,
         globalSnoozeHotkey: HotkeyDescriptor? = nil,
@@ -246,7 +254,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
         breakEnforcementMode: BreakEnforcementMode = .reminder,
         rolePolicies: [RolePolicy] = RolePolicy.defaults,
         activeRole: UserRole = .developer,
-        localOnlyMode: Bool = false
+        localOnlyMode: Bool = false,
+        onboardingReviewState: OnboardingReviewState = OnboardingReviewState(),
+        recoveryModeConfig: RecoveryModeConfig = RecoveryModeConfig()
     ) {
         self.eyeConfig = eyeConfig
         self.microConfig = microConfig
@@ -261,10 +271,13 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.pauseDuringCalendarEvents = pauseDuringCalendarEvents
         self.calendarFilterMode = calendarFilterMode
         self.filteredCalendarIDs = filteredCalendarIDs
+        self.calendarMatchOptions = calendarMatchOptions
         self.workdayStartMinutes = workdayStartMinutes
         self.workdayEndMinutes = workdayEndMinutes
         self.profiles = profiles
+        self.autoProfileRules = autoProfileRules
         self.activeProfileId = activeProfileId
+        self.profileActivationMode = profileActivationMode
         self.notificationLeadMinutes = max(0, min(5, notificationLeadMinutes))
         self.weeklyNotificationEnabled = weeklyNotificationEnabled
         self.globalSnoozeHotkey = globalSnoozeHotkey
@@ -273,6 +286,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.rolePolicies = rolePolicies
         self.activeRole = activeRole
         self.localOnlyMode = localOnlyMode
+        self.onboardingReviewState = onboardingReviewState
+        self.recoveryModeConfig = recoveryModeConfig
     }
 
     public init(from decoder: Decoder) throws {
@@ -290,6 +305,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         pauseDuringCalendarEvents = try c.decode(Bool.self, forKey: .pauseDuringCalendarEvents)
         calendarFilterMode = try c.decodeIfPresent(CalendarFilterMode.self, forKey: .calendarFilterMode) ?? .all
         filteredCalendarIDs = try c.decodeIfPresent([String].self, forKey: .filteredCalendarIDs) ?? []
+        calendarMatchOptions = try c.decodeIfPresent(CalendarMatchOptions.self, forKey: .calendarMatchOptions) ?? CalendarMatchOptions()
         if let mins = try c.decodeIfPresent(Int.self, forKey: .workdayStartMinutes) {
             workdayStartMinutes = mins
         } else if let hour = try c.decodeIfPresent(Int.self, forKey: .workdayStartHourLegacy) {
@@ -305,7 +321,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
             workdayEndMinutes = nil
         }
         profiles = try c.decodeIfPresent([AppProfile].self, forKey: .profiles) ?? []
+        autoProfileRules = try c.decodeIfPresent([AutoProfileRule].self, forKey: .autoProfileRules) ?? []
         activeProfileId = try c.decodeIfPresent(UUID.self, forKey: .activeProfileId)
+        profileActivationMode = try c.decodeIfPresent(ProfileActivationMode.self, forKey: .profileActivationMode) ?? .automatic
         notificationLeadMinutes = try c.decode(Int.self, forKey: .notificationLeadMinutes)
         weeklyNotificationEnabled = try c.decode(Bool.self, forKey: .weeklyNotificationEnabled)
         globalSnoozeHotkey = try c.decodeIfPresent(HotkeyDescriptor.self, forKey: .globalSnoozeHotkey)
@@ -314,17 +332,21 @@ public struct AppSettings: Codable, Equatable, Sendable {
         rolePolicies = try c.decode([RolePolicy].self, forKey: .rolePolicies)
         activeRole = try c.decode(UserRole.self, forKey: .activeRole)
         localOnlyMode = try c.decode(Bool.self, forKey: .localOnlyMode)
+        onboardingReviewState = try c.decodeIfPresent(OnboardingReviewState.self, forKey: .onboardingReviewState) ?? OnboardingReviewState()
+        recoveryModeConfig = try c.decodeIfPresent(RecoveryModeConfig.self, forKey: .recoveryModeConfig) ?? RecoveryModeConfig()
     }
 
     private enum CodingKeys: String, CodingKey {
         case eyeConfig, microConfig, longConfig, snoozeDurationMinutes, historyRetentionDays
         case isPaused, customBreakTypes, blockedBundleIDs, idleThresholdMinutes
-        case pauseDuringFocus, pauseDuringCalendarEvents, calendarFilterMode, filteredCalendarIDs
+        case pauseDuringFocus, pauseDuringCalendarEvents, calendarFilterMode, filteredCalendarIDs, calendarMatchOptions
         case workdayStartMinutes, workdayEndMinutes
         case workdayStartHourLegacy = "workdayStartHour"
         case workdayEndHourLegacy = "workdayEndHour"
-        case profiles, activeProfileId, notificationLeadMinutes, weeklyNotificationEnabled
+        case profiles, autoProfileRules, activeProfileId, profileActivationMode
+        case notificationLeadMinutes, weeklyNotificationEnabled
         case globalSnoozeHotkey, menuBarIconTheme, breakEnforcementMode, rolePolicies, activeRole, localOnlyMode
+        case onboardingReviewState, recoveryModeConfig
     }
 
     public var workdayStartHourDisplay: Int? { workdayStartMinutes.map { $0 / 60 } }
@@ -382,10 +404,13 @@ public struct AppSettings: Codable, Equatable, Sendable {
         try c.encode(pauseDuringCalendarEvents, forKey: .pauseDuringCalendarEvents)
         try c.encode(calendarFilterMode, forKey: .calendarFilterMode)
         try c.encode(filteredCalendarIDs, forKey: .filteredCalendarIDs)
+        try c.encode(calendarMatchOptions, forKey: .calendarMatchOptions)
         try c.encodeIfPresent(workdayStartMinutes, forKey: .workdayStartMinutes)
         try c.encodeIfPresent(workdayEndMinutes, forKey: .workdayEndMinutes)
         try c.encode(profiles, forKey: .profiles)
+        try c.encode(autoProfileRules, forKey: .autoProfileRules)
         try c.encodeIfPresent(activeProfileId, forKey: .activeProfileId)
+        try c.encode(profileActivationMode, forKey: .profileActivationMode)
         try c.encode(notificationLeadMinutes, forKey: .notificationLeadMinutes)
         try c.encode(weeklyNotificationEnabled, forKey: .weeklyNotificationEnabled)
         try c.encodeIfPresent(globalSnoozeHotkey, forKey: .globalSnoozeHotkey)
@@ -394,6 +419,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         try c.encode(rolePolicies, forKey: .rolePolicies)
         try c.encode(activeRole, forKey: .activeRole)
         try c.encode(localOnlyMode, forKey: .localOnlyMode)
+        try c.encode(onboardingReviewState, forKey: .onboardingReviewState)
+        try c.encode(recoveryModeConfig, forKey: .recoveryModeConfig)
     }
 
     public static var defaultCustomBreakTypes: [CustomBreakType] {
@@ -425,6 +452,10 @@ public struct AppSettings: Codable, Equatable, Sendable {
         try Self.validateRange(notificationLeadMinutes, field: "notificationLeadMinutes", range: 0...5)
         try Self.validateWorkdayMinutes(workdayStartMinutes, field: "workdayStartMinutes")
         try Self.validateWorkdayMinutes(workdayEndMinutes, field: "workdayEndMinutes")
+        try Self.validateRange(calendarMatchOptions.minimumDurationMinutes, field: "calendarMatchOptions.minimumDurationMinutes", range: 0...240)
+        try Self.validateRange(recoveryModeConfig.lookbackDays, field: "recoveryModeConfig.lookbackDays", range: 1...14)
+        try Self.validateRange(recoveryModeConfig.skipThreshold, field: "recoveryModeConfig.skipThreshold", range: 1...20)
+        try Self.validateRange(recoveryModeConfig.snoozeThreshold, field: "recoveryModeConfig.snoozeThreshold", range: 1...20)
 
         try Self.validateBreakConfig(eyeConfig, fieldPrefix: "eyeConfig")
         try Self.validateBreakConfig(microConfig, fieldPrefix: "microConfig")
@@ -438,6 +469,16 @@ public struct AppSettings: Codable, Equatable, Sendable {
             try Self.validateWorkdayMinutes(profile.workdayEndMinutes, field: "profiles[\(index)].workdayEndMinutes")
             for (breakIndex, breakType) in profile.customBreakTypes.enumerated() {
                 try Self.validateCustomBreakType(breakType, index: breakIndex, prefix: "profiles[\(index)].customBreakTypes")
+            }
+        }
+
+        for (index, rule) in autoProfileRules.enumerated() {
+            try Self.validateRange(rule.priority, field: "autoProfileRules[\(index)].priority", range: 0...100)
+            for trigger in rule.triggers {
+                if case let .timeWindow(startMinutes, endMinutes) = trigger {
+                    try Self.validateRange(startMinutes, field: "autoProfileRules[\(index)].timeWindow.startMinutes", range: 0...1439)
+                    try Self.validateRange(endMinutes, field: "autoProfileRules[\(index)].timeWindow.endMinutes", range: 0...1439)
+                }
             }
         }
 

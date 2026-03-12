@@ -4,10 +4,48 @@ import Foundation
 public struct ScheduledBreakContext: Equatable, Sendable {
     public let customTypeID: UUID
     public let scheduledAt: Date
+    public let insightMetadata: BreakInsightMetadata?
 
-    public init(customTypeID: UUID, scheduledAt: Date) {
+    public init(customTypeID: UUID, scheduledAt: Date, insightMetadata: BreakInsightMetadata? = nil) {
         self.customTypeID = customTypeID
         self.scheduledAt = scheduledAt
+        self.insightMetadata = insightMetadata
+    }
+
+    public func withInsightMetadata(_ metadata: BreakInsightMetadata?) -> ScheduledBreakContext {
+        ScheduledBreakContext(customTypeID: customTypeID, scheduledAt: scheduledAt, insightMetadata: metadata)
+    }
+}
+
+public struct DeferredBreakState: Equatable, Sendable {
+    public let context: ScheduledBreakContext
+    public let condition: DeferredBreakCondition?
+    public let deferredAt: Date
+
+    public init(context: ScheduledBreakContext, condition: DeferredBreakCondition? = nil, deferredAt: Date = Date()) {
+        self.context = context
+        self.condition = condition
+        self.deferredAt = deferredAt
+    }
+
+    public var customTypeID: UUID { context.customTypeID }
+    public var scheduledAt: Date { context.scheduledAt }
+
+    public func isReadyForRetry(evaluationContext: DeferredBreakEvaluationContext) -> Bool {
+        guard let condition else { return true }
+        switch condition {
+        case let .minutes(minutes):
+            return evaluationContext.now >= deferredAt.addingTimeInterval(Double(minutes) * 60)
+        case let .untilMeetingEnds(eventID):
+            if let eventID {
+                return !evaluationContext.activeMeetingEventIDs.contains(eventID)
+            }
+            return evaluationContext.activeMeetingEventIDs.isEmpty
+        case .untilFullscreenEnds:
+            return !evaluationContext.isFullscreen
+        case let .untilAppChanges(bundleID):
+            return evaluationContext.frontmostBundleID != bundleID
+        }
     }
 }
 
@@ -16,9 +54,11 @@ public final class BreakScheduler: ObservableObject {
     @Published public var nextBreak: (customTypeID: UUID, fireDate: Date)?
     @Published public var currentSettings: AppSettings
     @Published public private(set) var activePauseReasons: Set<PauseReason>
-    @Published public private(set) var pendingDeferredBreak: ScheduledBreakContext?
+    @Published public private(set) var pendingDeferredBreak: DeferredBreakState?
+    @Published public private(set) var decisionTrace: DecisionTrace
 
     public var onBreakTriggered: ((CustomBreakType, ScheduledBreakContext) -> Void)?
+    public var onSessionRecorded: ((BreakSession, BreakInsightMetadata?) -> Void)?
 
     var timers: [UUID: Timer] = [:]
 
@@ -28,6 +68,8 @@ public final class BreakScheduler: ObservableObject {
     public init(settings: AppSettings = .defaults) {
         self.currentSettings = settings
         self.activePauseReasons = settings.isPaused ? [.manual] : []
+        self.decisionTrace = DecisionTrace()
+        syncDecisionTrace()
     }
 
     deinit {
@@ -51,6 +93,9 @@ public final class BreakScheduler: ObservableObject {
     public var pendingDeferredSummary: String? {
         guard let pendingDeferredBreak,
               let customType = currentSettings.customBreakTypes.first(where: { $0.id == pendingDeferredBreak.customTypeID }) else { return nil }
+        if let condition = pendingDeferredBreak.condition {
+            return "Pending deferred: \(customType.name) until \(condition.displayName)"
+        }
         return "Pending deferred: \(customType.name)"
     }
 
@@ -73,7 +118,7 @@ public final class BreakScheduler: ObservableObject {
     }
 
     public func breakContextForPresentation() -> ScheduledBreakContext? {
-        activeBreakContext ?? pendingDeferredBreak ?? nextBreak.map { ScheduledBreakContext(customTypeID: $0.customTypeID, scheduledAt: $0.fireDate) }
+        activeBreakContext ?? pendingDeferredBreak?.context ?? nextBreak.map { ScheduledBreakContext(customTypeID: $0.customTypeID, scheduledAt: $0.fireDate) }
     }
 
     public func start(settings: AppSettings, offsetSeconds: TimeInterval = 0) {
@@ -129,7 +174,7 @@ public final class BreakScheduler: ObservableObject {
 
     public func beginBreakPresentation(_ context: ScheduledBreakContext) {
         activeBreakContext = context
-        if pendingDeferredBreak == context {
+        if pendingDeferredBreak?.context == context {
             pendingDeferredBreak = nil
         }
         if timers[context.customTypeID] == nil,
@@ -141,11 +186,17 @@ public final class BreakScheduler: ObservableObject {
         }
         refreshNextBreak()
         persistFireDates()
+        syncDecisionTrace()
     }
 
-    public func registerDeferredBreak(_ context: ScheduledBreakContext, repository: BreakHistoryRepository, cloudSync: CloudKitSyncService? = nil) {
+    public func registerDeferredBreak(
+        _ context: ScheduledBreakContext,
+        condition: DeferredBreakCondition? = nil,
+        repository: BreakHistoryRepository,
+        cloudSync: CloudKitSyncService? = nil
+    ) {
         Observability.emit(category: "BreakScheduler", message: "deferred break=\(customTypeName(for: context.customTypeID) ?? "unknown")")
-        if pendingDeferredBreak != context {
+        if pendingDeferredBreak?.context != context || pendingDeferredBreak?.condition != condition {
             let session = BreakSession(
                 type: legacyBreakType(forCustomTypeID: context.customTypeID),
                 scheduledAt: context.scheduledAt,
@@ -153,18 +204,53 @@ public final class BreakScheduler: ObservableObject {
                 breakTypeName: customTypeName(for: context.customTypeID)
             )
             repository.save(session)
+            onSessionRecorded?(session, context.insightMetadata)
             if !currentSettings.localOnlyMode, let cloudSync {
                 Task { await cloudSync.uploadSession(session) }
             }
         }
         activeBreakContext = nil
-        pendingDeferredBreak = context
+        pendingDeferredBreak = DeferredBreakState(context: context, condition: condition)
         refreshNextBreak()
         persistFireDates()
+        syncDecisionTrace()
     }
 
     public func clearPendingDeferredBreak() {
         pendingDeferredBreak = nil
+        syncDecisionTrace()
+    }
+
+    public func updateDecisionTrace(
+        effectiveSource: EffectiveSettingsSource,
+        matchedRule: AutoProfileRule? = nil,
+        lastSyncWriter: String? = nil
+    ) {
+        decisionTrace = DecisionTrace(
+            activeProfileID: currentSettings.activeProfileId,
+            activeProfileName: currentSettings.profiles.first(where: { $0.id == currentSettings.activeProfileId })?.name,
+            activationMode: currentSettings.profileActivationMode,
+            matchedRuleID: matchedRule?.id,
+            matchedRuleSummary: matchedRule?.summary,
+            activePauseReasons: PauseReason.allCases.filter(activePauseReasons.contains),
+            pendingDeferredCondition: pendingDeferredBreak?.condition,
+            effectiveSettingsSource: effectiveSource,
+            lastSyncWriter: lastSyncWriter
+        )
+    }
+
+    private func syncDecisionTrace() {
+        decisionTrace = DecisionTrace(
+            activeProfileID: currentSettings.activeProfileId,
+            activeProfileName: currentSettings.profiles.first(where: { $0.id == currentSettings.activeProfileId })?.name,
+            activationMode: currentSettings.profileActivationMode,
+            matchedRuleID: decisionTrace.matchedRuleID,
+            matchedRuleSummary: decisionTrace.matchedRuleSummary,
+            activePauseReasons: PauseReason.allCases.filter(activePauseReasons.contains),
+            pendingDeferredCondition: pendingDeferredBreak?.condition,
+            effectiveSettingsSource: decisionTrace.effectiveSettingsSource,
+            lastSyncWriter: decisionTrace.lastSyncWriter
+        )
     }
 
     public func snooze(minutes: Int? = nil, repository: BreakHistoryRepository? = nil, cloudSync: CloudKitSyncService? = nil) {
@@ -182,6 +268,7 @@ public final class BreakScheduler: ObservableObject {
                 breakTypeName: breakTypeName
             )
             repository.save(session)
+            onSessionRecorded?(session, context.insightMetadata)
             if !currentSettings.localOnlyMode, let cloudSync {
                 Task { await cloudSync.uploadSession(session) }
             }
@@ -206,12 +293,14 @@ public final class BreakScheduler: ObservableObject {
             breakTypeName: currentCustomBreakType?.name
         )
         repository.save(session)
+        onSessionRecorded?(session, context.insightMetadata)
         if !currentSettings.localOnlyMode, let cloudSync {
             Task { await cloudSync.uploadSession(session) }
         }
         activeBreakContext = nil
         pendingDeferredBreak = nil
         reschedule(with: currentSettings)
+        syncDecisionTrace()
     }
 
     public func markCompleted(repository: BreakHistoryRepository, cloudSync: CloudKitSyncService? = nil) {
@@ -226,12 +315,14 @@ public final class BreakScheduler: ObservableObject {
             breakTypeName: currentCustomBreakType?.name
         )
         repository.save(session)
+        onSessionRecorded?(session, context.insightMetadata)
         if !currentSettings.localOnlyMode, let cloudSync {
             Task { await cloudSync.uploadSession(session) }
         }
         activeBreakContext = nil
         pendingDeferredBreak = nil
         reschedule(with: currentSettings)
+        syncDecisionTrace()
     }
 
     public func pause(reason: PauseReason = .manual) {
@@ -242,6 +333,7 @@ public final class BreakScheduler: ObservableObject {
         Observability.emit(category: "BreakScheduler", message: "paused reason=\(reason.rawValue)")
         stop()
         Self.clearPersistedFireDates()
+        syncDecisionTrace()
     }
 
     public func resume(reason: PauseReason = .manual) {
@@ -256,6 +348,7 @@ public final class BreakScheduler: ObservableObject {
         }
         Observability.emit(category: "BreakScheduler", message: "resumed")
         start(settings: currentSettings)
+        syncDecisionTrace()
     }
 
     public func pause() {
@@ -269,6 +362,7 @@ public final class BreakScheduler: ObservableObject {
     public func reschedule(with settings: AppSettings) {
         stop()
         start(settings: settings)
+        syncDecisionTrace()
     }
 
     func simulateTimerFireForTesting(customTypeID: UUID) {

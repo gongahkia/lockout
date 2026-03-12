@@ -78,4 +78,16 @@ public final class BreakHistoryRepository {
         return map.map { DayStat(date: $0.key, counts: $0.value, perTypeCounts: typeMap[$0.key] ?? [:]) }
                   .sorted { $0.date < $1.date }
     }
+
+    public func recentSessions(for days: Int) -> [BreakSession] {
+        let cal = Calendar.current
+        let startOfToday = cal.startOfDay(for: Date())
+        let end = Date()
+        let start = cal.startOfDay(for: cal.date(byAdding: .day, value: -(days - 1), to: startOfToday)!)
+        return fetchSessions(from: start, to: end)
+    }
+
+    public func analyticsSnapshot(for days: Int, insightsStore: BreakInsightsStore) -> BreakAnalyticsSnapshot {
+        insightsStore.snapshot(for: recentSessions(for: days))
+    }
 }

@@ -1,11 +1,13 @@
 import SwiftUI
 import LockOutCore
+import AppKit
 
 struct DashboardView: View {
     let repository: BreakHistoryRepository
     @EnvironmentObject var scheduler: BreakScheduler
     @State private var now = Date()
     private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+    private var appDelegate: AppDelegate? { NSApp.delegate as? AppDelegate }
 
     private var remaining: TimeInterval {
         guard let nb = scheduler.nextBreak else { return 0 }
@@ -28,8 +30,17 @@ struct DashboardView: View {
         return Double(sessions.filter { $0.status == .completed }.count) / Double(max(sessions.count, 1))
     }
 
+    private var insightCards: [InsightCard] {
+        appDelegate?.insightCards(range: 30) ?? []
+    }
+
+    private var reviewCards: [InsightCard] {
+        appDelegate?.reviewSuggestionCards() ?? []
+    }
+
     var body: some View {
-        VStack(spacing: 24) {
+        ScrollView {
+            VStack(spacing: 24) {
             CountdownRing(
                 progress: progress,
                 label: scheduler.currentCustomBreakType?.name ?? "—",
@@ -48,6 +59,13 @@ struct DashboardView: View {
                 Text("\(Int(todayCompliance * 100))%")
                     .font(.largeTitle).bold()
                 Text("Today's compliance").font(.caption).foregroundStyle(.secondary)
+            }
+            decisionInspector
+            if !reviewCards.isEmpty {
+                reviewSection
+            }
+            if !insightCards.isEmpty {
+                insightSection
             }
             // #22: upcoming schedule
             let upcoming = scheduler.allUpcomingBreaks
@@ -84,11 +102,124 @@ struct DashboardView: View {
                 scheduler.currentSettings.isPaused ? scheduler.resume() : scheduler.pause()
             }
         }
+        }
         .padding(32)
         .onReceive(tick) { now = $0 }
     }
 
     private func reschedule() {
         scheduler.reschedule(with: scheduler.currentSettings)
+    }
+
+    @ViewBuilder private var decisionInspector: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Why LockOut?")
+                    .font(.headline)
+                Spacer()
+                sourceBadge(scheduler.decisionTrace.effectiveSettingsSource)
+            }
+            inspectorRow("Active profile", scheduler.decisionTrace.activeProfileName ?? "None")
+            HStack {
+                inspectorRow("Activation mode", scheduler.decisionTrace.activationMode.displayName)
+                Spacer()
+                if scheduler.currentSettings.profileActivationMode == .manualHold {
+                    Button("Return to Automatic") {
+                        appDelegate?.returnToAutomaticProfileMode()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+            }
+            if let matchedRuleSummary = scheduler.decisionTrace.matchedRuleSummary {
+                inspectorRow("Matched rule", matchedRuleSummary)
+            }
+            if !scheduler.decisionTrace.activePauseReasons.isEmpty {
+                inspectorRow("Pause reasons", scheduler.decisionTrace.activePauseReasons.map(\.displayName).joined(separator: ", "))
+            }
+            if let pending = scheduler.decisionTrace.pendingDeferredCondition {
+                inspectorRow("Pending defer", pending.displayName)
+            }
+            if let lastSyncWriter = scheduler.decisionTrace.lastSyncWriter {
+                inspectorRow("Last sync writer", lastSyncWriter)
+            }
+        }
+        .padding()
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+    }
+
+    @ViewBuilder private var reviewSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("First-week review")
+                    .font(.headline)
+                Spacer()
+                Button("Dismiss") {
+                    appDelegate?.dismissReviewSuggestions()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+            ForEach(reviewCards) { card in
+                insightCardView(card)
+            }
+        }
+        .padding()
+        .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 18))
+    }
+
+    @ViewBuilder private var insightSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Insights")
+                .font(.headline)
+            ForEach(insightCards) { card in
+                insightCardView(card)
+            }
+        }
+        .padding()
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+    }
+
+    private func insightCardView(_ card: InsightCard) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(card.title)
+                .font(.subheadline.weight(.semibold))
+            Text(card.summary)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(card.recommendation)
+                .font(.caption)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(Color.black.opacity(0.03), in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func inspectorRow(_ label: String, _ value: String) -> some View {
+        HStack {
+            Text(label)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text(value)
+                .multilineTextAlignment(.trailing)
+        }
+        .font(.caption)
+    }
+
+    private func sourceBadge(_ source: EffectiveSettingsSource) -> some View {
+        Text(source.displayName)
+            .font(.caption.weight(.semibold))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(badgeColor(for: source), in: Capsule())
+            .foregroundStyle(.white)
+    }
+
+    private func badgeColor(for source: EffectiveSettingsSource) -> Color {
+        switch source {
+        case .local: return .gray
+        case .synced: return .blue
+        case .managed: return .orange
+        }
     }
 }

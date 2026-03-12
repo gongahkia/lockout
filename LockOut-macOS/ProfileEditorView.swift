@@ -39,6 +39,7 @@ struct ProfileEditorView: View {
                             .disabled(scheduler.currentSettings.activeProfileId == profile.id)
                         Button("Edit") { editingProfile = profile; showEditor = true }
                             .buttonStyle(.plain)
+                            .accessibilityIdentifier("profiles.edit")
                         Button("Duplicate") { duplicate(profile) }
                             .buttonStyle(.plain)
                     }
@@ -85,8 +86,11 @@ struct ProfileEditorView: View {
     }
 
     private func activateProfile(_ profile: AppProfile) {
-        scheduler.currentSettings.apply(profile: profile)
-        scheduler.reschedule(with: scheduler.currentSettings)
+        var settings = scheduler.currentSettings
+        settings.apply(profile: profile)
+        settings.profileActivationMode = .manualHold
+        scheduler.reschedule(with: settings)
+        (NSApp.delegate as? AppDelegate)?.refreshDecisionTrace()
     }
 
     private func duplicate(_ profile: AppProfile) {
@@ -99,6 +103,7 @@ struct ProfileEditorView: View {
 
 // inline editor for a profile's break types
 struct ProfileDetailEditor: View {
+    @EnvironmentObject var scheduler: BreakScheduler
     @Binding var profile: AppProfile
     let onDone: () -> Void
 
@@ -124,9 +129,28 @@ struct ProfileDetailEditor: View {
         return supportedKeys.filter(isLocked).sorted { $0.displayName < $1.displayName }
     }
 
+    private var autoProfileRules: Binding<[AutoProfileRule]> {
+        Binding(
+            get: { scheduler.currentSettings.autoProfileRules.filter { $0.profileID == profile.id } },
+            set: { updatedRules in
+                var allRules = scheduler.currentSettings.autoProfileRules.filter { $0.profileID != profile.id }
+                allRules.append(contentsOf: updatedRules)
+                scheduler.currentSettings.autoProfileRules = allRules.sorted { $0.priority > $1.priority }
+            }
+        )
+    }
+
     var body: some View {
-        ScrollView {
+        ScrollViewReader { proxy in
             Form {
+                Section {
+                    quickJumpBar(proxy: proxy)
+                    Text("This profile includes workday scheduling, notifications, enforcement, and blocklist settings.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("profile.fullRoutineSummary")
+                }
+
                 if !lockedProfileKeys.isEmpty {
                     Section {
                         VStack(alignment: .leading, spacing: 8) {
@@ -192,6 +216,15 @@ struct ProfileDetailEditor: View {
                 }
 
                 Section("Workday") {
+                    Color.clear
+                        .frame(height: 1)
+                        .id("profile.anchor.workday")
+
+                    Text("Profile workday settings")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("profile.section.workday")
+
                     Picker("Start time", selection: Binding(
                         get: { profile.workdayStartMinutes ?? -1 },
                         set: { profile.workdayStartMinutes = $0 >= 0 ? $0 : nil }
@@ -201,6 +234,8 @@ struct ProfileDetailEditor: View {
                             Text(SettingsUIHelpers.formatMinutes(mins)).tag(mins)
                         }
                     }
+                    .accessibilityIdentifier("profile.workday.start")
+                    .accessibilityLabel("Start time")
                     .disabled(isLocked(.workdayStartMinutes))
 
                     Picker("End time", selection: Binding(
@@ -212,10 +247,21 @@ struct ProfileDetailEditor: View {
                             Text(SettingsUIHelpers.formatMinutes(mins)).tag(mins)
                         }
                     }
+                    .accessibilityIdentifier("profile.workday.end")
+                    .accessibilityLabel("End time")
                     .disabled(isLocked(.workdayEndMinutes))
                 }
 
                 Section("Notifications & Enforcement") {
+                    Color.clear
+                        .frame(height: 1)
+                        .id("profile.anchor.notifications")
+
+                    Text("Profile enforcement settings")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("profile.section.notifications")
+
                     Stepper(
                         "Notification lead: \(profile.notificationLeadMinutes) min",
                         value: $profile.notificationLeadMinutes,
@@ -235,15 +281,74 @@ struct ProfileDetailEditor: View {
                         Text("Soft Lock").tag(BreakEnforcementMode.soft_lock)
                         Text("Hard Lock").tag(BreakEnforcementMode.hard_lock)
                     }
+                    .accessibilityIdentifier("profile.enforcement")
+                    .accessibilityLabel("Break enforcement")
                     .disabled(isLocked(.breakEnforcementMode))
                 }
 
                 Section("Blocklist") {
+                    Color.clear
+                        .frame(height: 1)
+                        .id("profile.anchor.blocklist")
+
+                    Text("Profile blocklist settings")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("profile.section.blocklist")
+
                     BundleIDSelectionSection(
                         selectedBundleIDs: $profile.blockedBundleIDs,
                         isDisabled: isLocked(.blockedBundleIDs),
                         caption: "Block break overlay for these apps while this profile is active:"
                     )
+                }
+
+                Section("Automation") {
+                    Text("Rules are OR-based. The highest-priority matching rule wins unless manual hold is active.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if autoProfileRules.wrappedValue.isEmpty {
+                        Text("No automatic rules yet.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    ForEach(Array(autoProfileRules.wrappedValue.indices), id: \.self) { index in
+                        AutoProfileRuleEditor(
+                            rule: Binding(
+                                get: { autoProfileRules.wrappedValue[index] },
+                                set: {
+                                    var rules = autoProfileRules.wrappedValue
+                                    rules[index] = $0
+                                    autoProfileRules.wrappedValue = rules
+                                }
+                            )
+                        )
+                        Button("Remove Rule") {
+                            var rules = autoProfileRules.wrappedValue
+                            rules.remove(at: index)
+                            autoProfileRules.wrappedValue = rules
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.red)
+                    }
+                    Button("Add Rule") {
+                        var rules = autoProfileRules.wrappedValue
+                        rules.append(
+                            AutoProfileRule(
+                                enabled: true,
+                                priority: (rules.map(\.priority).max() ?? 0) + 1,
+                                profileID: profile.id,
+                                triggers: [
+                                    .timeWindow(
+                                        startMinutes: profile.workdayStartMinutes ?? 540,
+                                        endMinutes: profile.workdayEndMinutes ?? 1020
+                                    )
+                                ]
+                            )
+                        )
+                        autoProfileRules.wrappedValue = rules
+                    }
+                    .buttonStyle(.bordered)
                 }
 
                 Section {
@@ -261,7 +366,155 @@ struct ProfileDetailEditor: View {
         .accessibilityIdentifier("profile.detail")
     }
 
+    @ViewBuilder
+    private func quickJumpBar(proxy: ScrollViewProxy) -> some View {
+        HStack(spacing: 8) {
+            jumpButton(title: "Workday", accessibilityID: "profile.jump.workday", anchor: "profile.anchor.workday", proxy: proxy)
+            jumpButton(title: "Enforcement", accessibilityID: "profile.jump.notifications", anchor: "profile.anchor.notifications", proxy: proxy)
+            jumpButton(title: "Blocklist", accessibilityID: "profile.jump.blocklist", anchor: "profile.anchor.blocklist", proxy: proxy)
+        }
+    }
+
+    private func jumpButton(
+        title: String,
+        accessibilityID: String,
+        anchor: String,
+        proxy: ScrollViewProxy
+    ) -> some View {
+        Button(title) {
+            withAnimation {
+                proxy.scrollTo(anchor, anchor: .top)
+            }
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .accessibilityIdentifier(accessibilityID)
+    }
+
     private func isLocked(_ key: ManagedSettingsKey) -> Bool {
         managedSnapshot?.isForced(key) ?? false
+    }
+}
+
+private struct AutoProfileRuleEditor: View {
+    @Binding var rule: AutoProfileRule
+
+    private var timeWindow: (Int, Int)? {
+        for trigger in rule.triggers {
+            if case let .timeWindow(startMinutes, endMinutes) = trigger {
+                return (startMinutes, endMinutes)
+            }
+        }
+        return nil
+    }
+
+    private var appBundleIDs: [String] {
+        for trigger in rule.triggers {
+            if case let .frontmostApp(bundleIDs) = trigger {
+                return bundleIDs
+            }
+        }
+        return []
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle("Enabled", isOn: $rule.enabled)
+            Stepper("Priority: \(rule.priority)", value: $rule.priority, in: 0...100)
+            Toggle("Match calendar context", isOn: triggerBinding(for: .calendarMatch))
+            Toggle("Match Focus Mode", isOn: triggerBinding(for: .focusMode))
+            Toggle("Match external display", isOn: triggerBinding(for: .externalDisplayConnected))
+            Toggle("Use time window", isOn: timeWindowEnabledBinding)
+            if let timeWindow {
+                Picker("Start", selection: timeWindowStartBinding(defaultValue: timeWindow.0)) {
+                    ForEach(SettingsUIHelpers.workdayTimeSlots, id: \.self) { mins in
+                        Text(SettingsUIHelpers.formatMinutes(mins)).tag(mins)
+                    }
+                }
+                Picker("End", selection: timeWindowEndBinding(defaultValue: timeWindow.1)) {
+                    ForEach(SettingsUIHelpers.workdayTimeSlots, id: \.self) { mins in
+                        Text(SettingsUIHelpers.formatMinutes(mins)).tag(mins)
+                    }
+                }
+            }
+            TextField(
+                "Frontmost app bundle IDs",
+                text: Binding(
+                    get: { appBundleIDs.joined(separator: ", ") },
+                    set: { updateFrontmostApps($0) }
+                )
+            )
+            .textFieldStyle(.roundedBorder)
+        }
+        .padding(.vertical, 6)
+    }
+
+    private func triggerBinding(for trigger: ProfileTrigger) -> Binding<Bool> {
+        Binding(
+            get: { rule.triggers.contains(trigger) },
+            set: { enabled in
+                if enabled {
+                    if !rule.triggers.contains(trigger) {
+                        rule.triggers.append(trigger)
+                    }
+                } else {
+                    rule.triggers.removeAll { $0 == trigger }
+                }
+            }
+        )
+    }
+
+    private var timeWindowEnabledBinding: Binding<Bool> {
+        Binding(
+            get: { timeWindow != nil },
+            set: { enabled in
+                if enabled {
+                    if timeWindow == nil {
+                        rule.triggers.append(.timeWindow(startMinutes: 540, endMinutes: 1020))
+                    }
+                } else {
+                    rule.triggers.removeAll { trigger in
+                        if case .timeWindow = trigger { return true }
+                        return false
+                    }
+                }
+            }
+        )
+    }
+
+    private func timeWindowStartBinding(defaultValue: Int) -> Binding<Int> {
+        Binding(
+            get: { timeWindow?.0 ?? defaultValue },
+            set: { newValue in updateTimeWindow(start: newValue, end: timeWindow?.1 ?? 1020) }
+        )
+    }
+
+    private func timeWindowEndBinding(defaultValue: Int) -> Binding<Int> {
+        Binding(
+            get: { timeWindow?.1 ?? defaultValue },
+            set: { newValue in updateTimeWindow(start: timeWindow?.0 ?? 540, end: newValue) }
+        )
+    }
+
+    private func updateTimeWindow(start: Int, end: Int) {
+        rule.triggers.removeAll { trigger in
+            if case .timeWindow = trigger { return true }
+            return false
+        }
+        rule.triggers.append(.timeWindow(startMinutes: start, endMinutes: end))
+    }
+
+    private func updateFrontmostApps(_ text: String) {
+        let bundleIDs = text
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        rule.triggers.removeAll { trigger in
+            if case .frontmostApp = trigger { return true }
+            return false
+        }
+        if !bundleIDs.isEmpty {
+            rule.triggers.append(.frontmostApp(bundleIDs: bundleIDs))
+        }
     }
 }

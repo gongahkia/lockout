@@ -1,12 +1,15 @@
 import SwiftUI
 import Charts
 import LockOutCore
+import AppKit
 
 struct StatisticsView: View {
     let repository: BreakHistoryRepository
     let cloudSync: CloudKitSyncService
     @State private var range = 7
     private var stats: [DayStat] { repository.dailyStats(for: range) }
+    private var appDelegate: AppDelegate? { NSApp.delegate as? AppDelegate }
+    private var insightCards: [InsightCard] { appDelegate?.insightCards(range: max(range, 7)) ?? [] }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -70,6 +73,9 @@ struct StatisticsView: View {
                         Text("+\(streakInfo.nearMiss)d near miss").font(.caption2).foregroundStyle(.orange)
                     }
                 }
+            }
+            if !insightCards.isEmpty {
+                insightSection
             }
             syncStatusRow
             HStack {
@@ -164,5 +170,22 @@ struct StatisticsView: View {
 
     private func summaryCell(value: String, label: String) -> some View {
         VStack { Text(value).font(.title2).bold(); Text(label).font(.caption).foregroundStyle(.secondary) }
+    }
+
+    private var insightSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Insights")
+                .font(.headline)
+            ForEach(insightCards) { card in
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(card.title).font(.subheadline.weight(.semibold))
+                    Text(card.summary).font(.caption).foregroundStyle(.secondary)
+                    Text(card.recommendation).font(.caption)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(10)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
+            }
+        }
     }
 }

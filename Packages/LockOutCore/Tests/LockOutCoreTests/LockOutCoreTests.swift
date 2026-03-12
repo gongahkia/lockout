@@ -758,6 +758,125 @@ final class ManagedSettingsResolverTests: XCTestCase {
     }
 }
 
+final class AutoProfileRuleTests: XCTestCase {
+    func testTimeWindowMatchesWithinWindow() {
+        let rule = AutoProfileRule(profileID: UUID(), triggers: [.timeWindow(startMinutes: 540, endMinutes: 1020)])
+        let context = ProfileAutomationContext(
+            minutesFromMidnight: 600,
+            hasMatchingCalendarEvent: false,
+            isFocusModeEnabled: false,
+            frontmostBundleID: nil,
+            externalDisplayConnected: false
+        )
+        XCTAssertTrue(rule.matches(context))
+    }
+
+    func testFrontmostAppTriggerMatchesBundleID() {
+        let rule = AutoProfileRule(profileID: UUID(), triggers: [.frontmostApp(bundleIDs: ["com.test.editor"])])
+        let context = ProfileAutomationContext(
+            minutesFromMidnight: 0,
+            hasMatchingCalendarEvent: false,
+            isFocusModeEnabled: false,
+            frontmostBundleID: "com.test.editor",
+            externalDisplayConnected: false
+        )
+        XCTAssertTrue(rule.matches(context))
+    }
+}
+
+final class DeferredConditionTests: XCTestCase {
+    func testMinutesDeferredConditionWaitsForRequestedDelay() {
+        let state = DeferredBreakState(
+            context: ScheduledBreakContext(customTypeID: UUID(), scheduledAt: Date()),
+            condition: .minutes(10),
+            deferredAt: Date()
+        )
+        let early = DeferredBreakEvaluationContext(now: Date().addingTimeInterval(5 * 60), isFullscreen: false, frontmostBundleID: nil)
+        let late = DeferredBreakEvaluationContext(now: Date().addingTimeInterval(11 * 60), isFullscreen: false, frontmostBundleID: nil)
+        XCTAssertFalse(state.isReadyForRetry(evaluationContext: early))
+        XCTAssertTrue(state.isReadyForRetry(evaluationContext: late))
+    }
+
+    func testMeetingDeferredConditionWaitsUntilEventEnds() {
+        let state = DeferredBreakState(
+            context: ScheduledBreakContext(customTypeID: UUID(), scheduledAt: Date()),
+            condition: .untilMeetingEnds(eventID: "meeting-1")
+        )
+        let active = DeferredBreakEvaluationContext(activeMeetingEventIDs: ["meeting-1"], isFullscreen: false, frontmostBundleID: nil)
+        let ended = DeferredBreakEvaluationContext(activeMeetingEventIDs: [], isFullscreen: false, frontmostBundleID: nil)
+        XCTAssertFalse(state.isReadyForRetry(evaluationContext: active))
+        XCTAssertTrue(state.isReadyForRetry(evaluationContext: ended))
+    }
+}
+
+@MainActor
+final class DecisionTraceTests: XCTestCase {
+    func testSchedulerDecisionTraceReflectsUpdate() {
+        var settings = AppSettings.defaults
+        let profile = settings.profileSnapshot(name: "Writer")
+        settings.profiles = [profile]
+        settings.activeProfileId = profile.id
+        let scheduler = BreakScheduler(settings: settings)
+        let rule = AutoProfileRule(priority: 5, profileID: profile.id, triggers: [.focusMode])
+
+        scheduler.updateDecisionTrace(effectiveSource: .managed, matchedRule: rule, lastSyncWriter: "Office Mac")
+
+        XCTAssertEqual(scheduler.decisionTrace.activeProfileName, "Writer")
+        XCTAssertEqual(scheduler.decisionTrace.effectiveSettingsSource, .managed)
+        XCTAssertEqual(scheduler.decisionTrace.matchedRuleSummary, rule.summary)
+        XCTAssertEqual(scheduler.decisionTrace.lastSyncWriter, "Office Mac")
+    }
+}
+
+final class InsightsEngineTests: XCTestCase {
+    func testInsightsEngineGeneratesHotspotAndRecoveryCards() {
+        var settings = AppSettings.defaults
+        settings.recoveryModeConfig = RecoveryModeConfig(isEnabled: false, skipThreshold: 1, snoozeThreshold: 2, lookbackDays: 3)
+
+        let analytics = BreakAnalyticsSnapshot(
+            byHour: [14: BreakStatusCounts(completed: 0, skipped: 2, snoozed: 1, deferred: 0)],
+            byDayType: [.weekday: BreakStatusCounts(completed: 1, skipped: 2, snoozed: 1, deferred: 0)],
+            byProfile: ["Strict": BreakStatusCounts(completed: 4, skipped: 0, snoozed: 0, deferred: 0),
+                        "Loose": BreakStatusCounts(completed: 1, skipped: 2, snoozed: 0, deferred: 0)],
+            calendarOverlap: BreakStatusCounts(completed: 0, skipped: 1, snoozed: 1, deferred: 0),
+            fullscreenOverlap: BreakStatusCounts()
+        )
+        let sessions = [
+            BreakSession(type: .eye, scheduledAt: Date(), status: .skipped),
+            BreakSession(type: .eye, scheduledAt: Date(), status: .snoozed),
+        ]
+        let stats = [DayStat(date: Date(), completed: 0, skipped: 1, snoozed: 2)]
+
+        let cards = InsightsEngine.generateCards(dailyStats: stats, sessions: sessions, analytics: analytics, settings: settings)
+        XCTAssertFalse(cards.isEmpty)
+        XCTAssertTrue(cards.contains { $0.type == .skipHotspot || $0.type == .streakRisk })
+    }
+}
+
+final class OnboardingReviewStateTests: XCTestCase {
+    func testReviewStatePresentsAfterFiveCompletedSessions() {
+        let state = OnboardingReviewState(firstLaunchDate: Date(), completedSessionCount: 5, dismissalCount: 0, lastPresentedAt: nil)
+        XCTAssertTrue(state.shouldPresent())
+    }
+
+    func testReviewStatePresentsAfterSevenDays() {
+        let start = Calendar.current.date(byAdding: .day, value: -7, to: Date())!
+        let state = OnboardingReviewState(firstLaunchDate: start, completedSessionCount: 1, dismissalCount: 0, lastPresentedAt: nil)
+        XCTAssertTrue(state.shouldPresent())
+    }
+}
+
+final class SyncDeviceRegistryTests: XCTestCase {
+    func testPushRecordsCurrentDeviceInRegistry() async {
+        let service = SettingsSyncService()
+        var settings = AppSettings.defaults
+        settings.localOnlyMode = true
+        service.push(settings)
+        service.noteHistoryUpload()
+        XCTAssertEqual(service.currentDeviceRecord.deviceID, SettingsSyncService.currentDeviceID())
+    }
+}
+
 final class ProfileSnapshotTests: XCTestCase {
     func testProfileSnapshotRoundTripRestoresRoutineFields() {
         var settings = AppSettings.defaults
@@ -802,7 +921,7 @@ final class DeferredBreakTests: XCTestCase {
 
         scheduler.registerDeferredBreak(context, repository: repo)
 
-        XCTAssertEqual(scheduler.pendingDeferredBreak, context)
+        XCTAssertEqual(scheduler.pendingDeferredBreak?.context, context)
         XCTAssertEqual(repo.fetchSessions(from: .distantPast, to: .distantFuture).first?.status, .deferred)
     }
 

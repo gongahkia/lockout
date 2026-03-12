@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import LockOutCore
 
@@ -20,6 +21,7 @@ struct BreakOverlayView: View {
 
     private var elapsed: TimeInterval { Date().timeIntervalSince(showTime) }
     private var canSkip: Bool { elapsed >= Double(minDisplaySeconds) }
+    private var appDelegate: AppDelegate? { NSApp.delegate as? AppDelegate }
     private var canBypass: Bool {
         scheduler.currentSettings.rolePolicies
             .first(where: { $0.role == scheduler.currentSettings.activeRole })?
@@ -46,6 +48,9 @@ struct BreakOverlayView: View {
         case .reminder: return false
         case .soft_lock, .hard_lock: return emergencyEscapeAvailable
         }
+    }
+    private var deferredOptions: [ManualDeferredOption] {
+        appDelegate?.availableDeferredOptions() ?? []
     }
     private var primaryMessage: String {
         scheduler.currentCustomBreakType?.message ?? defaultMessage
@@ -108,6 +113,17 @@ struct BreakOverlayView: View {
                         .buttonStyle(.plain)
                         .disabled(!controlsEnabled)
                     }
+                }
+                if !deferredOptions.isEmpty && canBypass {
+                    Menu("Defer") {
+                        ForEach(deferredOptions) { option in
+                            Button(option.title) {
+                                appDelegate?.deferCurrentBreak(option.condition)
+                                onDismiss()
+                            }
+                        }
+                    }
+                    .menuStyle(.borderlessButton)
                 }
                 if enforcementMode != .reminder && !showEmergencyExit {
                     Text(lockStatusText)

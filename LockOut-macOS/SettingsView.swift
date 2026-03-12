@@ -103,6 +103,41 @@ struct SettingsView: View {
                                 isDisabled: isLocked(.filteredCalendarIDs) || isLocked(.pauseDuringCalendarEvents)
                             )
                         }
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Calendar matching")
+                                .font(.subheadline.weight(.semibold))
+                            Toggle(
+                                "Include all-day events",
+                                isOn: Binding(
+                                    get: { scheduler.currentSettings.calendarMatchOptions.includeAllDayEvents },
+                                    set: { scheduler.currentSettings.calendarMatchOptions.includeAllDayEvents = $0 }
+                                )
+                            )
+                            Stepper(
+                                "Minimum duration: \(scheduler.currentSettings.calendarMatchOptions.minimumDurationMinutes) min",
+                                value: Binding(
+                                    get: { scheduler.currentSettings.calendarMatchOptions.minimumDurationMinutes },
+                                    set: { scheduler.currentSettings.calendarMatchOptions.minimumDurationMinutes = max(0, min(240, $0)) }
+                                ),
+                                in: 0...240
+                            )
+                            availabilityToggles
+                            keywordRow(
+                                title: "Include keywords",
+                                values: Binding(
+                                    get: { scheduler.currentSettings.calendarMatchOptions.includeTitleKeywords },
+                                    set: { scheduler.currentSettings.calendarMatchOptions.includeTitleKeywords = $0 }
+                                )
+                            )
+                            keywordRow(
+                                title: "Exclude keywords",
+                                values: Binding(
+                                    get: { scheduler.currentSettings.calendarMatchOptions.excludeTitleKeywords },
+                                    set: { scheduler.currentSettings.calendarMatchOptions.excludeTitleKeywords = $0 }
+                                )
+                            )
+                        }
                     }
                 }
 
@@ -164,6 +199,55 @@ struct SettingsView: View {
                     .disabled(isLocked(.breakEnforcementMode))
                 }
 
+                Section("Recovery Mode") {
+                    Toggle(
+                        "Enable recovery mode suggestions",
+                        isOn: Binding(
+                            get: { scheduler.currentSettings.recoveryModeConfig.isEnabled },
+                            set: { scheduler.currentSettings.recoveryModeConfig.isEnabled = $0 }
+                        )
+                    )
+
+                    Stepper(
+                        "Skip threshold: \(scheduler.currentSettings.recoveryModeConfig.skipThreshold)",
+                        value: Binding(
+                            get: { scheduler.currentSettings.recoveryModeConfig.skipThreshold },
+                            set: { scheduler.currentSettings.recoveryModeConfig.skipThreshold = max(1, min(20, $0)) }
+                        ),
+                        in: 1...20
+                    )
+
+                    Stepper(
+                        "Snooze threshold: \(scheduler.currentSettings.recoveryModeConfig.snoozeThreshold)",
+                        value: Binding(
+                            get: { scheduler.currentSettings.recoveryModeConfig.snoozeThreshold },
+                            set: { scheduler.currentSettings.recoveryModeConfig.snoozeThreshold = max(1, min(20, $0)) }
+                        ),
+                        in: 1...20
+                    )
+
+                    Stepper(
+                        "Lookback window: \(scheduler.currentSettings.recoveryModeConfig.lookbackDays) days",
+                        value: Binding(
+                            get: { scheduler.currentSettings.recoveryModeConfig.lookbackDays },
+                            set: { scheduler.currentSettings.recoveryModeConfig.lookbackDays = max(1, min(14, $0)) }
+                        ),
+                        in: 1...14
+                    )
+
+                    Picker(
+                        "Temporary enforcement",
+                        selection: Binding(
+                            get: { scheduler.currentSettings.recoveryModeConfig.temporaryEnforcementMode },
+                            set: { scheduler.currentSettings.recoveryModeConfig.temporaryEnforcementMode = $0 }
+                        )
+                    ) {
+                        ForEach(BreakEnforcementMode.allCases, id: \.self) { mode in
+                            Text(enforcementLabel(mode)).tag(mode)
+                        }
+                    }
+                }
+
                 Section("Appearance & Startup") {
                     Picker(
                         "Menu Bar Icon",
@@ -214,10 +298,56 @@ struct SettingsView: View {
                     Button("Sync Now") {
                         Task {
                             await cloudSync.sync(repository: repository)
+                            appDelegate?.settingsSync.noteHistoryUpload(at: cloudSync.lastSyncDate)
                             syncRefresh.toggle()
                         }
                     }
+                    .accessibilityIdentifier("settings.syncNow")
                     .disabled(scheduler.currentSettings.localOnlyMode)
+                }
+
+                Section("Sync Devices") {
+                    if let current = appDelegate?.settingsSync.currentDeviceRecord {
+                        LabeledContent("Current device", value: current.deviceName)
+                    }
+                    if let records = appDelegate?.settingsSync.deviceRegistry, !records.isEmpty {
+                        ForEach(records) { record in
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack {
+                                    Text(record.deviceName)
+                                    Spacer()
+                                    if record.deviceID == appDelegate?.settingsSync.currentDeviceRecord.deviceID {
+                                        Text("This Mac").foregroundStyle(.secondary)
+                                    }
+                                }
+                                Text("Seen: \(formatted(record.lastSeenAt))")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                if let lastWrite = record.lastSettingsWriteAt {
+                                    Text("Settings write: \(formatted(lastWrite))")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                                if let lastHistoryUpload = record.lastHistoryUploadAt {
+                                    Text("History upload: \(formatted(lastHistoryUpload))")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                    HStack {
+                        Button("Force Pull") {
+                            appDelegate?.forcePullSettings()
+                            syncRefresh.toggle()
+                        }
+                        .disabled(scheduler.currentSettings.localOnlyMode)
+                        Button("Force Push") {
+                            appDelegate?.forcePushSettings()
+                            syncRefresh.toggle()
+                        }
+                        .disabled(scheduler.currentSettings.localOnlyMode)
+                    }
                 }
 
                 Section("Notifications") {
@@ -263,7 +393,9 @@ struct SettingsView: View {
                 Section("Settings Transfer") {
                     HStack {
                         Button("Export Settings") { exportSettings() }
+                            .accessibilityIdentifier("settings.export")
                         Button("Import Settings") { importSettings() }
+                            .accessibilityIdentifier("settings.import")
                         Spacer()
                     }
                 }
@@ -317,6 +449,53 @@ struct SettingsView: View {
         let lastSync = cloudSync.lastSyncDate
         if lastSync == .distantPast { return "Never" }
         return formatted(lastSync)
+    }
+
+    @ViewBuilder private var availabilityToggles: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Included availabilities")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            ForEach(CalendarAvailabilityMatch.allCases, id: \.self) { availability in
+                Toggle(
+                    availability.displayName,
+                    isOn: Binding(
+                        get: { scheduler.currentSettings.calendarMatchOptions.includedAvailabilities.contains(availability) },
+                        set: { enabled in
+                            var values = scheduler.currentSettings.calendarMatchOptions.includedAvailabilities
+                            if enabled {
+                                if !values.contains(availability) {
+                                    values.append(availability)
+                                }
+                            } else {
+                                values.removeAll { $0 == availability }
+                            }
+                            scheduler.currentSettings.calendarMatchOptions.includedAvailabilities = values.sorted { $0.rawValue < $1.rawValue }
+                        }
+                    )
+                )
+            }
+        }
+    }
+
+    private func keywordRow(title: String, values: Binding<[String]>) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            TextField(
+                "Comma-separated",
+                text: Binding(
+                    get: { values.wrappedValue.joined(separator: ", ") },
+                    set: { input in
+                        values.wrappedValue = input
+                            .split(separator: ",")
+                            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                            .filter { !$0.isEmpty }
+                    }
+                )
+            )
+        }
     }
 
     private var hotkeyLabel: String {
@@ -542,10 +721,13 @@ struct SettingsView: View {
             "pauseDuringCalendarEvents",
             "calendarFilterMode",
             "filteredCalendarIDs",
+            "calendarMatchOptions",
             "workdayStartMinutes",
             "workdayEndMinutes",
             "profiles",
+            "autoProfileRules",
             "activeProfileId",
+            "profileActivationMode",
             "notificationLeadMinutes",
             "weeklyNotificationEnabled",
             "globalSnoozeHotkey",
@@ -554,6 +736,8 @@ struct SettingsView: View {
             "rolePolicies",
             "activeRole",
             "localOnlyMode",
+            "onboardingReviewState",
+            "recoveryModeConfig",
         ]
     }
 
@@ -568,10 +752,15 @@ struct SettingsView: View {
         case "historyRetentionDays": return "Retention Period"
         case "isPaused": return "Pause State"
         case "profiles": return "Profiles"
+        case "autoProfileRules": return "Auto Profile Rules"
         case "activeProfileId": return "Active Profile"
+        case "profileActivationMode": return "Profile Activation Mode"
         case "weeklyNotificationEnabled": return "Weekly Summary"
         case "globalSnoozeHotkey": return "Snooze Hotkey"
         case "menuBarIconTheme": return "Menu Bar Icon"
+        case "calendarMatchOptions": return "Calendar Matching"
+        case "recoveryModeConfig": return "Recovery Mode"
+        case "onboardingReviewState": return "Onboarding Review"
         default: return key
         }
     }
@@ -604,14 +793,20 @@ struct SettingsView: View {
             return calendarFilterSummary(settings.calendarFilterMode)
         case "filteredCalendarIDs":
             return settings.filteredCalendarIDs.isEmpty ? "None" : "\(settings.filteredCalendarIDs.count) calendar(s)"
+        case "calendarMatchOptions":
+            return "Availabilities \(settings.calendarMatchOptions.includedAvailabilities.map(\.displayName).joined(separator: ", ")); min \(settings.calendarMatchOptions.minimumDurationMinutes)m"
         case "workdayStartMinutes":
             return settings.workdayStartMinutes.map(SettingsUIHelpers.formatMinutes) ?? "Off"
         case "workdayEndMinutes":
             return settings.workdayEndMinutes.map(SettingsUIHelpers.formatMinutes) ?? "Off"
         case "profiles":
             return "\(settings.profiles.count) profile(s)"
+        case "autoProfileRules":
+            return "\(settings.autoProfileRules.count) rule(s)"
         case "activeProfileId":
             return activeProfileSummary(for: settings)
+        case "profileActivationMode":
+            return settings.profileActivationMode.displayName
         case "notificationLeadMinutes":
             return "\(settings.notificationLeadMinutes) min"
         case "weeklyNotificationEnabled":
@@ -628,6 +823,10 @@ struct SettingsView: View {
             return roleLabel(settings.activeRole)
         case "localOnlyMode":
             return settings.localOnlyMode ? "Local only" : "Syncing"
+        case "onboardingReviewState":
+            return "\(settings.onboardingReviewState.completedSessionCount) completed, \(settings.onboardingReviewState.dismissalCount) dismissed"
+        case "recoveryModeConfig":
+            return settings.recoveryModeConfig.isEnabled ? "Enabled" : "Disabled"
         default:
             guard let object = rawSettingsValue(for: key, in: settings) else { return "Unknown" }
             return stringifyJSONObject(object) ?? "Unknown"
@@ -809,7 +1008,10 @@ struct BundleIDSelectionSection: View {
 
             HStack {
                 TextField("Manual bundle ID", text: $manualBundleID)
+                    .accessibilityIdentifier("bundle.manual")
+                    .accessibilityLabel("Manual bundle ID")
                 Button("Add", action: addManualBundleID)
+                    .accessibilityIdentifier("bundle.add")
                     .disabled(isDisabled)
             }
 

@@ -3,6 +3,11 @@ import SwiftUI
 import AVFoundation
 import LockOutCore
 
+enum OverlayPresentationResult {
+    case shown
+    case deferred(DeferredBreakCondition?)
+}
+
 @MainActor
 final class BreakOverlayWindowController {
     private var windows: [NSWindow] = []
@@ -19,24 +24,23 @@ final class BreakOverlayWindowController {
         self.cloudSync = cloudSync
     }
 
-    @discardableResult
-    func show(breakType: BreakType, duration: Int, minDisplaySeconds: Int = 5, scheduledAt: Date) -> Bool {
+    func show(breakType: BreakType, duration: Int, minDisplaySeconds: Int = 5, scheduledAt: Date) -> OverlayPresentationResult {
         guard windows.isEmpty else {
             FileLogger.shared.log(.debug, category: "Overlay", "show skipped: overlay already visible")
-            return false
+            return .deferred(nil)
         }
         guard !SystemStateService.isScreenLocked() else {
             FileLogger.shared.log(.info, category: "Overlay", "deferred: screen locked")
-            return false
+            return .deferred(nil)
         }
         guard !SystemStateService.frontmostAppIsFullscreen() else {
             FileLogger.shared.log(.info, category: "Overlay", "deferred: fullscreen app active")
-            return false
+            return .deferred(.untilFullscreenEnds)
         }
         let frontmostID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? ""
         if scheduler.currentSettings.blockedBundleIDs.contains(frontmostID) {
             FileLogger.shared.log(.info, category: "Overlay", "deferred: blocked app \(frontmostID)")
-            return false
+            return .deferred(.untilAppChanges(bundleID: frontmostID))
         }
         FileLogger.shared.log(.info, category: "Overlay", "showing break=\(breakType.rawValue) duration=\(duration)s screens=\(NSScreen.screens.count)")
         let customType = scheduler.currentCustomBreakType
@@ -87,7 +91,7 @@ final class BreakOverlayWindowController {
             }
             windows.append(win)
         }
-        return true
+        return .shown
     }
 
     private func playBreakSound(_ soundName: String?) {

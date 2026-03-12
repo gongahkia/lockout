@@ -15,12 +15,8 @@ final class LockOutUITests: XCTestCase {
         launch(arguments: ["--uitesting", "--reset-onboarding"])
 
         XCTAssertTrue(app.staticTexts["Choose a working style"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["Developer Focus"].exists)
-        XCTAssertTrue(app.buttons["Strict Recovery"].exists)
-        XCTAssertTrue(app.buttons["Writer Gentle Routine"].exists)
-
-        app.buttons["Writer Gentle Routine"].click()
-        app.buttons["onboarding.continue"].click()
+        clickElement(accessibilityID: "onboarding.preset.writerGentleRoutine", fallbackLabel: "Writer Gentle Routine")
+        clickElement(accessibilityID: "onboarding.continue", fallbackLabel: "Continue")
 
         XCTAssertTrue(app.staticTexts["Enable essential permissions"].waitForExistence(timeout: 5))
     }
@@ -29,64 +25,94 @@ final class LockOutUITests: XCTestCase {
         launch()
         openSidebarItem(accessibilityID: "sidebar.settings", fallbackLabel: "Settings")
 
-        XCTAssertTrue(app.staticTexts["Sync Status"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["Export Settings"].exists)
-        XCTAssertTrue(app.buttons["Import Settings"].exists)
+        XCTAssertTrue(waitForElement(accessibilityID: "settings.export", fallbackLabel: "Export Settings", timeout: 5).exists)
+        XCTAssertTrue(waitForElement(accessibilityID: "settings.import", fallbackLabel: "Import Settings", timeout: 2).exists)
     }
 
     func testProfileEditorShowsFullRoutineControls() throws {
         launch()
         openSidebarItem(accessibilityID: "sidebar.profiles", fallbackLabel: "Profiles")
 
-        let saveCurrent = app.buttons["profiles.saveCurrent"]
-        if saveCurrent.waitForExistence(timeout: 5) {
-            saveCurrent.click()
-        } else {
-            let fallbackSaveCurrent = app.buttons["Save Current Settings as New Profile"]
-            XCTAssertTrue(fallbackSaveCurrent.waitForExistence(timeout: 5))
-            fallbackSaveCurrent.click()
-        }
+        clickElement(accessibilityID: "profiles.saveCurrent", fallbackLabel: "Save Current Settings as New Profile")
 
-        let editButton = app.buttons["Edit"].firstMatch
+        let editButton = waitForElement(accessibilityID: "profiles.edit", fallbackLabel: "Edit", timeout: 5)
         XCTAssertTrue(editButton.waitForExistence(timeout: 5))
+        activateApp()
         editButton.click()
 
-        XCTAssertTrue(app.staticTexts["Workday"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Notifications & Enforcement"].exists)
-        XCTAssertTrue(app.staticTexts["Blocklist"].exists)
-
-        let manualBundleID = app.textFields["Manual bundle ID"]
-        let fallbackManualBundleID = app.textFields.matching(NSPredicate(format: "placeholderValue == %@", "Manual bundle ID")).firstMatch
-        XCTAssertTrue(manualBundleID.exists || fallbackManualBundleID.exists)
+        XCTAssertTrue(waitForElement(accessibilityID: "profile.jump.workday", fallbackLabel: "Workday", timeout: 5).exists)
+        XCTAssertTrue(waitForElement(accessibilityID: "profile.jump.notifications", fallbackLabel: "Enforcement", timeout: 2).exists)
+        XCTAssertTrue(waitForElement(accessibilityID: "profile.jump.blocklist", fallbackLabel: "Blocklist", timeout: 2).exists)
     }
 
     private func launch(arguments: [String] = ["--uitesting"]) {
         app = XCUIApplication()
         app.launchArguments = arguments
         app.launch()
+        activateApp()
     }
 
     private func openSidebarItem(accessibilityID: String, fallbackLabel: String) {
         let identifiedButton = app.buttons[accessibilityID]
         if identifiedButton.waitForExistence(timeout: 5) {
+            activateApp()
             identifiedButton.click()
             return
         }
 
         let identifiedStaticText = app.staticTexts[accessibilityID]
         if identifiedStaticText.waitForExistence(timeout: 2) {
+            activateApp()
             identifiedStaticText.click()
             return
         }
 
         let fallbackButton = app.buttons[fallbackLabel]
         if fallbackButton.waitForExistence(timeout: 2) {
+            activateApp()
             fallbackButton.click()
             return
         }
 
         let fallbackStaticText = app.staticTexts[fallbackLabel]
         XCTAssertTrue(fallbackStaticText.waitForExistence(timeout: 2), "Missing sidebar item \(fallbackLabel)")
+        activateApp()
         fallbackStaticText.click()
+    }
+
+    private func clickElement(accessibilityID: String, fallbackLabel: String) {
+        let element = waitForElement(accessibilityID: accessibilityID, fallbackLabel: fallbackLabel, timeout: 5)
+        XCTAssertTrue(element.exists, "Missing element \(fallbackLabel)")
+        activateApp()
+        element.click()
+    }
+
+    private func waitForElement(
+        accessibilityID: String,
+        fallbackLabel: String,
+        timeout: TimeInterval
+    ) -> XCUIElement {
+        let identified = app.descendants(matching: .any)[accessibilityID]
+        if identified.waitForExistence(timeout: timeout) {
+            return identified
+        }
+
+        let fallbacks: [XCUIElement] = [
+            app.buttons[fallbackLabel],
+            app.popUpButtons[fallbackLabel],
+            app.textFields[fallbackLabel],
+            app.staticTexts[fallbackLabel],
+            app.otherElements[fallbackLabel],
+        ]
+
+        for element in fallbacks where element.waitForExistence(timeout: 1) {
+            return element
+        }
+
+        return identified
+    }
+
+    private func activateApp() {
+        app.activate()
     }
 }

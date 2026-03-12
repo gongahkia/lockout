@@ -195,6 +195,8 @@ struct OnboardingView: View {
                     )
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier("onboarding.preset.\(preset.rawValue)")
+                .accessibilityLabel(preset.title)
                 .disabled(managedSnapshot != nil && preset != .managedTeam)
             }
 

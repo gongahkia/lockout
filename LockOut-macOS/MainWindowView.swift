@@ -28,10 +28,18 @@ struct MainWindowView: View {
 
     var body: some View {
         NavigationSplitView {
-            List(SidebarItem.allCases, selection: $selected) { item in
-                Label(item.rawValue, systemImage: item.icon)
-                    .tag(item)
-                    .accessibilityIdentifier(item.accessibilityID)
+            List(SidebarItem.allCases) { item in
+                Button {
+                    selected = item
+                } label: {
+                    Label(item.rawValue, systemImage: item.icon)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 4)
+                }
+                .buttonStyle(.plain)
+                .contentShape(Rectangle())
+                .listRowBackground(selected == item ? Color.accentColor.opacity(0.12) : Color.clear)
+                .accessibilityIdentifier(item.accessibilityID)
             }
             .accessibilityIdentifier("sidebar.list")
             .navigationTitle("LockOut")

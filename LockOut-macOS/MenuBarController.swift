@@ -17,6 +17,7 @@ final class MenuBarController {
     private var appSwitchDebounceWork: DispatchWorkItem?
     private var breakSubmenu: NSMenu?
     private var profileSubmenu: NSMenu?
+    private var inspectorSubmenu: NSMenu?
 
     private let scheduler: BreakScheduler
     private let repository: BreakHistoryRepository
@@ -24,6 +25,7 @@ final class MenuBarController {
     private let settingsSync: SettingsSyncService
     private let showBreak: (BreakType, Int) -> Void
     private let updater: SPUStandardUpdaterController
+    private var appDelegate: AppDelegate? { NSApp.delegate as? AppDelegate }
 
     init(scheduler: BreakScheduler,
          repository: BreakHistoryRepository,
@@ -47,6 +49,9 @@ final class MenuBarController {
                 }
                 if let profileSubmenu = self.profileSubmenu {
                     self.rebuildProfileMenu(profileSubmenu)
+                }
+                if let inspectorSubmenu = self.inspectorSubmenu {
+                    self.rebuildInspectorMenu(inspectorSubmenu)
                 }
             }
         }.store(in: &cancellables)
@@ -113,6 +118,12 @@ final class MenuBarController {
         profileItem.submenu = profileMenu
         menu.addItem(profileItem)
         rebuildProfileMenu(profileMenu)
+        let inspectorMenu = NSMenu()
+        self.inspectorSubmenu = inspectorMenu
+        let inspectorItem = NSMenuItem(title: "Why LockOut?", action: nil, keyEquivalent: "")
+        inspectorItem.submenu = inspectorMenu
+        menu.addItem(inspectorItem)
+        rebuildInspectorMenu(inspectorMenu)
         menu.addItem(.separator())
         let aboutItem = NSMenuItem(title: "About LockOut v\(AppVersion.current)", action: nil, keyEquivalent: "")
         aboutItem.isEnabled = false
@@ -309,6 +320,12 @@ final class MenuBarController {
 
     private func rebuildProfileMenu(_ profileMenu: NSMenu) {
         profileMenu.removeAllItems()
+        if scheduler.currentSettings.profileActivationMode == .manualHold {
+            let automaticItem = NSMenuItem(title: "Return to Automatic", action: #selector(returnToAutomatic), keyEquivalent: "")
+            automaticItem.target = self
+            profileMenu.addItem(automaticItem)
+            profileMenu.addItem(.separator())
+        }
         for profile in scheduler.currentSettings.profiles {
             let item = NSMenuItem(title: profile.name, action: #selector(switchProfile(_:)), keyEquivalent: "")
             item.target = self
@@ -322,8 +339,35 @@ final class MenuBarController {
         guard let idStr = sender.representedObject as? String,
               let id = UUID(uuidString: idStr),
               let profile = scheduler.currentSettings.profiles.first(where: { $0.id == id }) else { return }
-        scheduler.currentSettings.apply(profile: profile)
-        scheduler.reschedule(with: scheduler.currentSettings)
+        var settings = scheduler.currentSettings
+        settings.apply(profile: profile)
+        settings.profileActivationMode = .manualHold
+        scheduler.reschedule(with: settings)
+        appDelegate?.refreshDecisionTrace()
+    }
+
+    @objc private func returnToAutomatic() {
+        appDelegate?.returnToAutomaticProfileMode()
+    }
+
+    private func rebuildInspectorMenu(_ inspectorMenu: NSMenu) {
+        inspectorMenu.removeAllItems()
+        let trace = scheduler.decisionTrace
+        let pauseReasons = trace.activePauseReasons.isEmpty ? "None" : trace.activePauseReasons.map(\.displayName).joined(separator: ", ")
+        let rows = [
+            "Profile: \(trace.activeProfileName ?? "None")",
+            "Mode: \(trace.activationMode.displayName)",
+            "Source: \(trace.effectiveSettingsSource.displayName)",
+            "Rule: \(trace.matchedRuleSummary ?? "None")",
+            "Pause: \(pauseReasons)",
+            "Deferred: \(trace.pendingDeferredCondition?.displayName ?? "None")",
+            "Last sync writer: \(trace.lastSyncWriter ?? "Unknown")",
+        ]
+        for row in rows {
+            let item = NSMenuItem(title: row, action: nil, keyEquivalent: "")
+            item.isEnabled = false
+            inspectorMenu.addItem(item)
+        }
     }
 
     func stopObserving() {
