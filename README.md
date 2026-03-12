@@ -3,7 +3,7 @@
 
 # `LockOut`
 
-...
+[MacOS menu bar](https://support.apple.com/en-sg/guide/mac-help/mchlp1446/mac) app that fights [screen fatigue](https://my.clevelandclinic.org/health/diseases/24802-computer-vision-syndrome) with [scheduled breaks](#architecture).
 
 ## Stack
 
@@ -13,7 +13,7 @@
 * *Package* [Sparkle](https://www.thesparkleproject.org/), [XcodeGen](https://xcodegen.com/)
 * *CI/CD*: [Github Actions](https://github.com/features/actions)
 
-## Screenshot
+## Screenshots
 
 <div align="center">
     <img src="./asset/reference/1.png" width="29%">
