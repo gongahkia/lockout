@@ -24,7 +24,7 @@ enum LockOutSchemaMigrationPlan: SchemaMigrationPlan {
 }
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate, ObservableObject {
     nonisolated private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.lockout", category: "AppDelegate")
     private static let lastFireKey = "last_break_fire_date"
 
@@ -36,6 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private(set) var insightsStore: BreakInsightsStore!
 
     @Published var syncError: String?
+    @Published private(set) var isReadyForUI = false
     @Published private(set) var managedSettings: ManagedSettingsSnapshot?
     @Published private(set) var matchedAutoProfileRule: AutoProfileRule?
 
@@ -165,6 +166,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         evaluateAutoProfileRules()
         refreshDecisionTrace()
         NotificationCenter.default.post(name: .appDidFinishSetup, object: nil)
+        isReadyForUI = true
         FileLogger.shared.log(.info, category: "AppDelegate", "applicationDidFinishLaunching completed")
     }
 

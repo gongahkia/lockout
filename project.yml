@@ -64,6 +64,10 @@ schemes:
     build:
       targets:
         LockOut-macOS: all
+    test:
+      config: Debug
+      targets:
+        - LockOut-macOSUITests
     run:
       config: Debug
     archive:
