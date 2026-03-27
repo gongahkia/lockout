@@ -17,12 +17,22 @@ struct SettingsView: View {
 
     var body: some View {
         ScrollView {
-            Form {
-                if let managedSnapshot {
-                    managedBanner(snapshot: managedSnapshot)
-                }
+            VStack(alignment: .leading, spacing: 24) {
+                LockOutScreenHeader(
+                    title: "Settings",
+                    subtitle: "Tune policy, sync, startup, managed preferences, and import or export behavior without leaving the app shell.",
+                    symbol: "gearshape.2",
+                    accent: LockOutPalette.sky
+                )
 
-                Section("Break Settings") {
+                settingsOverviewCard
+
+                Form {
+                    if let managedSnapshot {
+                        managedBanner(snapshot: managedSnapshot)
+                    }
+
+                    Section("Break Settings") {
                     Stepper(
                         "Snooze duration: \(scheduler.currentSettings.snoozeDurationMinutes) min",
                         value: Binding(
@@ -404,13 +414,44 @@ struct SettingsView: View {
                     blocklistSection
                 }
 
-                versionFooter
+                    versionFooter
+                }
+                .formStyle(.grouped)
             }
         }
         .padding(24)
+        .background(LockOutSceneBackground())
         .navigationTitle("Settings")
         .id(syncRefresh)
         .accessibilityIdentifier("settings.view")
+    }
+
+    private var settingsOverviewCard: some View {
+        LockOutCard(
+            title: "Current Configuration",
+            subtitle: "A quick snapshot of the most important runtime switches before you dig into the full form below.",
+            icon: "slider.horizontal.3",
+            accent: LockOutPalette.sky
+        ) {
+            VStack(alignment: .leading, spacing: 10) {
+                LockOutKeyValueRow(
+                    label: "Sync mode",
+                    value: scheduler.currentSettings.localOnlyMode ? "Local only" : "Cloud sync"
+                )
+                LockOutKeyValueRow(
+                    label: "Active role",
+                    value: roleLabel(scheduler.currentSettings.activeRole)
+                )
+                LockOutKeyValueRow(
+                    label: "Enforcement",
+                    value: enforcementLabel(scheduler.currentSettings.breakEnforcementMode)
+                )
+                LockOutKeyValueRow(
+                    label: "Menu bar icon",
+                    value: menuBarThemeSummary(scheduler.currentSettings.menuBarIconTheme)
+                )
+            }
+        }
     }
 
     @ViewBuilder private func managedBanner(snapshot: ManagedSettingsSnapshot) -> some View {

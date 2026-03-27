@@ -1,111 +1,222 @@
-import SwiftUI
+import AppKit
 import Charts
 import LockOutCore
-import AppKit
+import SwiftUI
+
+private struct StatisticsSeries: Identifiable {
+    let id: String
+    let label: String
+    let color: Color
+    let value: (DayStat) -> Int
+}
 
 struct StatisticsView: View {
     let repository: BreakHistoryRepository
     let cloudSync: CloudKitSyncService
+
     @State private var range = 7
-    private var stats: [DayStat] { repository.dailyStats(for: range) }
-    private var appDelegate: AppDelegate? { NSApp.delegate as? AppDelegate }
-    private var insightCards: [InsightCard] { appDelegate?.insightCards(range: max(range, 7)) ?? [] }
+
+    private var stats: [DayStat] {
+        repository.dailyStats(for: range)
+    }
+
+    private var appDelegate: AppDelegate? {
+        NSApp.delegate as? AppDelegate
+    }
+
+    private var insightCards: [InsightCard] {
+        appDelegate?.insightCards(range: max(range, 7)) ?? []
+    }
+
+    private var totalSessions: Int {
+        stats.reduce(0) { $0 + $1.counts.allOutcomesTotal }
+    }
+
+    private var complianceRate: Double {
+        ComplianceCalculator.overallRate(stats: stats)
+    }
+
+    private var streakInfo: (streak: Int, nearMiss: Int) {
+        ComplianceCalculator.streakWithNearMiss(stats: repository.dailyStats(for: 30))
+    }
+
+    private var previousStats: [DayStat] {
+        Array(repository.dailyStats(for: range * 2).prefix(range))
+    }
+
+    private var trend: Double {
+        ComplianceCalculator.trend(current: stats, previous: previousStats)
+    }
+
+    private var chartSeries: [StatisticsSeries] {
+        [
+            StatisticsSeries(id: "completed", label: "Completed", color: LockOutPalette.mint, value: { $0.completed }),
+            StatisticsSeries(id: "skipped", label: "Skipped", color: LockOutPalette.coral, value: { $0.skipped }),
+            StatisticsSeries(id: "snoozed", label: "Snoozed", color: LockOutPalette.amber, value: { $0.snoozed }),
+            StatisticsSeries(id: "deferred", label: "Deferred", color: LockOutPalette.sky, value: { $0.deferred }),
+        ]
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Picker("Range", selection: $range) {
-                Text("7 days").tag(7)
-                Text("14 days").tag(14)
-                Text("30 days").tag(30)
-            }
-            .pickerStyle(.segmented)
-            Chart {
-                ForEach(stats, id: \.date) { s in
-                    BarMark(x: .value("Date", s.date, unit: .day),
-                            y: .value("Completed", s.completed))
-                    .foregroundStyle(.green)
-                    BarMark(x: .value("Date", s.date, unit: .day),
-                            y: .value("Skipped", s.skipped))
-                    .foregroundStyle(.red)
-                    BarMark(x: .value("Date", s.date, unit: .day),
-                            y: .value("Snoozed", s.snoozed))
-                    .foregroundStyle(.orange)
-                    BarMark(x: .value("Date", s.date, unit: .day),
-                            y: .value("Deferred", s.deferred))
-                    .foregroundStyle(.blue)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                LockOutScreenHeader(
+                    title: "Statistics",
+                    subtitle: "Track compliance, identify drift, and export the same history used to power insights and sync.",
+                    symbol: "chart.bar.xaxis",
+                    accent: LockOutPalette.sky
+                )
+
+                LockOutCard(accent: LockOutPalette.sky) {
+                    HStack(alignment: .top, spacing: 16) {
+                        Picker("Range", selection: $range) {
+                            Text("7 days").tag(7)
+                            Text("14 days").tag(14)
+                            Text("30 days").tag(30)
+                        }
+                        .pickerStyle(.segmented)
+
+                        Spacer(minLength: 12)
+
+                        Button("Export CSV", action: exportCSV)
+                            .buttonStyle(.bordered)
+                        Button("Export JSON", action: exportJSON)
+                            .buttonStyle(.borderedProminent)
+                    }
                 }
-            }
-            .frame(height: 200)
-            // legend
-            HStack(spacing: 12) {
-                legendDot(color: .green, label: "Completed")
-                legendDot(color: .red, label: "Skipped")
-                legendDot(color: .orange, label: "Snoozed")
-                legendDot(color: .blue, label: "Deferred")
-            }
-            // summary (#21: trend + near-miss)
-            let total = stats.reduce(0) { $0 + $1.counts.allOutcomesTotal }
-            let rate = ComplianceCalculator.overallRate(stats: stats)
-            let streakInfo = ComplianceCalculator.streakWithNearMiss(stats: repository.dailyStats(for: 30))
-            let previousStats = repository.dailyStats(for: range * 2).prefix(range).map { $0 }
-            let trend = ComplianceCalculator.trend(current: stats, previous: previousStats)
-            HStack(spacing: 24) {
-                summaryCell(value: "\(total)", label: "Total")
-                VStack {
-                    HStack(spacing: 2) {
-                        Text("\(Int(rate * 100))%").font(.title2).bold()
-                        if trend != 0 {
-                            Image(systemName: trend > 0 ? "arrow.up.right" : "arrow.down.right")
-                                .foregroundStyle(trend > 0 ? .green : .red)
-                                .font(.caption)
+
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 170, maximum: 220), spacing: 14)], spacing: 14) {
+                    LockOutMetricTile(
+                        value: "\(totalSessions)",
+                        label: "Total sessions",
+                        detail: "Across the selected range",
+                        accent: LockOutPalette.sky
+                    )
+                    LockOutMetricTile(
+                        value: "\(Int(complianceRate * 100))%",
+                        label: "Compliance",
+                        detail: trendDetail,
+                        accent: trend >= 0 ? LockOutPalette.mint : LockOutPalette.coral
+                    )
+                    LockOutMetricTile(
+                        value: "\(streakInfo.streak)d",
+                        label: "Current streak",
+                        detail: streakInfo.nearMiss > 0 ? "\(streakInfo.nearMiss)d near miss" : "No near misses",
+                        accent: LockOutPalette.amber
+                    )
+                    LockOutMetricTile(
+                        value: "\(cloudSync.pendingUploadsCount)",
+                        label: "Pending uploads",
+                        detail: cloudSync.pendingUploadsCount == 0 ? "Cloud history is current" : "Waiting to sync",
+                        accent: cloudSync.pendingUploadsCount == 0 ? LockOutPalette.mint : LockOutPalette.amber
+                    )
+                }
+
+                LockOutCard(
+                    title: "Break Outcomes",
+                    subtitle: "Grouped by day and outcome so you can spot where compliance is improving or slipping.",
+                    icon: "chart.bar.doc.horizontal",
+                    accent: LockOutPalette.sky
+                ) {
+                    if stats.isEmpty {
+                        LockOutEmptyState(
+                            symbol: "chart.bar.xaxis.ascending",
+                            title: "No history yet",
+                            message: "Break statistics will appear here once LockOut records completed, skipped, snoozed, or deferred sessions."
+                        )
+                    } else {
+                        VStack(alignment: .leading, spacing: 16) {
+                            Chart {
+                                ForEach(stats, id: \.date) { dayStat in
+                                    ForEach(chartSeries) { series in
+                                        BarMark(
+                                            x: .value("Date", dayStat.date, unit: .day),
+                                            y: .value(series.label, series.value(dayStat))
+                                        )
+                                        .position(by: .value("Outcome", series.label))
+                                        .foregroundStyle(series.color.gradient)
+                                    }
+                                }
+                            }
+                            .frame(height: 260)
+
+                            HStack(spacing: 10) {
+                                ForEach(chartSeries) { series in
+                                    StatisticsLegendItem(color: series.color, label: series.label)
+                                }
+                            }
                         }
                     }
-                    Text("Compliance").font(.caption).foregroundStyle(.secondary)
-                    if trend != 0 {
-                        Text("\(trend > 0 ? "+" : "")\(Int(trend * 100))pp vs prior")
-                            .font(.caption2).foregroundStyle(.secondary)
+                }
+
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .top, spacing: 18) {
+                        syncCard
+                            .frame(maxWidth: .infinity, alignment: .topLeading)
+                        if !insightCards.isEmpty {
+                            insightCard
+                                .frame(maxWidth: .infinity, alignment: .topLeading)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 18) {
+                        syncCard
+                        if !insightCards.isEmpty {
+                            insightCard
+                        }
                     }
                 }
-                VStack {
-                    Text("\(streakInfo.streak)d").font(.title2).bold()
-                    Text("Streak").font(.caption).foregroundStyle(.secondary)
-                    if streakInfo.nearMiss > 0 {
-                        Text("+\(streakInfo.nearMiss)d near miss").font(.caption2).foregroundStyle(.orange)
-                    }
-                }
             }
-            if !insightCards.isEmpty {
-                insightSection
-            }
-            syncStatusRow
-            HStack {
-                Button("Export CSV") { exportCSV() }
-                Button("Export JSON") { exportJSON() }
-            }
+            .padding(28)
         }
-        .padding(24)
+        .background(LockOutSceneBackground())
         .navigationTitle("Statistics")
     }
 
-    @ViewBuilder private var syncStatusRow: some View {
-        let pending = cloudSync.pendingUploadsCount
-        let lastSync = cloudSync.lastSyncDate
-        HStack(spacing: 6) {
-            if pending > 0 {
-                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.yellow)
-                Text("\(pending) pending upload\(pending == 1 ? "" : "s")")
-            } else {
-                Image(systemName: "checkmark.icloud").foregroundStyle(.secondary)
-            }
-            Spacer()
-            if lastSync == .distantPast {
-                Text("Never synced").foregroundStyle(.secondary)
-            } else {
-                Text("Last synced: \(lastSync.formatted(.dateTime.month().day().hour().minute()))")
-                    .foregroundStyle(.secondary)
+    private var trendDetail: String {
+        guard trend != 0 else {
+            return "Steady versus the prior period"
+        }
+        let sign = trend > 0 ? "+" : ""
+        return "\(sign)\(Int(trend * 100))pp versus prior period"
+    }
+
+    private var syncCard: some View {
+        LockOutCard(
+            title: "Sync Status",
+            subtitle: "Cloud history uploads are tracked independently from the local statistics cache.",
+            icon: "icloud",
+            accent: LockOutPalette.mint
+        ) {
+            VStack(alignment: .leading, spacing: 10) {
+                LockOutKeyValueRow(
+                    label: "Mode",
+                    value: cloudSync.pendingUploadsCount == 0 ? "Healthy" : "Needs upload"
+                )
+                LockOutKeyValueRow(
+                    label: "Last sync",
+                    value: cloudSync.lastSyncDate == .distantPast
+                        ? "Never"
+                        : cloudSync.lastSyncDate.formatted(.dateTime.month().day().hour().minute())
+                )
+                LockOutKeyValueRow(label: "Pending uploads", value: "\(cloudSync.pendingUploadsCount)")
             }
         }
-        .font(.caption)
+    }
+
+    private var insightCard: some View {
+        LockOutCard(
+            title: "Insights",
+            subtitle: "Recommendations derived from the same statistics shown above.",
+            icon: "lightbulb",
+            accent: LockOutPalette.amber
+        ) {
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(insightCards) { card in
+                    LockOutInsightRow(card: card, accent: LockOutPalette.amber)
+                }
+            }
+        }
     }
 
     private var allTypeNames: [String] {
@@ -113,18 +224,18 @@ struct StatisticsView: View {
     }
 
     private func exportJSON() {
-        let fmt = ISO8601DateFormatter()
+        let formatter = ISO8601DateFormatter()
         let typeNames = allTypeNames
-        let rows = stats.map { s -> [String: Any] in
+        let rows = stats.map { stat -> [String: Any] in
             var row: [String: Any] = [
-                "date": fmt.string(from: s.date),
-                "completed": s.completed,
-                "skipped": s.skipped,
-                "snoozed": s.snoozed,
-                "deferred": s.deferred,
+                "date": formatter.string(from: stat.date),
+                "completed": stat.completed,
+                "skipped": stat.skipped,
+                "snoozed": stat.snoozed,
+                "deferred": stat.deferred,
             ]
             for name in typeNames {
-                let counts = s.perTypeCounts[name] ?? BreakStatusCounts()
+                let counts = stat.perTypeCounts[name] ?? BreakStatusCounts()
                 row["\(name)_completed"] = counts.completed
                 row["\(name)_skipped"] = counts.skipped
                 row["\(name)_snoozed"] = counts.snoozed
@@ -132,11 +243,17 @@ struct StatisticsView: View {
             }
             return row
         }
-        guard let data = try? JSONSerialization.data(withJSONObject: rows, options: .prettyPrinted) else { return }
+
+        guard let data = try? JSONSerialization.data(withJSONObject: rows, options: .prettyPrinted) else {
+            return
+        }
+
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.json]
         panel.nameFieldStringValue = "lockout-stats.json"
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard panel.runModal() == .OK, let url = panel.url else {
+            return
+        }
         try? data.write(to: url)
     }
 
@@ -144,48 +261,56 @@ struct StatisticsView: View {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.commaSeparatedText]
         panel.nameFieldStringValue = "lockout-stats.csv"
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard panel.runModal() == .OK, let url = panel.url else {
+            return
+        }
+
         let typeNames = allTypeNames
-        let typeHeaders = typeNames.flatMap { ["\($0)_completed", "\($0)_skipped", "\($0)_snoozed", "\($0)_deferred"] }
-        let headers = (["date", "completed", "skipped", "snoozed", "deferred"] + typeHeaders).map(CSVExport.escapedCell)
+        let typeHeaders = typeNames.flatMap {
+            ["\($0)_completed", "\($0)_skipped", "\($0)_snoozed", "\($0)_deferred"]
+        }
+        let headers = (["date", "completed", "skipped", "snoozed", "deferred"] + typeHeaders)
+            .map(CSVExport.escapedCell)
         var csv = headers.joined(separator: ",") + "\n"
-        let fmt = ISO8601DateFormatter()
-        for s in stats {
-            var row = [fmt.string(from: s.date), "\(s.completed)", "\(s.skipped)", "\(s.snoozed)", "\(s.deferred)"]
+        let formatter = ISO8601DateFormatter()
+
+        for stat in stats {
+            var row = [
+                formatter.string(from: stat.date),
+                "\(stat.completed)",
+                "\(stat.skipped)",
+                "\(stat.snoozed)",
+                "\(stat.deferred)",
+            ]
             for name in typeNames {
-                let counts = s.perTypeCounts[name] ?? BreakStatusCounts()
-                row += ["\(counts.completed)", "\(counts.skipped)", "\(counts.snoozed)", "\(counts.deferred)"]
+                let counts = stat.perTypeCounts[name] ?? BreakStatusCounts()
+                row += [
+                    "\(counts.completed)",
+                    "\(counts.skipped)",
+                    "\(counts.snoozed)",
+                    "\(counts.deferred)",
+                ]
             }
             csv += row.map(CSVExport.escapedCell).joined(separator: ",") + "\n"
         }
+
         try? csv.write(to: url, atomically: true, encoding: .utf8)
     }
+}
 
-    private func legendDot(color: Color, label: String) -> some View {
-        HStack(spacing: 4) {
-            RoundedRectangle(cornerRadius: 4).fill(color).frame(width: 14, height: 14)
-            Text(label).font(.caption)
-        }
-    }
+private struct StatisticsLegendItem: View {
+    let color: Color
+    let label: String
 
-    private func summaryCell(value: String, label: String) -> some View {
-        VStack { Text(value).font(.title2).bold(); Text(label).font(.caption).foregroundStyle(.secondary) }
-    }
+    var body: some View {
+        HStack(spacing: 6) {
+            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                .fill(color)
+                .frame(width: 14, height: 14)
 
-    private var insightSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Insights")
-                .font(.headline)
-            ForEach(insightCards) { card in
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(card.title).font(.subheadline.weight(.semibold))
-                    Text(card.summary).font(.caption).foregroundStyle(.secondary)
-                    Text(card.recommendation).font(.caption)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(10)
-                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
-            }
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 }
