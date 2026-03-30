@@ -187,9 +187,18 @@ public enum ManagedSettingsResolver {
         if let data = object as? Data {
             return decodeJSON(Value.self, from: data, key: key)
         }
-        if JSONSerialization.isValidJSONObject(object),
-           let data = try? JSONSerialization.data(withJSONObject: object) {
-            return decodeJSON(Value.self, from: data, key: key)
+        if JSONSerialization.isValidJSONObject(object) {
+            do {
+                let data = try JSONSerialization.data(withJSONObject: object)
+                return decodeJSON(Value.self, from: data, key: key)
+            } catch {
+                Observability.emit(
+                    category: "ManagedSettingsResolver",
+                    message: "managed value JSON serialization failed for \(key.rawValue): \(error)",
+                    level: .warn
+                )
+                return nil
+            }
         }
         if let string = object as? String {
             return decodeJSON(Value.self, from: Data("\"\(string)\"".utf8), key: key)
