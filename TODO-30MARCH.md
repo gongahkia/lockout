@@ -10,8 +10,9 @@ Remaining work is environment-only verification (toolchain unavailable in this s
 2. [x] Run app build:
    - `xcodebuild -project LockOut.xcodeproj -scheme LockOut-macOS -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO build`
    - Result (2026-03-30): passed (`** BUILD SUCCEEDED **`)
-3. [ ] (Optional) Run UI test target:
+3. [x] (Optional) Run UI test target:
    - `xcodebuild build-for-testing -scheme LockOut-macOS -project LockOut.xcodeproj -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO -only-testing:LockOut-macOSUITests`
+   - Result (2026-03-30): passed (`** TEST BUILD SUCCEEDED **`)
 4. [ ] Manual smoke check in app:
    - Settings -> Diagnostics panel updates/clear flow
    - Profile Editor -> "Bootstrap Agent Presets"
