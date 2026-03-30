@@ -277,8 +277,11 @@ public final class SettingsSyncService {
     }
 
     private func decodeEnvelope(from data: Data) throws -> SyncedSettingsEnvelope {
-        if let envelope = try? JSONDecoder().decode(SyncedSettingsEnvelope.self, from: data) {
+        do {
+            let envelope = try JSONDecoder().decode(SyncedSettingsEnvelope.self, from: data)
             return envelope
+        } catch {
+            Observability.emit(category: "SettingsSyncService", message: "envelope decode failed, attempting legacy format: \(error)", level: .warn)
         }
         let settings = try JSONDecoder().decode(AppSettings.self, from: data)
         return SyncedSettingsEnvelope(
