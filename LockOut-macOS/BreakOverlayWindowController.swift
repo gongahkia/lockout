@@ -101,12 +101,25 @@ final class BreakOverlayWindowController {
         let url = Bundle.main.url(forResource: name, withExtension: "aiff")
             ?? Bundle.main.url(forResource: "chime", withExtension: "aiff")
         guard let url else {
+            FileLogger.shared.log(.warn, category: "Overlay", "sound file missing for \(name), using system fallback")
+            DiagnosticsStore.shared.record(level: .warning, category: "Overlay", message: "sound file missing for \(name)")
             NSSound(named: NSSound.Name("Glass"))?.play() // fallback
             return
         }
         // AVAudioPlayer respects system mute state automatically
-        audioPlayer = try? AVAudioPlayer(contentsOf: url)
-        audioPlayer?.play()
+        do {
+            let player = try AVAudioPlayer(contentsOf: url)
+            audioPlayer = player
+            player.play()
+        } catch {
+            FileLogger.shared.log(.warn, category: "Overlay", "failed to play sound \(name): \(error)")
+            DiagnosticsStore.shared.record(
+                level: .warning,
+                category: "Overlay",
+                message: "failed to play sound \(name): \(error.localizedDescription)"
+            )
+            NSSound(named: NSSound.Name("Glass"))?.play()
+        }
     }
 
     private static func materialForString(_ s: String) -> NSVisualEffectView.Material {
