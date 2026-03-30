@@ -4,13 +4,14 @@ No code stubs or placeholder implementations were found.
 
 Remaining work is environment-only verification (toolchain unavailable in this session):
 
-1. Run package tests:
+1. [x] Run package tests:
    - `swift test --package-path Packages/LockOutCore`
-2. Run app build:
+   - Result (2026-03-30): passed (`78` tests, `0` failures)
+2. [ ] Run app build:
    - `xcodebuild -project LockOut.xcodeproj -scheme LockOut-macOS -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO build`
-3. (Optional) Run UI test target:
+3. [ ] (Optional) Run UI test target:
    - `xcodebuild build-for-testing -scheme LockOut-macOS -project LockOut.xcodeproj -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO -only-testing:LockOut-macOSUITests`
-4. Manual smoke check in app:
+4. [ ] Manual smoke check in app:
    - Settings -> Diagnostics panel updates/clear flow
    - Profile Editor -> "Bootstrap Agent Presets"
    - Onboarding -> "Agent Developer" preset path
