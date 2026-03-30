@@ -10,6 +10,7 @@ struct ProfileEditorView: View {
     @EnvironmentObject private var scheduler: BreakScheduler
     @State private var newProfileName = ""
     @State private var editingContext: EditingProfileContext?
+    @State private var bootstrapStatusMessage: String?
 
     private var profiles: Binding<[AppProfile]> {
         Binding(
@@ -41,9 +42,18 @@ struct ProfileEditorView: View {
                                 tone: scheduler.currentSettings.profileActivationMode == .manualHold ? .warning : .info
                             )
                             Spacer()
+                            Button("Bootstrap Agent Presets", action: bootstrapAgentDeveloperProfiles)
+                                .buttonStyle(.bordered)
+                                .accessibilityIdentifier("profiles.bootstrapAgentPresets")
                             Button("Save Current Settings as New Profile", action: saveCurrentProfile)
                                 .buttonStyle(.bordered)
                                 .accessibilityIdentifier("profiles.saveCurrent")
+                        }
+
+                        if let bootstrapStatusMessage {
+                            Text(bootstrapStatusMessage)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
 
                         if profiles.wrappedValue.isEmpty {
@@ -114,6 +124,17 @@ struct ProfileEditorView: View {
         let profile = scheduler.currentSettings.profileSnapshot(name: name)
         profiles.wrappedValue.append(profile)
         scheduler.currentSettings.activeProfileId = profile.id
+    }
+
+    private func bootstrapAgentDeveloperProfiles() {
+        var settings = scheduler.currentSettings
+        let result = AgentDeveloperPresets.bootstrap(into: &settings)
+        scheduler.currentSettings = settings
+        if result.isNoOp {
+            bootstrapStatusMessage = "Agent presets already exist in this workspace."
+            return
+        }
+        bootstrapStatusMessage = "Added \(result.addedProfiles.count) agent profiles and \(result.addedRules) starter rules (rules are disabled by default)."
     }
 
     private func activateProfile(_ profile: AppProfile) {
