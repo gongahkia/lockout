@@ -19,12 +19,23 @@ public final class CloudKitSyncService {
 
     private var pendingUploads: [BreakSession] {
         get {
-            guard let data = UserDefaults.standard.data(forKey: Self.pendingKey),
-                  let sessions = try? JSONDecoder().decode([BreakSession].self, from: data) else { return [] }
-            return sessions
+            guard let data = UserDefaults.standard.data(forKey: Self.pendingKey) else { return [] }
+            do {
+                return try JSONDecoder().decode([BreakSession].self, from: data)
+            } catch {
+                Observability.emit(category: "CloudKitSyncService", message: "pending upload decode failed: \(error)", level: .error)
+                logger.error("pending upload decode failed: \(String(describing: error), privacy: .public)")
+                UserDefaults.standard.removeObject(forKey: Self.pendingKey)
+                return []
+            }
         }
         set {
-            UserDefaults.standard.set(try? JSONEncoder().encode(newValue), forKey: Self.pendingKey)
+            do {
+                UserDefaults.standard.set(try JSONEncoder().encode(newValue), forKey: Self.pendingKey)
+            } catch {
+                Observability.emit(category: "CloudKitSyncService", message: "pending upload encode failed: \(error)", level: .error)
+                logger.error("pending upload encode failed: \(String(describing: error), privacy: .public)")
+            }
         }
     }
 
