@@ -24,6 +24,7 @@ final class OnboardingWindowController: NSWindowController {
 }
 
 private enum OnboardingPreset: String, CaseIterable, Identifiable {
+    case agentDeveloper
     case developerFocus
     case strictRecovery
     case managerCalendarFirst
@@ -35,6 +36,7 @@ private enum OnboardingPreset: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
+        case .agentDeveloper: return "Agent Developer"
         case .developerFocus: return "Developer Focus"
         case .strictRecovery: return "Strict Recovery"
         case .managerCalendarFirst: return "Manager Calendar-First"
@@ -46,6 +48,8 @@ private enum OnboardingPreset: String, CaseIterable, Identifiable {
 
     var summary: String {
         switch self {
+        case .agentDeveloper:
+            return "Bootstraps profiles for coding sprints, eval runs, and incident windows."
         case .developerFocus:
             return "Focus-aware reminders, workday scheduling, and a faster pre-break warning."
         case .strictRecovery:
@@ -64,6 +68,14 @@ private enum OnboardingPreset: String, CaseIterable, Identifiable {
     func applying(to settings: AppSettings) -> AppSettings {
         var updated = settings
         switch self {
+        case .agentDeveloper:
+            updated.activeRole = .developer
+            let result = AgentDeveloperPresets.bootstrap(into: &updated)
+            if let firstProfileName = result.addedProfiles.first,
+               let profile = updated.profiles.first(where: { $0.name == firstProfileName }) {
+                updated.apply(profile: profile)
+                updated.activeProfileId = profile.id
+            }
         case .developerFocus:
             updated.pauseDuringFocus = true
             updated.pauseDuringCalendarEvents = false
