@@ -90,7 +90,12 @@ public final class CloudKitSyncService {
             try await db.save(record)
         } catch let error as CKError where shouldRetry(error) && attempt < 3 {
             let delay: UInt64 = UInt64(pow(2.0, Double(attempt))) * 1_000_000_000
-            try? await Task.sleep(nanoseconds: delay)
+            do {
+                try await Task.sleep(nanoseconds: delay)
+            } catch {
+                Observability.emit(category: "CloudKitSyncService", message: "retry sleep interrupted: \(error)", level: .debug)
+                return
+            }
             await uploadWithBackoff(session, attempt: attempt + 1)
         } catch {
             handle(error: error)
@@ -130,8 +135,14 @@ public final class CloudKitSyncService {
         do {
             let result = try await db.records(matching: query)
             return result.matchResults.compactMap { _, res in
-                guard let r = try? res.get() else { return nil }
-                return mapRecord(r)
+                do {
+                    let record = try res.get()
+                    return mapRecord(record)
+                } catch {
+                    Observability.emit(category: "CloudKitSyncService", message: "record decode failed: \(error)", level: .warn)
+                    logger.notice("record decode failed: \(String(describing: error), privacy: .public)")
+                    return nil
+                }
             }
         } catch {
             handle(error: error)
