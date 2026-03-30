@@ -93,13 +93,22 @@ public final class BreakInsightsStore {
     }
 
     private func loadAll() -> [String: BreakInsightMetadata] {
-        guard let data = defaults.data(forKey: Self.metadataKey),
-              let metadata = try? JSONDecoder().decode([String: BreakInsightMetadata].self, from: data) else { return [:] }
-        return metadata
+        guard let data = defaults.data(forKey: Self.metadataKey) else { return [:] }
+        do {
+            return try JSONDecoder().decode([String: BreakInsightMetadata].self, from: data)
+        } catch {
+            Observability.emit(category: "BreakInsightsStore", message: "metadata decode failed: \(error)", level: .error)
+            defaults.removeObject(forKey: Self.metadataKey)
+            return [:]
+        }
     }
 
     private func persist(_ metadata: [String: BreakInsightMetadata]) {
-        defaults.set(try? JSONEncoder().encode(metadata), forKey: Self.metadataKey)
+        do {
+            defaults.set(try JSONEncoder().encode(metadata), forKey: Self.metadataKey)
+        } catch {
+            Observability.emit(category: "BreakInsightsStore", message: "metadata encode failed: \(error)", level: .error)
+        }
     }
 }
 
