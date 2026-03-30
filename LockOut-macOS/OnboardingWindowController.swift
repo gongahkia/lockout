@@ -235,11 +235,27 @@ struct OnboardingView: View {
                 .foregroundStyle(.secondary)
             HStack(spacing: 12) {
                 Button("Allow Notifications") {
-                    UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+                    UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
+                        if let error {
+                            FileLogger.shared.log(.error, category: "Onboarding", "notification permission request failed: \(error)")
+                            DiagnosticsStore.shared.record(level: .error, category: "Onboarding", message: "notification permission request failed: \(error.localizedDescription)")
+                            return
+                        }
+                        FileLogger.shared.log(.info, category: "Onboarding", "notification permission granted=\(granted)")
+                        DiagnosticsStore.shared.record(level: .info, category: "Onboarding", message: "notification permission granted=\(granted)")
+                    }
                 }
                 .buttonStyle(.borderedProminent)
                 Button("Allow Calendar Access") {
-                    EKEventStore().requestFullAccessToEvents { _, _ in }
+                    EKEventStore().requestFullAccessToEvents { granted, error in
+                        if let error {
+                            FileLogger.shared.log(.error, category: "Onboarding", "calendar permission request failed: \(error)")
+                            DiagnosticsStore.shared.record(level: .error, category: "Onboarding", message: "calendar permission request failed: \(error.localizedDescription)")
+                            return
+                        }
+                        FileLogger.shared.log(.info, category: "Onboarding", "calendar permission granted=\(granted)")
+                        DiagnosticsStore.shared.record(level: .info, category: "Onboarding", message: "calendar permission granted=\(granted)")
+                    }
                 }
                 .buttonStyle(.bordered)
             }
