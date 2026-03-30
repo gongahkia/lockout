@@ -38,4 +38,27 @@ final class AgentDeveloperPresetsTests: XCTestCase {
         let sorted = settings.autoProfileRules.map(\.priority)
         XCTAssertEqual(sorted, sorted.sorted(by: >))
     }
+
+    func testOnboardingAgentPresetEquivalentActivatesSeededProfile() {
+        var settings = AppSettings.defaults
+        settings.activeRole = .developer
+
+        let result = AgentDeveloperPresets.bootstrap(into: &settings)
+        XCTAssertFalse(result.addedProfiles.isEmpty)
+
+        guard let firstProfileName = result.addedProfiles.first,
+              let profile = settings.profiles.first(where: { $0.name == firstProfileName }) else {
+            return XCTFail("Expected onboarding-equivalent bootstrap profile to exist")
+        }
+
+        settings.apply(profile: profile)
+        settings.activeProfileId = profile.id
+
+        XCTAssertEqual(settings.activeRole, .developer)
+        XCTAssertEqual(settings.activeProfileId, profile.id)
+        XCTAssertEqual(
+            settings.profiles.first(where: { $0.id == settings.activeProfileId })?.name,
+            firstProfileName
+        )
+    }
 }

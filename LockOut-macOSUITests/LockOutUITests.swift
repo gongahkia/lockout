@@ -21,12 +21,59 @@ final class LockOutUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Enable essential permissions"].waitForExistence(timeout: 5))
     }
 
+    func testOnboardingAgentDeveloperPresetPath() throws {
+        launch(arguments: ["--uitesting", "--reset-onboarding"])
+
+        XCTAssertTrue(app.staticTexts["Choose a working style"].waitForExistence(timeout: 5))
+        clickElement(accessibilityID: "onboarding.preset.agentDeveloper", fallbackLabel: "Agent Developer")
+        clickElement(accessibilityID: "onboarding.continue", fallbackLabel: "Continue")
+
+        XCTAssertTrue(app.staticTexts["Enable essential permissions"].waitForExistence(timeout: 5))
+    }
+
     func testSettingsScreenShowsSyncAndTransferSections() throws {
         launch()
         openSidebarItem(accessibilityID: "sidebar.settings", fallbackLabel: "Settings")
 
         XCTAssertTrue(waitForElement(accessibilityID: "settings.export", fallbackLabel: "Export Settings", timeout: 5).exists)
         XCTAssertTrue(waitForElement(accessibilityID: "settings.import", fallbackLabel: "Import Settings", timeout: 2).exists)
+    }
+
+    func testSettingsDiagnosticsPanelRefreshAndClearFlow() throws {
+        launch()
+        openSidebarItem(accessibilityID: "sidebar.settings", fallbackLabel: "Settings")
+
+        XCTAssertTrue(app.staticTexts["Recent events"].waitForExistence(timeout: 5))
+
+        let refreshButton = waitForElement(
+            accessibilityID: "Refresh Diagnostics",
+            fallbackLabel: "Refresh Diagnostics",
+            timeout: 5
+        )
+        XCTAssertTrue(refreshButton.exists)
+        activateApp()
+        refreshButton.click()
+
+        let clearButton = waitForElement(
+            accessibilityID: "Clear Diagnostics",
+            fallbackLabel: "Clear Diagnostics",
+            timeout: 5
+        )
+        XCTAssertTrue(clearButton.exists)
+        activateApp()
+        clearButton.click()
+
+        XCTAssertTrue(app.staticTexts["Recent events"].waitForExistence(timeout: 5))
+    }
+
+    func testProfileEditorBootstrapAgentPresetsFlow() throws {
+        launch()
+        openSidebarItem(accessibilityID: "sidebar.profiles", fallbackLabel: "Profiles")
+        clickElement(accessibilityID: "profiles.bootstrapAgentPresets", fallbackLabel: "Bootstrap Agent Presets")
+
+        let addedMessage = app.staticTexts.containing(NSPredicate(format: "label CONTAINS[c] %@", "Added")).firstMatch
+        let alreadyExistsMessage = app.staticTexts.containing(NSPredicate(format: "label CONTAINS[c] %@", "already exist")).firstMatch
+        XCTAssertTrue(addedMessage.waitForExistence(timeout: 5) || alreadyExistsMessage.waitForExistence(timeout: 2))
     }
 
     func testProfileEditorShowsFullRoutineControls() throws {
