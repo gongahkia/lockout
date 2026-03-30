@@ -361,6 +361,34 @@ struct SettingsView: View {
                     }
                 }
 
+                Section("Diagnostics") {
+                    LabeledContent("Recent events", value: "\(recentDiagnostics.count)")
+                    LabeledContent("Errors (last 200)", value: "\(diagnosticsCounts[.error, default: 0])")
+                    LabeledContent("Warnings (last 200)", value: "\(diagnosticsCounts[.warning, default: 0])")
+                    HStack {
+                        Button("Refresh Diagnostics") {
+                            syncRefresh.toggle()
+                        }
+                        Button("Clear Diagnostics") {
+                            DiagnosticsStore.shared.clear()
+                            syncRefresh.toggle()
+                        }
+                    }
+
+                    ForEach(Array(recentDiagnostics.prefix(8))) { event in
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("[\(event.level.rawValue.uppercased())] \(event.category)")
+                                .font(.caption.weight(.semibold))
+                            Text(event.message)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            Text(formatted(event.timestamp))
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                }
+
                 Section("Notifications") {
                     Toggle(
                         "Weekly compliance summary",
@@ -506,6 +534,14 @@ struct SettingsView: View {
         let lastSync = cloudSync.lastSyncDate
         if lastSync == .distantPast { return "Never" }
         return formatted(lastSync)
+    }
+
+    private var recentDiagnostics: [DiagnosticsEvent] {
+        DiagnosticsStore.shared.recentEvents(limit: 20).reversed()
+    }
+
+    private var diagnosticsCounts: [DiagnosticsLevel: Int] {
+        DiagnosticsStore.shared.countsByLevel(limit: 200)
     }
 
     @ViewBuilder private var availabilityToggles: some View {
