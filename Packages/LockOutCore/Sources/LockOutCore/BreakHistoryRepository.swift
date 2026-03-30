@@ -91,6 +91,12 @@ public final class BreakHistoryRepository {
     }
 
     private func fetchAllRecords() -> [BreakSessionRecord] {
-        (try? context.fetch(FetchDescriptor<BreakSessionRecord>())) ?? []
+        do {
+            return try context.fetch(FetchDescriptor<BreakSessionRecord>())
+        } catch {
+            Observability.emit(category: "BreakHistoryRepository", message: "fetchAllRecords failed: \(error)", level: .error)
+            logger.error("fetchAllRecords failed: \(String(describing: error), privacy: .public)")
+            return []
+        }
     }
 }
