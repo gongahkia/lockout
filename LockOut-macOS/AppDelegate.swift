@@ -288,10 +288,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     nonisolated static func scheduleNotification(_ request: UNNotificationRequest) {
         let logger = Self.logger
         UNUserNotificationCenter.current().getNotificationSettings { settings in
-            guard settings.authorizationStatus == .authorized else { return }
+            guard settings.authorizationStatus == .authorized else {
+                DiagnosticsStore.shared.record(
+                    level: .warning,
+                    category: "Notifications",
+                    message: "notification dropped: authorization status \(settings.authorizationStatus.rawValue)"
+                )
+                return
+            }
             UNUserNotificationCenter.current().add(request) { err in
                 if let err {
                     logger.error("notification scheduling failed: \(String(describing: err), privacy: .public)")
+                    DiagnosticsStore.shared.record(
+                        level: .error,
+                        category: "Notifications",
+                        message: "notification scheduling failed: \(err.localizedDescription)"
+                    )
                 }
             }
         }
@@ -307,6 +319,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     private func configureLogging() {
         let log = FileLogger.shared
+        let diagnostics = DiagnosticsStore.shared
         Observability.levelSink = { level, category, message in
             let mapped: FileLogger.Level
             switch level {
@@ -315,11 +328,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             case .warn: mapped = .warn
             case .error: mapped = .error
             }
+            diagnostics.record(level: DiagnosticsLevel(from: level), category: category, message: message)
             log.log(mapped, category: category, message)
         }
         log.log(.info, category: "AppDelegate", "applicationDidFinishLaunching started")
         log.log(.info, category: "AppDelegate", "bundle=\(Bundle.main.bundleIdentifier ?? "nil") version=\(AppVersion.current)")
-            log.log(.info, category: "AppDelegate", "logFile=\(log.logURL.path)")
+        log.log(.info, category: "AppDelegate", "logFile=\(log.logURL.path)")
     }
 
     private func configureUITestingDefaultsIfNeeded() {
@@ -690,7 +704,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         let category = UNNotificationCategory(identifier: "BREAK_REMINDER", actions: [startAction, snoozeAction], intentIdentifiers: [], options: [])
         UNUserNotificationCenter.current().setNotificationCategories([category])
         UNUserNotificationCenter.current().delegate = self
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
+            if let error {
+                FileLogger.shared.log(.error, category: "Notifications", "permission request failed: \(error)")
+                DiagnosticsStore.shared.record(
+                    level: .error,
+                    category: "Notifications",
+                    message: "permission request failed: \(error.localizedDescription)"
+                )
+                return
+            }
+            FileLogger.shared.log(.info, category: "Notifications", "permission status granted=\(granted)")
+            DiagnosticsStore.shared.record(
+                level: .info,
+                category: "Notifications",
+                message: "permission status granted=\(granted)"
+            )
+        }
     }
 
     private func presentAdHocBreak(type: BreakType, duration: Int) {
