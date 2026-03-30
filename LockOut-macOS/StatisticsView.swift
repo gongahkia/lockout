@@ -15,6 +15,7 @@ struct StatisticsView: View {
     let cloudSync: CloudKitSyncService
 
     @State private var range = 7
+    @State private var exportFailureMessage: String?
 
     private var stats: [DayStat] {
         repository.dailyStats(for: range)
@@ -171,6 +172,21 @@ struct StatisticsView: View {
         }
         .background(LockOutSceneBackground())
         .navigationTitle("Statistics")
+        .alert(
+            "Export Failed",
+            isPresented: Binding(
+                get: { exportFailureMessage != nil },
+                set: { showing in
+                    if !showing { exportFailureMessage = nil }
+                }
+            ),
+            actions: {
+                Button("OK", role: .cancel) {}
+            },
+            message: {
+                Text(exportFailureMessage ?? "Unknown export error.")
+            }
+        )
     }
 
     private var trendDetail: String {
@@ -244,7 +260,11 @@ struct StatisticsView: View {
             return row
         }
 
-        guard let data = try? JSONSerialization.data(withJSONObject: rows, options: .prettyPrinted) else {
+        let data: Data
+        do {
+            data = try JSONSerialization.data(withJSONObject: rows, options: .prettyPrinted)
+        } catch {
+            reportExportFailure("Failed to serialize JSON export.", error: error)
             return
         }
 
@@ -254,7 +274,11 @@ struct StatisticsView: View {
         guard panel.runModal() == .OK, let url = panel.url else {
             return
         }
-        try? data.write(to: url)
+        do {
+            try data.write(to: url)
+        } catch {
+            reportExportFailure("Failed to write JSON export to disk.", error: error)
+        }
     }
 
     private func exportCSV() {
@@ -294,7 +318,21 @@ struct StatisticsView: View {
             csv += row.map(CSVExport.escapedCell).joined(separator: ",") + "\n"
         }
 
-        try? csv.write(to: url, atomically: true, encoding: .utf8)
+        do {
+            try csv.write(to: url, atomically: true, encoding: .utf8)
+        } catch {
+            reportExportFailure("Failed to write CSV export to disk.", error: error)
+        }
+    }
+
+    private func reportExportFailure(_ message: String, error: Error) {
+        FileLogger.shared.log(.error, category: "StatisticsExport", "\(message) \(error)")
+        DiagnosticsStore.shared.record(
+            level: .error,
+            category: "StatisticsExport",
+            message: "\(message) \(error.localizedDescription)"
+        )
+        exportFailureMessage = "\(message)\n\(error.localizedDescription)"
     }
 }
 
