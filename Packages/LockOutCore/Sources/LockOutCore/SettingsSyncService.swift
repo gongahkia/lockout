@@ -98,10 +98,14 @@ public final class SettingsSyncService {
     public var lastSyncMetadata: SettingsSyncMetadata? {
         get {
             guard let data = UserDefaults.standard.data(forKey: Self.lastMetadataKey) else { return nil }
-            return try? JSONDecoder().decode(SettingsSyncMetadata.self, from: data)
+            return decode(SettingsSyncMetadata.self, from: data, context: "lastSyncMetadata")
         }
         set {
-            let data = newValue.flatMap { try? JSONEncoder().encode($0) }
+            guard let newValue else {
+                UserDefaults.standard.removeObject(forKey: Self.lastMetadataKey)
+                return
+            }
+            let data = encode(newValue, context: "lastSyncMetadata")
             UserDefaults.standard.set(data, forKey: Self.lastMetadataKey)
         }
     }
@@ -114,12 +118,13 @@ public final class SettingsSyncService {
     public var deviceRegistry: [SyncDeviceRecord] {
         get {
             guard let data = UserDefaults.standard.data(forKey: Self.deviceRegistryKey),
-                  let records = try? JSONDecoder().decode([SyncDeviceRecord].self, from: data) else { return [] }
+                  let records = decode([SyncDeviceRecord].self, from: data, context: "deviceRegistry") else { return [] }
             return records.sorted { $0.lastSeenAt > $1.lastSeenAt }
         }
         set {
             let sorted = newValue.sorted { $0.lastSeenAt > $1.lastSeenAt }
-            UserDefaults.standard.set(try? JSONEncoder().encode(sorted), forKey: Self.deviceRegistryKey)
+            guard let encoded = encode(sorted, context: "deviceRegistry") else { return }
+            UserDefaults.standard.set(encoded, forKey: Self.deviceRegistryKey)
         }
     }
 
@@ -169,11 +174,14 @@ public final class SettingsSyncService {
     public func pullEnvelope() -> SyncedSettingsEnvelope? {
         guard !isLocalOnlyEnabled else { return nil }
         guard let data = store.data(forKey: Self.key) else { return nil }
-        if let envelope = try? decodeEnvelope(from: data) {
+        do {
+            let envelope = try decodeEnvelope(from: data)
             updateDeviceRegistry(from: envelope.metadata, wroteSettings: true)
             return envelope
+        } catch {
+            Observability.emit(category: "SettingsSyncService", message: "pullEnvelope decode failed: \(error)", level: .error)
+            return nil
         }
-        return nil
     }
 
     public func observeChanges(handler: @escaping (AppSettings) -> Void) {
@@ -259,7 +267,9 @@ public final class SettingsSyncService {
             lastErrorMessage = nil
         }
         store.set(data, forKey: Self.key)
-        store.synchronize()
+        if !store.synchronize() {
+            Observability.emit(category: "SettingsSyncService", message: "iCloud key-value synchronize returned false", level: .warn)
+        }
         lastPushDate = envelope.metadata.updatedAt
         lastSyncMetadata = envelope.metadata
         updateDeviceRegistry(from: envelope.metadata, wroteSettings: true)
@@ -347,5 +357,23 @@ public final class SettingsSyncService {
             }
         }
         return rank(lhs) >= rank(rhs) ? lhs : rhs
+    }
+
+    private func decode<Value: Decodable>(_ type: Value.Type, from data: Data, context: String) -> Value? {
+        do {
+            return try JSONDecoder().decode(type, from: data)
+        } catch {
+            Observability.emit(category: "SettingsSyncService", message: "\(context) decode failed: \(error)", level: .error)
+            return nil
+        }
+    }
+
+    private func encode<Value: Encodable>(_ value: Value, context: String) -> Data? {
+        do {
+            return try JSONEncoder().encode(value)
+        } catch {
+            Observability.emit(category: "SettingsSyncService", message: "\(context) encode failed: \(error)", level: .error)
+            return nil
+        }
     }
 }
