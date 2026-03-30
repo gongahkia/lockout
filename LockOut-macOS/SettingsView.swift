@@ -11,6 +11,7 @@ struct SettingsView: View {
 
     @State private var isRecordingHotkey = false
     @State private var syncRefresh = false
+    @State private var transferFailureMessage: String?
 
     private var appDelegate: AppDelegate? { NSApp.delegate as? AppDelegate }
     private var managedSnapshot: ManagedSettingsSnapshot? { appDelegate?.managedSettings }
@@ -424,6 +425,21 @@ struct SettingsView: View {
         .navigationTitle("Settings")
         .id(syncRefresh)
         .accessibilityIdentifier("settings.view")
+        .alert(
+            "Settings Transfer Failed",
+            isPresented: Binding(
+                get: { transferFailureMessage != nil },
+                set: { showing in
+                    if !showing { transferFailureMessage = nil }
+                }
+            ),
+            actions: {
+                Button("OK", role: .cancel) {}
+            },
+            message: {
+                Text(transferFailureMessage ?? "Unknown transfer error.")
+            }
+        )
     }
 
     private var settingsOverviewCard: some View {
@@ -628,9 +644,19 @@ struct SettingsView: View {
     }
 
     private func stringifyJSONObject(_ object: Any) -> String? {
-        if JSONSerialization.isValidJSONObject(object),
-           let data = try? JSONSerialization.data(withJSONObject: object) {
-            return String(data: data, encoding: .utf8)
+        if JSONSerialization.isValidJSONObject(object) {
+            do {
+                let data = try JSONSerialization.data(withJSONObject: object)
+                return String(data: data, encoding: .utf8)
+            } catch {
+                FileLogger.shared.log(.error, category: "SettingsTransfer", "Failed to stringify JSON object: \(error)")
+                DiagnosticsStore.shared.record(
+                    level: .error,
+                    category: "SettingsTransfer",
+                    message: "Failed to stringify JSON object: \(error.localizedDescription)"
+                )
+                return nil
+            }
         }
         if let string = object as? String { return string }
         if let number = object as? NSNumber { return number.stringValue }
@@ -646,12 +672,22 @@ struct SettingsView: View {
             alert.addButton(withTitle: "Cancel")
             guard alert.runModal() == .alertFirstButtonReturn else { return }
         }
-        guard let data = try? JSONEncoder().encode(scheduler.currentSettings) else { return }
+        let data: Data
+        do {
+            data = try JSONEncoder().encode(scheduler.currentSettings)
+        } catch {
+            reportTransferFailure("Failed to encode settings for export.", error: error)
+            return
+        }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.json]
         panel.nameFieldStringValue = "lockout-settings.json"
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        try? data.write(to: url)
+        do {
+            try data.write(to: url)
+        } catch {
+            reportTransferFailure("Failed to write settings export.", error: error)
+        }
     }
 
     private func formatted(_ date: Date?) -> String {
@@ -880,9 +916,42 @@ struct SettingsView: View {
     }
 
     private func rawSettingsValue(for key: String, in settings: AppSettings) -> Any? {
-        guard let data = try? JSONEncoder().encode(settings),
-              let dict = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return nil }
+        guard let dict = rawSettingsDictionary(from: settings) else { return nil }
         return dict[key]
+    }
+
+    private func rawSettingsDictionary(from settings: AppSettings) -> [String: Any]? {
+        do {
+            let data = try JSONEncoder().encode(settings)
+            guard let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                FileLogger.shared.log(.error, category: "SettingsTransfer", "Encoded settings did not decode into dictionary")
+                DiagnosticsStore.shared.record(
+                    level: .error,
+                    category: "SettingsTransfer",
+                    message: "Encoded settings did not decode into dictionary"
+                )
+                return nil
+            }
+            return dict
+        } catch {
+            FileLogger.shared.log(.error, category: "SettingsTransfer", "Failed to inspect settings payload: \(error)")
+            DiagnosticsStore.shared.record(
+                level: .error,
+                category: "SettingsTransfer",
+                message: "Failed to inspect settings payload: \(error.localizedDescription)"
+            )
+            return nil
+        }
+    }
+
+    private func reportTransferFailure(_ message: String, error: Error) {
+        FileLogger.shared.log(.error, category: "SettingsTransfer", "\(message) \(error)")
+        DiagnosticsStore.shared.record(
+            level: .error,
+            category: "SettingsTransfer",
+            message: "\(message) \(error.localizedDescription)"
+        )
+        transferFailureMessage = "\(message)\n\(error.localizedDescription)"
     }
 
     private func breakConfigSummary(_ config: BreakConfig) -> String {
