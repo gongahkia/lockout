@@ -116,7 +116,7 @@ public enum ManagedSettingsResolver {
     private static func applyManagedValue(for key: ManagedSettingsKey, from defaults: UserDefaults, to settings: inout AppSettings) -> Bool {
         switch key {
         case .customBreakTypes:
-            guard let value: [CustomBreakType] = decodeManagedValue(defaults.object(forKey: key.rawValue)) else { return false }
+            guard let value: [CustomBreakType] = decodeManagedValue(defaults.object(forKey: key.rawValue), key: key) else { return false }
             settings.customBreakTypes = value
         case .snoozeDurationMinutes:
             guard let value = decodeInt(defaults.object(forKey: key.rawValue)) else { return false }
@@ -131,10 +131,10 @@ public enum ManagedSettingsResolver {
             guard let value = decodeBool(defaults.object(forKey: key.rawValue)) else { return false }
             settings.pauseDuringCalendarEvents = value
         case .calendarFilterMode:
-            guard let value: CalendarFilterMode = decodeManagedValue(defaults.object(forKey: key.rawValue)) else { return false }
+            guard let value: CalendarFilterMode = decodeManagedValue(defaults.object(forKey: key.rawValue), key: key) else { return false }
             settings.calendarFilterMode = value
         case .filteredCalendarIDs:
-            guard let value = defaults.stringArray(forKey: key.rawValue) ?? decodeManagedValue(defaults.object(forKey: key.rawValue)) as [String]? else { return false }
+            guard let value = defaults.stringArray(forKey: key.rawValue) ?? decodeManagedValue(defaults.object(forKey: key.rawValue), key: key) as [String]? else { return false }
             settings.filteredCalendarIDs = value
         case .workdayStartMinutes:
             settings.workdayStartMinutes = decodeInt(defaults.object(forKey: key.rawValue))
@@ -144,16 +144,16 @@ public enum ManagedSettingsResolver {
             guard let value = decodeInt(defaults.object(forKey: key.rawValue)) else { return false }
             settings.notificationLeadMinutes = value
         case .breakEnforcementMode:
-            guard let value: BreakEnforcementMode = decodeManagedValue(defaults.object(forKey: key.rawValue)) else { return false }
+            guard let value: BreakEnforcementMode = decodeManagedValue(defaults.object(forKey: key.rawValue), key: key) else { return false }
             settings.breakEnforcementMode = value
         case .blockedBundleIDs:
-            guard let value = defaults.stringArray(forKey: key.rawValue) ?? decodeManagedValue(defaults.object(forKey: key.rawValue)) as [String]? else { return false }
+            guard let value = defaults.stringArray(forKey: key.rawValue) ?? decodeManagedValue(defaults.object(forKey: key.rawValue), key: key) as [String]? else { return false }
             settings.blockedBundleIDs = value
         case .rolePolicies:
-            guard let value: [RolePolicy] = decodeManagedValue(defaults.object(forKey: key.rawValue)) else { return false }
+            guard let value: [RolePolicy] = decodeManagedValue(defaults.object(forKey: key.rawValue), key: key) else { return false }
             settings.rolePolicies = value
         case .activeRole:
-            guard let value: UserRole = decodeManagedValue(defaults.object(forKey: key.rawValue)) else { return false }
+            guard let value: UserRole = decodeManagedValue(defaults.object(forKey: key.rawValue), key: key) else { return false }
             settings.activeRole = value
         case .localOnlyMode:
             guard let value = decodeBool(defaults.object(forKey: key.rawValue)) else { return false }
@@ -182,24 +182,37 @@ public enum ManagedSettingsResolver {
         }
     }
 
-    private static func decodeManagedValue<Value: Decodable>(_ object: Any?) -> Value? {
+    private static func decodeManagedValue<Value: Decodable>(_ object: Any?, key: ManagedSettingsKey) -> Value? {
         guard let object else { return nil }
         if let data = object as? Data {
-            return try? JSONDecoder().decode(Value.self, from: data)
+            return decodeJSON(Value.self, from: data, key: key)
         }
         if JSONSerialization.isValidJSONObject(object),
            let data = try? JSONSerialization.data(withJSONObject: object) {
-            return try? JSONDecoder().decode(Value.self, from: data)
+            return decodeJSON(Value.self, from: data, key: key)
         }
         if let string = object as? String {
-            return try? JSONDecoder().decode(Value.self, from: Data("\"\(string)\"".utf8))
+            return decodeJSON(Value.self, from: Data("\"\(string)\"".utf8), key: key)
         }
         if let number = object as? NSNumber {
-            return try? JSONDecoder().decode(Value.self, from: Data(number.stringValue.utf8))
+            return decodeJSON(Value.self, from: Data(number.stringValue.utf8), key: key)
         }
         if let bool = object as? Bool {
-            return try? JSONDecoder().decode(Value.self, from: Data((bool ? "true" : "false").utf8))
+            return decodeJSON(Value.self, from: Data((bool ? "true" : "false").utf8), key: key)
         }
         return nil
+    }
+
+    private static func decodeJSON<Value: Decodable>(_ type: Value.Type, from data: Data, key: ManagedSettingsKey) -> Value? {
+        do {
+            return try JSONDecoder().decode(type, from: data)
+        } catch {
+            Observability.emit(
+                category: "ManagedSettingsResolver",
+                message: "managed value decode failed for \(key.rawValue): \(error)",
+                level: .warn
+            )
+            return nil
+        }
     }
 }
