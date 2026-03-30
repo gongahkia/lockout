@@ -537,7 +537,7 @@ struct SettingsView: View {
     }
 
     private var recentDiagnostics: [DiagnosticsEvent] {
-        DiagnosticsStore.shared.recentEvents(limit: 20).reversed()
+        Array(DiagnosticsStore.shared.recentEvents(limit: 20).reversed())
     }
 
     private var diagnosticsCounts: [DiagnosticsLevel: Int] {
