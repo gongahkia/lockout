@@ -32,21 +32,21 @@ struct BreakOverlayView: View {
     private var showSkipSnoozeButtons: Bool {
         switch enforcementMode {
         case .reminder: return true
-        case .soft_lock: return canBypass
-        case .hard_lock: return canBypass && emergencyEscapeAvailable
+        case .softLock: return canBypass
+        case .hardLock: return canBypass && emergencyEscapeAvailable
         }
     }
     private var controlsEnabled: Bool {
         switch enforcementMode {
         case .reminder: return canSkip && canBypass
-        case .soft_lock: return canSkip && canBypass
-        case .hard_lock: return emergencyEscapeAvailable && canBypass
+        case .softLock: return canSkip && canBypass
+        case .hardLock: return emergencyEscapeAvailable && canBypass
         }
     }
     private var showEmergencyExit: Bool {
         switch enforcementMode {
         case .reminder: return false
-        case .soft_lock, .hard_lock: return emergencyEscapeAvailable
+        case .softLock, .hardLock: return emergencyEscapeAvailable
         }
     }
     private var deferredOptions: [ManualDeferredOption] {
@@ -93,7 +93,7 @@ struct BreakOverlayView: View {
                 CountdownRing(
                     progress: 1.0 - Double(remaining) / Double(max(duration, 1)),
                     label: scheduler.currentCustomBreakType?.name ?? breakType.rawValue.capitalized,
-                    timeString: String(format: "%02d:%02d", remaining / 60, remaining % 60)
+                    timeString: LockOutFormatters.clockTime(minutes: remaining / 60, seconds: remaining % 60)
                 )
                 .frame(width: 140, height: 140)
                 Spacer()
@@ -211,9 +211,9 @@ struct BreakOverlayView: View {
             return "Bypass disabled. Emergency exit available in \(max(0, 30 - Int(elapsed)))s."
         }
         switch enforcementMode {
-        case .soft_lock:
+        case .softLock:
             return "Skip and snooze unlock in \(max(0, minDisplaySeconds - Int(elapsed)))s."
-        case .hard_lock:
+        case .hardLock:
             return "Skip and snooze unlock after the emergency timeout."
         case .reminder:
             return ""

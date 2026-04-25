@@ -36,7 +36,7 @@ struct DashboardView: View {
     private var timeString: String {
         let minutes = Int(remaining) / 60
         let seconds = Int(remaining) % 60
-        return String(format: "%02d:%02d", minutes, seconds)
+        return LockOutFormatters.clockTime(minutes: minutes, seconds: seconds)
     }
 
     private var progress: Double {
@@ -426,11 +426,11 @@ private struct DashboardRoutineToggle: View {
         }
         .padding(14)
         .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: LockOutLayout.cornerRadius)
                 .fill(.thinMaterial)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .strokeBorder(.white.opacity(0.55), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: LockOutLayout.cornerRadius)
+                        .strokeBorder(LockOutPalette.separator.opacity(0.35), lineWidth: 1)
                 )
         )
     }

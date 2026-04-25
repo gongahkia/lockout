@@ -18,9 +18,9 @@ private struct AppBootstrapView: View {
 
     var body: some View {
         Group {
-            if appDelegate.isReadyForUI {
+            if appDelegate.isReadyForUI, let repository = appDelegate.repository {
                 MainWindowView(
-                    repository: appDelegate.repository,
+                    repository: repository,
                     cloudSync: appDelegate.cloudSync
                 )
                 .environmentObject(appDelegate.scheduler)

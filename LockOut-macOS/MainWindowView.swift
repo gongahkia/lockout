@@ -54,7 +54,7 @@ struct MainWindowView: View {
 
     var body: some View {
         NavigationSplitView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 12) {
                 SidebarSummaryCard(
                     pauseStatus: scheduler.pauseStatusLabel,
                     profileName: activeProfileName,
@@ -68,16 +68,9 @@ struct MainWindowView: View {
                 }
                 .accessibilityIdentifier("sidebar.list")
                 .listStyle(.sidebar)
-                .scrollContentBackground(.hidden)
             }
-            .padding(18)
-            .background(
-                LinearGradient(
-                    colors: [Color.white.opacity(0.84), LockOutPalette.mist.opacity(0.92)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
+            .padding(.horizontal, 12)
+            .padding(.vertical, 14)
         } detail: {
             detailView(for: selected ?? .dashboard)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -128,12 +121,12 @@ private struct SidebarSummaryCard: View {
                 Image(systemName: "sparkles")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.white)
-                    .frame(width: 36, height: 36)
-                    .background(LockOutPalette.sky.gradient, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .frame(width: 32, height: 32)
+                    .background(LockOutPalette.sky, in: RoundedRectangle(cornerRadius: LockOutLayout.iconCornerRadius))
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("LockOut")
-                        .font(.system(size: 22, weight: .semibold, design: .rounded))
+                        .font(.headline)
 
                     Text("Menu bar recovery for long screen sessions")
                         .font(.caption)
@@ -153,11 +146,11 @@ private struct SidebarSummaryCard: View {
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: LockOutLayout.cornerRadius)
                 .fill(.regularMaterial)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .strokeBorder(.white.opacity(0.5), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: LockOutLayout.cornerRadius)
+                        .strokeBorder(LockOutPalette.separator.opacity(0.35), lineWidth: 1)
                 )
         )
     }
@@ -170,13 +163,12 @@ private struct SidebarRow: View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: item.icon)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(LockOutPalette.sky)
-                .frame(width: 30, height: 30)
-                .background(LockOutPalette.sky.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .foregroundStyle(.secondary)
+                .frame(width: 18)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.rawValue)
-                    .font(.headline)
+                    .lineLimit(1)
 
                 Text(item.subtitle)
                     .font(.caption)

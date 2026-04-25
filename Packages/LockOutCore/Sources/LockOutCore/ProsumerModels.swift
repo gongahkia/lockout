@@ -129,7 +129,11 @@ public enum ProfileTrigger: Equatable, Sendable {
     }
 
     private static func format(minutes: Int) -> String {
-        String(format: "%02d:%02d", minutes / 60, minutes % 60)
+        "\(twoDigit(minutes / 60)):\(twoDigit(minutes % 60))"
+    }
+
+    private static func twoDigit(_ value: Int) -> String {
+        value < 10 ? "0\(value)" : "\(value)"
     }
 }
 
@@ -474,7 +478,7 @@ public struct RecoveryModeConfig: Codable, Equatable, Sendable {
         skipThreshold: Int = 3,
         snoozeThreshold: Int = 5,
         lookbackDays: Int = 3,
-        temporaryEnforcementMode: BreakEnforcementMode = .soft_lock,
+        temporaryEnforcementMode: BreakEnforcementMode = .softLock,
         coachingCopy: String = "You are skipping or snoozing breaks frequently. Consider a stricter profile during heavy focus periods."
     ) {
         self.isEnabled = isEnabled

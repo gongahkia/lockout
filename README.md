@@ -3,7 +3,7 @@
 
 # `LockOut`
 
-[MacOS menu bar](https://support.apple.com/en-sg/guide/mac-help/mchlp1446/mac) app that fights [screen fatigue](https://my.clevelandclinic.org/health/diseases/24802-computer-vision-syndrome) with [scheduled breaks](#architecture).
+[macOS menu bar](https://support.apple.com/en-sg/guide/mac-help/mchlp1446/mac) app that fights [screen fatigue](https://my.clevelandclinic.org/health/diseases/24802-computer-vision-syndrome) with [scheduled breaks](#architecture).
 
 ## Stack
 
@@ -11,7 +11,7 @@
 * *Local persistence*: [SwiftData](https://developer.apple.com/documentation/swiftdata)
 * *Cloud*: [CloudKit](https://developer.apple.com/icloud/cloudkit/)
 * *Package* [Sparkle](https://www.thesparkleproject.org/), [XcodeGen](https://xcodegen.com/)
-* *CI/CD*: [Github Actions](https://github.com/features/actions)
+* *CI/CD*: [GitHub Actions](https://github.com/features/actions)
 
 ## Screenshots
 

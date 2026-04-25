@@ -15,8 +15,8 @@ public enum CalendarFilterMode: String, Codable, CaseIterable, Sendable {
 // MARK: - Break enforcement
 public enum BreakEnforcementMode: String, Codable, CaseIterable, Sendable {
     case reminder
-    case soft_lock
-    case hard_lock
+    case softLock = "soft_lock"
+    case hardLock = "hard_lock"
 }
 
 // MARK: - Pause reason
@@ -41,7 +41,7 @@ public enum PauseReason: String, Codable, CaseIterable, Hashable, Sendable {
 // MARK: - Role policy
 public enum UserRole: String, Codable, CaseIterable, Sendable {
     case developer
-    case it_managed
+    case itManaged = "it_managed"
     case health_conscious
 }
 
@@ -57,7 +57,7 @@ public struct RolePolicy: Codable, Equatable, Sendable {
     public static var defaults: [RolePolicy] {
         [
             RolePolicy(role: .developer, canBypassBreak: true),
-            RolePolicy(role: .it_managed, canBypassBreak: false),
+            RolePolicy(role: .itManaged, canBypassBreak: false),
             RolePolicy(role: .health_conscious, canBypassBreak: true),
         ]
     }

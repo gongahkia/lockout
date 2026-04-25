@@ -13,34 +13,24 @@ struct ManualDeferredOption: Identifiable {
     let condition: DeferredBreakCondition
 }
 
-enum LockOutSchemaV1: VersionedSchema {
-    static var versionIdentifier = Schema.Version(1, 0, 0)
-    static var models: [any PersistentModel.Type] { [BreakSessionRecord.self] }
-}
-
-enum LockOutSchemaMigrationPlan: SchemaMigrationPlan {
-    static var schemas: [any VersionedSchema.Type] { [LockOutSchemaV1.self] }
-    static var stages: [MigrationStage] { [] }
-}
-
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate, ObservableObject {
     nonisolated private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.lockout", category: "AppDelegate")
     private static let lastFireKey = "last_break_fire_date"
 
-    private(set) var scheduler: BreakScheduler!
-    private(set) var repository: BreakHistoryRepository!
-    private(set) var settingsSync: SettingsSyncService!
-    private(set) var cloudSync: CloudKitSyncService!
-    private(set) var updaterController: UpdaterController!
-    private(set) var insightsStore: BreakInsightsStore!
+    private(set) var scheduler = BreakScheduler()
+    private(set) var repository: BreakHistoryRepository?
+    private(set) var settingsSync = SettingsSyncService()
+    private(set) var cloudSync = CloudKitSyncService()
+    private(set) var updaterController = UpdaterController()
+    private(set) var insightsStore = BreakInsightsStore()
 
     @Published var syncError: String?
     @Published private(set) var isReadyForUI = false
     @Published private(set) var managedSettings: ManagedSettingsSnapshot?
     @Published private(set) var matchedAutoProfileRule: AutoProfileRule?
 
-    private var modelContainer: ModelContainer!
+    private var modelContainer: ModelContainer?
     var menuBarController: MenuBarController?
     var overlayController: BreakOverlayWindowController?
 
@@ -86,15 +76,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             return
         }
 
-        guard initializePersistence() else { return }
+        guard let modelContainer = initializePersistence() else { return }
 
-        repository = BreakHistoryRepository(modelContext: ModelContext(modelContainer))
-        settingsSync = SettingsSyncService()
-        cloudSync = CloudKitSyncService()
-        updaterController = UpdaterController()
-        insightsStore = BreakInsightsStore()
-        settingsSync.onError = { [weak self] msg in DispatchQueue.main.async { self?.syncError = msg } }
-        cloudSync.onError = { [weak self] msg in DispatchQueue.main.async { self?.syncError = msg } }
+        self.modelContainer = modelContainer
+        let repository = BreakHistoryRepository(modelContext: ModelContext(modelContainer))
+        self.repository = repository
+        settingsSync.onError = { [weak self] msg in
+            Task { @MainActor in self?.syncError = msg }
+        }
+        cloudSync.onError = { [weak self] msg in
+            Task { @MainActor in self?.syncError = msg }
+        }
 
         refreshManagedSettings()
         let localSettings = AppSettingsStore.load()
@@ -119,8 +111,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
 
         let retentionDays = resolvedSettings.historyRetentionDays
-        let repo = repository!
-        Task { @MainActor in repo.pruneOldRecords(retentionDays: retentionDays) }
+        Task { @MainActor in repository.pruneOldRecords(retentionDays: retentionDays) }
 
         applyLaunchOffset(settings: resolvedSettings)
         configureSettingsObservation(for: resolvedSettings)
@@ -147,7 +138,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             OnboardingWindowController.present(scheduler: scheduler)
         } else if !UserDefaults.standard.bool(forKey: "hasSeenMainWindow") {
             UserDefaults.standard.set(true, forKey: "hasSeenMainWindow")
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(500))
                 NSApp.setActivationPolicy(.regular)
                 NSApp.activate(ignoringOtherApps: true)
             }
@@ -214,7 +206,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 let flags = Int(event.flags.rawValue) & 0x00FF0000
                 if keyCode == hotkey.keyCode && flags == (hotkey.modifierFlags & 0x00FF0000) {
                     Task { @MainActor in
-                        delegate.scheduler.snooze(repository: delegate.repository, cloudSync: delegate.cloudSync)
+                        guard let repository = delegate.repository else { return }
+                        delegate.scheduler.snooze(repository: repository, cloudSync: delegate.cloudSync)
                     }
                     return nil
                 }
@@ -277,7 +270,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 }
             case "SNOOZE_BREAK":
                 let mins = self.scheduler.currentCustomBreakType?.snoozeMinutes ?? self.scheduler.currentSettings.snoozeDurationMinutes
-                self.scheduler.snooze(minutes: mins, repository: self.repository, cloudSync: self.cloudSync)
+                guard let repository = self.repository else { return }
+                self.scheduler.snooze(minutes: mins, repository: repository, cloudSync: self.cloudSync)
             default:
                 break
             }
@@ -357,16 +351,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         NSApp.terminate(nil)
     }
 
-    private func initializePersistence() -> Bool {
-        let isUITesting = CommandLine.arguments.contains("--uitesting")
+    private func initializePersistence() -> ModelContainer? {
         do {
-            let config = isUITesting ? ModelConfiguration(isStoredInMemoryOnly: true) : ModelConfiguration()
-            modelContainer = try ModelContainer(
-                for: BreakSessionRecord.self,
-                migrationPlan: LockOutSchemaMigrationPlan.self,
-                configurations: config
-            )
-            return true
+            return try LockOutPersistenceController.makeContainer(isUITesting: isUITesting)
         } catch {
             FileLogger.shared.log(.error, category: "AppDelegate", "SwiftData init failed: \(error)")
             let alert = NSAlert()
@@ -376,7 +363,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             alert.addButton(withTitle: "Quit")
             alert.runModal()
             NSApp.terminate(nil)
-            return false
+            return nil
         }
     }
 
@@ -532,6 +519,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     private func fireWeeklyComplianceNotification() {
+        guard let repository else { return }
         let stats = repository.dailyStats(for: 7)
         let rate = Int(ComplianceCalculator.overallRate(stats: stats) * 100)
         let content = UNMutableNotificationContent()
@@ -740,7 +728,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     private func attemptBreakPresentation(customType: CustomBreakType, context: ScheduledBreakContext) {
-        guard let overlayController else { return }
+        guard let overlayController, let repository else { return }
         let frontmostBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
         let isFullscreen = SystemStateService.frontmostAppIsFullscreen()
         let enrichedContext = context.withInsightMetadata(
@@ -822,7 +810,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     func deferCurrentBreak(_ condition: DeferredBreakCondition) {
-        guard let context = scheduler.breakContextForPresentation() else { return }
+        guard let context = scheduler.breakContextForPresentation(), let repository else { return }
         scheduler.registerDeferredBreak(context, condition: condition, repository: repository, cloudSync: cloudSync)
         overlayController?.dismiss()
         refreshDeferredRetryTimer()
@@ -854,6 +842,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     func insightCards(range: Int) -> [InsightCard] {
+        guard let repository else { return [] }
         let dailyStats = repository.dailyStats(for: range)
         let sessions = repository.recentSessions(for: range)
         let analytics = repository.analyticsSnapshot(for: range, insightsStore: insightsStore)

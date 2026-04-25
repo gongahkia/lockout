@@ -46,7 +46,7 @@ public enum AgentDeveloperPreset: String, CaseIterable, Codable, Sendable {
                 workdayStartMinutes: 9 * 60,
                 workdayEndMinutes: 19 * 60,
                 notificationLeadMinutes: 1,
-                breakEnforcementMode: .soft_lock,
+                breakEnforcementMode: .softLock,
                 snoozeDurationMinutes: 3
             )
         case .evalRuns:

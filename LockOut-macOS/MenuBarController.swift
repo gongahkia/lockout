@@ -14,7 +14,7 @@ final class MenuBarController {
     private var countdownItem: NSMenuItem!
     private var upcomingItem: NSMenuItem! // #22
     private var tickCount = 0
-    private var appSwitchDebounceWork: DispatchWorkItem?
+    private var appSwitchDebounceTask: Task<Void, Never>?
     private var breakSubmenu: NSMenu?
     private var profileSubmenu: NSMenu?
     private var inspectorSubmenu: NSMenu?
@@ -41,7 +41,7 @@ final class MenuBarController {
         self.showBreak = showBreak
         setup()
         scheduler.objectWillChange.sink { [weak self] in
-            DispatchQueue.main.async {
+            Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.updateIcon()
                 if let breakSubmenu = self.breakSubmenu {
@@ -62,10 +62,12 @@ final class MenuBarController {
     }
 
     @objc private func appSwitched() {
-        appSwitchDebounceWork?.cancel()
-        let work = DispatchWorkItem { [weak self] in self?.updateOverdue() }
-        appSwitchDebounceWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1, execute: work)
+        appSwitchDebounceTask?.cancel()
+        appSwitchDebounceTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(100))
+            guard !Task.isCancelled else { return }
+            self?.updateOverdue()
+        }
     }
 
     private func setup() {
@@ -177,7 +179,7 @@ final class MenuBarController {
             let mins = Int(remaining) / 60
             let secs = Int(remaining) % 60
             let breakName = scheduler.currentCustomBreakType?.name ?? "Break"
-            countdownItem.title = "Next \(breakName) in \(String(format: "%d:%02d", mins, secs))"
+            countdownItem.title = "Next \(breakName) in \(LockOutFormatters.clockTime(minutes: mins, seconds: secs))"
         } else {
             countdownItem.title = "No breaks scheduled"
         }
@@ -290,7 +292,8 @@ final class MenuBarController {
         NSApp.activate(ignoringOtherApps: true)
         NSApp.windows.first(where: { $0.title == "LockOut" })?.makeKeyAndOrderFront(nil)
         if priorPolicy == .accessory {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(100))
                 NSApp.setActivationPolicy(.accessory)
             }
         }
@@ -377,6 +380,8 @@ final class MenuBarController {
         midnightTimer = nil
         manualResumeTimer?.invalidate()
         manualResumeTimer = nil
+        appSwitchDebounceTask?.cancel()
+        appSwitchDebounceTask = nil
         cancellables.removeAll()
     }
 }

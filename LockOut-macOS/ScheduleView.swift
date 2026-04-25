@@ -209,11 +209,11 @@ private struct ScheduleBreakTypeRow: View {
         }
         .padding(16)
         .background(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: LockOutLayout.cornerRadius)
                 .fill(.thinMaterial)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .strokeBorder(.white.opacity(0.6), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: LockOutLayout.cornerRadius)
+                        .strokeBorder(LockOutPalette.separator.opacity(0.35), lineWidth: 1)
                 )
         )
     }

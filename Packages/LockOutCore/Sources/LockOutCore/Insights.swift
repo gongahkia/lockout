@@ -214,7 +214,7 @@ public enum InsightsEngine {
     }
 
     private static func format(hour: Int) -> String {
-        String(format: "%02d:00", hour)
+        "\(hour < 10 ? "0\(hour)" : "\(hour)"):00"
     }
 
     private static func groupByDaypart(_ sessions: [BreakSession], calendar: Calendar = .current) -> [String: Double] {

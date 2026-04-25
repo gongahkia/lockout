@@ -54,7 +54,7 @@ public struct SyncedSettingsEnvelope: Codable, Equatable, Sendable {
 public final class SettingsSyncService {
     private let store = NSUbiquitousKeyValueStore.default
     nonisolated private static let key = "app_settings"
-    nonisolated private static let pushDebounceSeconds: TimeInterval = 0.4
+    nonisolated private static let pushDebounceDuration: Duration = .milliseconds(400)
     nonisolated private static let lastPushKey = "settings_last_push_date"
     nonisolated private static let lastPullKey = "settings_last_pull_date"
     nonisolated private static let lastMetadataKey = "settings_last_sync_metadata"
@@ -64,7 +64,7 @@ public final class SettingsSyncService {
     nonisolated private static let kvStoreWarnThreshold = 900_000
 
     private var observer: NSObjectProtocol?
-    private var pendingPushWorkItem: DispatchWorkItem?
+    private var pendingPushTask: Task<Void, Never>?
     private var externalChangeHandler: ((AppSettings) -> Void)?
 
     public var onCloudPush: ((AppSettings) -> Void)?
@@ -140,17 +140,17 @@ public final class SettingsSyncService {
     public func push(_ settings: AppSettings) {
         AppSettingsStore.save(settings)
         guard !settings.localOnlyMode else {
-            pendingPushWorkItem?.cancel()
-            pendingPushWorkItem = nil
+            pendingPushTask?.cancel()
+            pendingPushTask = nil
             return
         }
-        pendingPushWorkItem?.cancel()
+        pendingPushTask?.cancel()
         let toPush = settings
-        let workItem = DispatchWorkItem { [weak self] in
+        pendingPushTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: Self.pushDebounceDuration)
+            guard !Task.isCancelled else { return }
             self?.commitCloudPush(toPush)
         }
-        pendingPushWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.pushDebounceSeconds, execute: workItem)
     }
 
     public func pull() -> AppSettings? {
@@ -355,8 +355,8 @@ public final class SettingsSyncService {
         func rank(_ mode: BreakEnforcementMode) -> Int {
             switch mode {
             case .reminder: return 0
-            case .soft_lock: return 1
-            case .hard_lock: return 2
+            case .softLock: return 1
+            case .hardLock: return 2
             }
         }
         return rank(lhs) >= rank(rhs) ? lhs : rhs

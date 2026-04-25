@@ -408,14 +408,14 @@ final class SettingsSyncServiceTests: PersistentStateTestCase {
     func testPushPersistsMutatedSettingsLocally() {
         let svc = SettingsSyncService()
         var settings = AppSettings.defaults
-        settings.activeRole = .it_managed
-        settings.breakEnforcementMode = .hard_lock
+        settings.activeRole = .itManaged
+        settings.breakEnforcementMode = .hardLock
         settings.localOnlyMode = false
         svc.push(settings)
 
         let loaded = AppSettingsStore.load()
-        XCTAssertEqual(loaded?.activeRole, .it_managed)
-        XCTAssertEqual(loaded?.breakEnforcementMode, .hard_lock)
+        XCTAssertEqual(loaded?.activeRole, .itManaged)
+        XCTAssertEqual(loaded?.breakEnforcementMode, .hardLock)
     }
 
     func testPushDebouncesCloudCommitAndUsesLatestSettings() async {
@@ -447,7 +447,7 @@ final class SettingsSyncServiceTests: PersistentStateTestCase {
         local.localOnlyMode = true
         local.isPaused = true
         local.pauseDuringFocus = true
-        local.breakEnforcementMode = .hard_lock
+        local.breakEnforcementMode = .hardLock
         local.blockedBundleIDs = ["com.local.blocked"]
 
         var remote = AppSettings.defaults
@@ -461,7 +461,7 @@ final class SettingsSyncServiceTests: PersistentStateTestCase {
         XCTAssertTrue(merged.localOnlyMode)
         XCTAssertTrue(merged.isPaused)
         XCTAssertTrue(merged.pauseDuringFocus)
-        XCTAssertEqual(merged.breakEnforcementMode, .hard_lock)
+        XCTAssertEqual(merged.breakEnforcementMode, .hardLock)
         XCTAssertEqual(Set(merged.blockedBundleIDs), Set(["com.local.blocked", "com.remote.blocked"]))
     }
 }
@@ -757,7 +757,7 @@ final class ManagedSettingsResolverTests: XCTestCase {
 
         var managed = AppSettings.defaults
         managed.pauseDuringFocus = true
-        managed.breakEnforcementMode = .hard_lock
+        managed.breakEnforcementMode = .hardLock
 
         let snapshot = ManagedSettingsSnapshot(
             settings: managed,
@@ -766,7 +766,7 @@ final class ManagedSettingsResolverTests: XCTestCase {
 
         let resolved = ManagedSettingsResolver.apply(snapshot, to: local)
         XCTAssertTrue(resolved.pauseDuringFocus)
-        XCTAssertEqual(resolved.breakEnforcementMode, .hard_lock)
+        XCTAssertEqual(resolved.breakEnforcementMode, .hardLock)
         XCTAssertEqual(resolved.snoozeDurationMinutes, local.snoozeDurationMinutes)
     }
 
@@ -918,7 +918,7 @@ final class ProfileSnapshotTests: XCTestCase {
         settings.workdayStartMinutes = 540
         settings.workdayEndMinutes = 1020
         settings.notificationLeadMinutes = 3
-        settings.breakEnforcementMode = .soft_lock
+        settings.breakEnforcementMode = .softLock
         settings.snoozeDurationMinutes = 7
 
         let profile = settings.profileSnapshot(name: "Workday")

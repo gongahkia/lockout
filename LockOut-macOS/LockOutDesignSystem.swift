@@ -1,5 +1,5 @@
-import SwiftUI
 import LockOutCore
+import SwiftUI
 
 enum LockOutPalette {
     static let sky = Color(red: 0.23, green: 0.48, blue: 0.91)
@@ -8,40 +8,18 @@ enum LockOutPalette {
     static let coral = Color(red: 0.86, green: 0.36, blue: 0.39)
     static let slate = Color(red: 0.21, green: 0.25, blue: 0.34)
     static let mist = Color(red: 0.96, green: 0.98, blue: 1.0)
+    static let separator = Color(nsColor: .separatorColor)
+}
+
+enum LockOutLayout {
+    static let cornerRadius: CGFloat = 8
+    static let iconCornerRadius: CGFloat = 6
 }
 
 struct LockOutSceneBackground: View {
     var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: [
-                    LockOutPalette.mist,
-                    Color.white,
-                    Color(red: 0.98, green: 0.98, blue: 0.97),
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-
-            Circle()
-                .fill(LockOutPalette.sky.opacity(0.10))
-                .frame(width: 420, height: 420)
-                .blur(radius: 24)
-                .offset(x: 280, y: -210)
-
-            Circle()
-                .fill(LockOutPalette.mint.opacity(0.12))
-                .frame(width: 360, height: 360)
-                .blur(radius: 18)
-                .offset(x: -280, y: 260)
-
-            Circle()
-                .fill(LockOutPalette.amber.opacity(0.08))
-                .frame(width: 300, height: 300)
-                .blur(radius: 24)
-                .offset(x: -180, y: -220)
-        }
-        .ignoresSafeArea()
+        Color(nsColor: .windowBackgroundColor)
+            .ignoresSafeArea()
     }
 }
 
@@ -76,7 +54,7 @@ struct LockOutCard<Content: View>: View {
                                 .font(.system(size: 13, weight: .semibold))
                                 .foregroundStyle(accent)
                                 .frame(width: 28, height: 28)
-                                .background(accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                .background(accent.opacity(0.12), in: RoundedRectangle(cornerRadius: LockOutLayout.iconCornerRadius))
                         }
 
                         if let title {
@@ -100,14 +78,13 @@ struct LockOutCard<Content: View>: View {
         }
         .padding(20)
         .background(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
+            RoundedRectangle(cornerRadius: LockOutLayout.cornerRadius)
                 .fill(.regularMaterial)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .strokeBorder(.white.opacity(0.55), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: LockOutLayout.cornerRadius)
+                        .strokeBorder(LockOutPalette.separator.opacity(0.35), lineWidth: 1)
                 )
         )
-        .shadow(color: .black.opacity(0.05), radius: 18, y: 10)
     }
 }
 
@@ -130,12 +107,12 @@ struct LockOutScreenHeader: View {
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(width: 44, height: 44)
-                .background(accent.gradient, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .background(accent, in: RoundedRectangle(cornerRadius: LockOutLayout.iconCornerRadius))
 
             VStack(alignment: .leading, spacing: 6) {
                 Text(title)
-                    .font(.system(size: 30, weight: .semibold, design: .rounded))
-                    .foregroundStyle(LockOutPalette.slate)
+                    .font(.title)
+                    .foregroundStyle(.primary)
 
                 Text(subtitle)
                     .font(.subheadline)
@@ -164,7 +141,7 @@ struct LockOutMetricTile: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Capsule()
-                .fill(accent.gradient)
+                .fill(accent)
                 .frame(width: 42, height: 6)
 
             Text(value)
@@ -185,10 +162,10 @@ struct LockOutMetricTile: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(18)
         .background(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: LockOutLayout.cornerRadius)
                 .fill(.thinMaterial)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    RoundedRectangle(cornerRadius: LockOutLayout.cornerRadius)
                         .strokeBorder(accent.opacity(0.18), lineWidth: 1)
                 )
         )
@@ -265,7 +242,7 @@ struct LockOutEmptyState: View {
                 .font(.system(size: 30, weight: .medium))
                 .foregroundStyle(accent)
                 .frame(width: 62, height: 62)
-                .background(accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .background(accent.opacity(0.12), in: RoundedRectangle(cornerRadius: LockOutLayout.cornerRadius))
 
             Text(title)
                 .font(.headline)
@@ -294,7 +271,7 @@ struct LockOutKeyValueRow: View {
 
             Text(value)
                 .multilineTextAlignment(.trailing)
-                .foregroundStyle(LockOutPalette.slate)
+                .foregroundStyle(.primary)
         }
         .font(.subheadline)
     }
@@ -325,10 +302,10 @@ struct LockOutInsightRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
         .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: LockOutLayout.cornerRadius)
                 .fill(accent.opacity(0.08))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    RoundedRectangle(cornerRadius: LockOutLayout.cornerRadius)
                         .strokeBorder(accent.opacity(0.12), lineWidth: 1)
                 )
         )

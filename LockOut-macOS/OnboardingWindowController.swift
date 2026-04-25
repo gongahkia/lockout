@@ -90,7 +90,7 @@ private enum OnboardingPreset: String, CaseIterable, Identifiable {
                 CustomBreakType(name: "Micro Break", intervalMinutes: 35, durationSeconds: 60, minDisplaySeconds: 20, tips: ["Drop your shoulders and loosen your grip"], overlayOpacity: 0.9, snoozeMinutes: 3),
                 CustomBreakType(name: "Long Break", intervalMinutes: 75, durationSeconds: 600, minDisplaySeconds: 30, tips: ["Stand up, stretch, and step away"], overlayOpacity: 0.95, snoozeMinutes: 5),
             ]
-            updated.breakEnforcementMode = .hard_lock
+            updated.breakEnforcementMode = .hardLock
             updated.notificationLeadMinutes = 1
             updated.snoozeDurationMinutes = 3
             updated.pauseDuringFocus = false
@@ -120,16 +120,16 @@ private enum OnboardingPreset: String, CaseIterable, Identifiable {
             updated.workdayStartMinutes = 8 * 60 + 30
             updated.workdayEndMinutes = 18 * 60
             updated.notificationLeadMinutes = 2
-            updated.breakEnforcementMode = .soft_lock
+            updated.breakEnforcementMode = .softLock
             updated.localOnlyMode = false
         case .managedTeam:
-            updated.activeRole = .it_managed
+            updated.activeRole = .itManaged
             updated.pauseDuringCalendarEvents = true
             updated.pauseDuringFocus = true
             updated.workdayStartMinutes = 9 * 60
             updated.workdayEndMinutes = 17 * 60
             updated.notificationLeadMinutes = 2
-            updated.breakEnforcementMode = .soft_lock
+            updated.breakEnforcementMode = .softLock
             updated.snoozeDurationMinutes = 5
         }
         return updated

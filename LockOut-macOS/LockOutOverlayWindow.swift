@@ -16,9 +16,9 @@ final class LockOutOverlayWindow: NSWindow {
         switch enforcementMode {
         case .reminder:
             onEscape?()
-        case .soft_lock:
+        case .softLock:
             if elapsed >= Self.emergencyEscapeSeconds { onEscape?() } // allow after timeout
-        case .hard_lock:
+        case .hardLock:
             if elapsed >= Self.emergencyEscapeSeconds { onEscape?() } // emergency escape
         }
     }
